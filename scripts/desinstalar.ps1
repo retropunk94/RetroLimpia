@@ -1,8 +1,9 @@
 ﻿# Desinstala un programa intentando primero el modo silencioso (sin ventanas).
 # Si el programa no lo permite, abre su desinstalador normal como último recurso.
-param([string]$P)
+# Ojo: PowerShell no distingue mayúsculas ($P y $p serían la misma variable)
+param([Alias('P')][string]$EntradaB64)
 . "$PSScriptRoot\common.ps1"
-$p = Read-Params $P
+$p = Read-Params $EntradaB64
 
 function Test-Gone {
     param([string]$KeyName)

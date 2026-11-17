@@ -4,11 +4,17 @@
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const GB = 1024 ** 3, MB = 1024 ** 2;
 
+let token = 0;
+function cancel() { token++; }
 async function steps(onProgress, msgs, total = 1200) {
-  for (let i = 0; i < msgs.length; i++) {
-    onProgress({ pct: Math.round(((i + 1) / msgs.length) * 100), msg: msgs[i], en: msgs[i] });
-    await wait(total / msgs.length);
+  const my = token;
+  const n = Math.max(msgs.length, 6);
+  for (let i = 0; i < n; i++) {
+    if (my !== token) throw new Error('CANCELADO');
+    onProgress({ pct: Math.round(((i + 1) / n) * 100), msg: msgs[Math.min(i, msgs.length - 1)], en: msgs[Math.min(i, msgs.length - 1)] });
+    await wait(total / n);
   }
+  if (my !== token) throw new Error('CANCELADO');
 }
 
 const programas = [
@@ -138,4 +144,4 @@ async function run(script, p, onProgress) {
   return {};
 }
 
-module.exports = { run };
+module.exports = { run, cancel };

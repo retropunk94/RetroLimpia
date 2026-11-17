@@ -54,14 +54,23 @@ function run(script, params = {}, onProgress = () => {}) {
     child.on('close', (code) => {
       running.delete(child);
       if (buffer.startsWith('@@RESULT ')) { try { result = JSON.parse(buffer.slice(9)); } catch { /* nada */ } }
+      if (child.cancelado) return reject(new Error('CANCELADO'));
       if (result) resolve(result);
       else reject(new Error(`El motor terminó sin respuesta (código ${code}). ${errText.slice(0, 600)}`));
     });
   });
 }
 
+// Detiene todo lo que esté en marcha, incluidos los procesos que lanzó cada script.
 function cancelAll() {
-  for (const c of running) { try { c.kill(); } catch { /* ya cerrado */ } }
+  if (cfg.demo) { demo.cancel && demo.cancel(); return true; }
+  for (const c of running) {
+    c.cancelado = true;
+    try {
+      if (process.platform === 'win32') execFile('taskkill', ['/PID', String(c.pid), '/T', '/F'], { windowsHide: true }, () => {});
+      else c.kill();
+    } catch { /* ya cerrado */ }
+  }
   running.clear();
   return true;
 }

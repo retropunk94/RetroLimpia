@@ -1,8 +1,9 @@
 ﻿# Revisa los drivers instalados y los dispositivos con problemas.
 # Acciones: revisar, respaldar
-param([string]$P)
+# Ojo: PowerShell no distingue mayúsculas ($P y $p serían la misma variable)
+param([Alias('P')][string]$EntradaB64)
 . "$PSScriptRoot\common.ps1"
-$p = Read-Params $P
+$p = Read-Params $EntradaB64
 
 if ($p.accion -eq 'respaldar') {
     Send-Progress 10 'Haciendo copia de tus drivers actuales (puede tardar unos minutos)...' 'Backing up your current drivers (may take a few minutes)...'

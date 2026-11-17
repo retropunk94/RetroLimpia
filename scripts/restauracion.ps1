@@ -1,8 +1,9 @@
 ﻿# Puntos de restauración de Windows: la red de seguridad antes de cualquier cambio.
 # Acciones: crear, listar, abrir
-param([string]$P)
+# Ojo: PowerShell no distingue mayúsculas ($P y $p serían la misma variable)
+param([Alias('P')][string]$EntradaB64)
 . "$PSScriptRoot\common.ps1"
-$p = Read-Params $P
+$p = Read-Params $EntradaB64
 
 switch ($p.accion) {
     'crear' {

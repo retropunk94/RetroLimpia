@@ -1,9 +1,10 @@
 ﻿# Limpieza de archivos basura. Solo toca cachés y temporales: nunca tus documentos,
 # fotos, contraseñas ni historial del navegador.
 # Acciones: analizar, limpiar
-param([string]$P)
+# Ojo: PowerShell no distingue mayúsculas ($P y $p serían la misma variable)
+param([Alias('P')][string]$EntradaB64)
 . "$PSScriptRoot\common.ps1"
-$p = Read-Params $P
+$p = Read-Params $EntradaB64
 
 function Get-BrowserCacheDirs {
     $dirs = @()
@@ -79,7 +80,7 @@ switch ($p.accion) {
             Send-Progress ([int](100 * $i / $categories.Count)) 'Midiendo archivos basura...' 'Measuring junk files...'
             $out.Add(@{ id = $k; tamano = (Get-CategorySize $categories[$k] $k); color = $categories[$k].color })
         }
-        Send-Result @{ categorias = @($out) }
+        Send-Result @{ categorias = $out.ToArray() }
     }
     'limpiar' {
         $sel = @($p.categorias)

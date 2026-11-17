@@ -1,9 +1,10 @@
 ﻿# Programas que arrancan con Windows. Usa el mismo interruptor que el Administrador
 # de tareas, así que todo es reversible y nada se borra.
 # Acciones: listar, cambiar
-param([string]$P)
+# Ojo: PowerShell no distingue mayúsculas ($P y $p serían la misma variable)
+param([Alias('P')][string]$EntradaB64)
 . "$PSScriptRoot\common.ps1"
-$p = Read-Params $P
+$p = Read-Params $EntradaB64
 
 $approvedBase = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved'
 $sources = @(
@@ -40,7 +41,7 @@ switch ($p.accion) {
                 }
             }
         }
-        Send-Result @{ elementos = @($items) }
+        Send-Result @{ elementos = $items.ToArray() }
     }
     'cambiar' {
         $parts = ([string]$p.id) -split '\|', 2

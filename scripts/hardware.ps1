@@ -1,7 +1,8 @@
 ﻿# Lee el hardware del PC y la salud de los discos.
-param([string]$P)
+# Ojo: PowerShell no distingue mayúsculas ($P y $p serían la misma variable)
+param([Alias('P')][string]$EntradaB64)
 . "$PSScriptRoot\common.ps1"
-$p = Read-Params $P
+$p = Read-Params $EntradaB64
 
 Send-Progress 5 'Leyendo el procesador y la memoria...' 'Reading CPU and memory...'
 $cpu = Get-CimInstance Win32_Processor -ErrorAction SilentlyContinue | Select-Object -First 1

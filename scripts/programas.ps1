@@ -1,7 +1,8 @@
 ﻿# Lista los programas instalados (clásicos y de Microsoft Store).
-param([string]$P)
+# Ojo: PowerShell no distingue mayúsculas ($P y $p serían la misma variable)
+param([Alias('P')][string]$EntradaB64)
 . "$PSScriptRoot\common.ps1"
-$params = Read-Params $P
+$params = Read-Params $EntradaB64
 
 Send-Progress 5 'Buscando programas instalados...' 'Looking for installed programs...'
 
@@ -82,4 +83,4 @@ try {
 }
 
 Send-Progress 100 'Listo' 'Done'
-Send-Result @{ programas = @($programs); apps = @($apps) }
+Send-Result @{ programas = $programs.ToArray(); apps = $apps.ToArray() }

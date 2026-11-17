@@ -1,9 +1,10 @@
 ﻿# Cuarentena: en vez de borrar, RetroLimpia mueve los restos aquí durante unos días.
 # Si algo deja de funcionar, se pueden restaurar con un clic. Después se borran solos.
 # Acciones: mover, listar, restaurar, purgar
-param([string]$P)
+# Ojo: PowerShell no distingue mayúsculas ($P y $p serían la misma variable)
+param([Alias('P')][string]$EntradaB64)
 . "$PSScriptRoot\common.ps1"
-$p = Read-Params $P
+$p = Read-Params $EntradaB64
 $root = Get-RLFolder 'Cuarentena'
 
 function Move-Safe {
@@ -52,10 +53,10 @@ switch ($p.accion) {
                 } else { $failed.Add(@{ ruta = $it.ruta; error = 'En uso o sin permiso' }) }
             }
         }
-        $manifest = @{ id = $id; fecha = (Get-Date).ToString('o'); motivo = [string]$p.motivo; items = @($saved) }
+        $manifest = @{ id = $id; fecha = (Get-Date).ToString('o'); motivo = [string]$p.motivo; items = $saved.ToArray() }
         $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $dir 'manifest.json') -Encoding UTF8
         Write-RLLog ('Cuarentena ' + $id + ': ' + $saved.Count + ' guardados, ' + $failed.Count + ' fallidos')
-        Send-Result @{ id = $id; guardados = $saved.Count; fallidos = @($failed); bytes = ($saved | Measure-Object -Property tamano -Sum).Sum }
+        Send-Result @{ id = $id; guardados = $saved.Count; fallidos = $failed.ToArray(); bytes = ($saved | Measure-Object -Property tamano -Sum).Sum }
     }
     'listar' {
         $list = New-Object System.Collections.Generic.List[object]

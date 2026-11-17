@@ -108,34 +108,72 @@ function toast(msg, type = 'ok') {
 }
 function setStatus(t) { $('#titlebarStatus').textContent = t || ''; }
 
-async function task(label, fn) {
-  if (S.busy) { toast(L('Espera a que termine la tarea actual.', 'Wait for the current task to finish.'), 'err'); return; }
-  S.busy = { label, pct: 0, msg: '' };
+// Tareas: solo una a la vez. Las de solo lectura se cancelan al instante;
+// las que cambian el sistema se detienen al terminar el paso en curso (nunca a medias).
+async function task(label, fn, opts = {}) {
+  if (S.busy) { toast(L('Espera a que termine la tarea actual o cancélala.', 'Wait for the current task to finish or cancel it.'), 'err'); return; }
+  S.cancelRequested = false;
+  S.busy = { label, pct: 0, msg: '', start: Date.now(), cambios: !!opts.cambios };
   setStatus(label); render();
   try { return await fn(); }
-  catch (e) { console.error(e); toast(L('Algo falló: ', 'Something failed: ') + (e.message || e), 'err'); }
-  finally { S.busy = null; setStatus(''); render(); }
+  catch (e) {
+    if (isCancel(e)) toast(L('Tarea cancelada.', 'Task cancelled.'));
+    else { console.error(e); toast(L('Algo falló: ', 'Something failed: ') + (e.message || e), 'err'); }
+  }
+  finally { S.busy = null; S.cancelRequested = false; setStatus(''); render(); }
+}
+const taskC = (label, fn) => task(label, fn, { cambios: true });
+const isCancel = (e) => S.cancelRequested || /CANCELADO/.test(String(e && e.message || e));
+function checkCancel() { if (S.cancelRequested) throw new Error('CANCELADO'); }
+async function cancelTask() {
+  if (!S.busy || S.cancelRequested) return;
+  S.cancelRequested = true;
+  if (!S.busy.cambios) await rl.cancel();   // solo lectura: se corta ya
+  else S.busy.msg = L('Cancelando al terminar el paso actual (para no dejar nada a medias)...', 'Cancelling after the current step (so nothing is left half-done)...');
+  render();
+}
+function fmtEta(start, pct) {
+  const el = (Date.now() - start) / 1000;
+  if (pct < 4 || el < 4) return L('Calculando tiempo...', 'Estimating time...');
+  const left = Math.max(1, Math.round(el * (100 - pct) / pct));
+  if (left < 60) return L(`Quedan ~${left} s`, `~${left} s left`);
+  return L(`Quedan ~${Math.round(left / 60)} min`, `~${Math.round(left / 60)} min left`);
 }
 function progressHTML() {
   if (!S.busy) return '';
-  const pct = S.busy.pct || 0;
-  return `<div class="progress-card"><div class="msg"><span><b>${esc(S.busy.label)}</b>${S.busy.msg ? ' · ' + esc(S.busy.msg) : ''}</span><span>${pct ? pct + '%' : ''}</span></div>
-  <div class="pbar ${pct ? '' : 'indet'}"><i style="width:${pct}%"></i></div></div>`;
+  const pct = Math.min(99, Math.round(S.busy.pct || 0));
+  return `<div class="progress-card"><div class="msg"><span><b>${esc(S.busy.label)}</b>${S.busy.msg ? ' · ' + esc(S.busy.msg) : ''}</span><span class="eta">${pct ? pct + '% · ' + fmtEta(S.busy.start, pct) : ''}</span></div>
+  <div class="prow"><div class="pbar ${pct ? '' : 'indet'}"><i style="width:${pct}%"></i></div>
+  <button class="btn small danger" data-act="cancel" ${S.cancelRequested ? 'disabled' : ''}>${S.cancelRequested ? L('Cancelando...', 'Cancelling...') : L('Cancelar', 'Cancel')}</button></div></div>`;
 }
 function updateProgressOnly() {
   const card = document.querySelector('.progress-card');
-  if (!card || !S.busy) return;
-  card.outerHTML = progressHTML();
+  if (card && S.busy) card.outerHTML = progressHTML();
 }
 
 // ============================================================ Datos
-async function loadPrograms() { S.programs = await rl.run('programas', {}); }
-async function loadHardware() { S.hardware = await rl.run('hardware', {}); }
-async function loadDrivers() { S.drivers = await rl.run('drivers', { accion: 'revisar' }); }
-async function loadUpdates() { S.updates = await rl.run('actualizaciones', { accion: 'buscar' }); }
-async function loadJunk() { S.junk = await rl.run('limpieza', { accion: 'analizar' }); S.junkSel = new Set(S.junk.categorias.filter((c) => c.color === 'verde' && c.tamano > 0).map((c) => c.id)); }
-async function loadStartup() { S.startup = await rl.run('inicio', { accion: 'listar' }); }
-async function loadQuarantine() { S.quarantine = await rl.run('cuarentena', { accion: 'listar' }); S.restorePoints = await rl.run('restauracion', { accion: 'listar' }); }
+// PowerShell a veces devuelve un objeto suelto en vez de una lista: lo normalizamos siempre.
+const arr = (x) => (Array.isArray(x) ? x : x == null ? [] : [x]);
+const obj = (x) => (x && typeof x === 'object' ? x : {});
+async function loadPrograms() { const r = obj(await rl.run('programas', {})); S.programs = { programas: arr(r.programas), apps: arr(r.apps) }; }
+async function loadHardware() {
+  const r = obj(await rl.run('hardware', {}));
+  S.hardware = { ...r, equipo: obj(r.equipo), sistema: obj(r.sistema), cpu: obj(r.cpu), ram: obj(r.ram), placa: obj(r.placa), bios: obj(r.bios), gpus: arr(r.gpus), discos: arr(r.discos), unidades: arr(r.unidades), bateria: r.bateria || null };
+}
+async function loadDrivers() { const r = obj(await rl.run('drivers', { accion: 'revisar' })); S.drivers = { drivers: arr(r.drivers), problemas: arr(r.problemas), respaldos: arr(r.respaldos) }; }
+async function loadUpdates() { const r = obj(await rl.run('actualizaciones', { accion: 'buscar' })); S.updates = { windows: arr(r.windows), apps: arr(r.apps), wingetDisponible: !!r.wingetDisponible, error: r.error || '' }; }
+async function loadJunk() {
+  const r = obj(await rl.run('limpieza', { accion: 'analizar' }));
+  S.junk = { categorias: arr(r.categorias) };
+  S.junkSel = new Set(S.junk.categorias.filter((c) => c.color === 'verde' && c.tamano > 0).map((c) => c.id));
+}
+async function loadStartup() { const r = obj(await rl.run('inicio', { accion: 'listar' })); S.startup = { elementos: arr(r.elementos) }; }
+async function loadQuarantine() {
+  const q = obj(await rl.run('cuarentena', { accion: 'listar' }));
+  S.quarantine = { lotes: arr(q.lotes).map((l) => ({ ...l, items: arr(l.items) })) };
+  const rp = obj(await rl.run('restauracion', { accion: 'listar' }));
+  S.restorePoints = { puntos: arr(rp.puntos) };
+}
 
 function allPrograms() {
   if (!S.programs) return [];
@@ -241,30 +279,45 @@ function scoreLabel(n) {
 }
 
 // ============================================================ Acciones principales
+// [id, script, peso en la barra de progreso, texto es, texto en, función]
 const SCAN_STEPS = [
-  ['hardware', 'Leyendo tu hardware y la salud de los discos', 'Reading your hardware and disk health', loadHardware],
-  ['drivers', 'Revisando drivers y dispositivos', 'Checking drivers and devices', loadDrivers],
-  ['programas', 'Buscando programas y bloatware', 'Looking for programs and bloatware', loadPrograms],
-  ['limpieza', 'Midiendo archivos basura', 'Measuring junk files', loadJunk],
-  ['inicio', 'Revisando lo que arranca con Windows', 'Checking startup programs', loadStartup],
-  ['updates', 'Buscando actualizaciones oficiales', 'Looking for official updates', loadUpdates]
+  ['hardware', 'hardware', 8, 'Leyendo tu hardware y la salud de los discos', 'Reading your hardware and disk health', loadHardware],
+  ['drivers', 'drivers', 10, 'Revisando drivers y dispositivos', 'Checking drivers and devices', loadDrivers],
+  ['programas', 'programas', 17, 'Buscando programas y bloatware', 'Looking for programs and bloatware', loadPrograms],
+  ['limpieza', 'limpieza', 25, 'Midiendo archivos basura', 'Measuring junk files', loadJunk],
+  ['inicio', 'inicio', 5, 'Revisando lo que arranca con Windows', 'Checking startup programs', loadStartup],
+  ['updates', 'actualizaciones', 35, 'Buscando actualizaciones oficiales', 'Looking for official updates', loadUpdates]
 ];
+function scanPct() {
+  let done = 0, total = 0;
+  for (const [id, script, w] of SCAN_STEPS) {
+    total += w;
+    const st = S.scan.steps[id];
+    if (st === 'ok' || st === 'err') done += w;
+    else if (st === 'run') done += w * Math.min(95, S.scan.pct[script] || 0) / 100;
+  }
+  return Math.round((done / total) * 100);
+}
 
+// Todos los análisis son de solo lectura, así que corren a la vez (mucho más rápido).
 async function scanAll() {
-  S.view = 'inicio';
-  S.scan = { state: 'running', steps: {}, findings: [], score: null };
+  S.view = 'inicio'; S.fix = null;
+  S.scan = { state: 'running', steps: {}, pct: {}, findings: [], score: null };
   await task(L('Revisando tu PC', 'Checking your PC'), async () => {
-    for (const [id, , , fn] of SCAN_STEPS) {
+    await Promise.all(SCAN_STEPS.map(async ([id, script, , , , fn]) => {
       S.scan.steps[id] = 'run'; render();
       try { await fn(); S.scan.steps[id] = 'ok'; }
-      catch (e) { console.error(e); S.scan.steps[id] = 'err'; }
+      catch (e) { if (!isCancel(e)) console.error(id, e); S.scan.steps[id] = isCancel(e) ? 'cancel' : 'err'; S.scan.errors = { ...(S.scan.errors || {}), [id]: String(e.message || e).slice(0, 300) }; }
+      if (S.busy) S.busy.pct = scanPct();
       render();
-    }
+    }));
+    if (S.cancelRequested) { S.scan.state = 'idle'; throw new Error('CANCELADO'); }
     S.scan.findings = buildFindings();
     S.scan.score = computeScore();
     S.scan.state = 'done';
     S.scan.date = new Date();
   });
+  if (S.scan.state === 'running') S.scan.state = 'idle';   // por si algo inesperado cortó el análisis
 }
 
 async function uninstallPrograms(list, motivo) {
@@ -273,6 +326,7 @@ async function uninstallPrograms(list, motivo) {
   await restorePoint(motivo);
   let i = 0;
   for (const p of list) {
+    if (S.cancelRequested) { res.cancelado = true; break; }
     i++;
     if (S.busy) { S.busy.label = L(`Desinstalando (${i}/${list.length})`, `Uninstalling (${i}/${list.length})`); S.busy.msg = p.cls.nombre; S.busy.pct = Math.round(((i - 1) / list.length) * 100); updateProgressOnly(); setStatus(S.busy.label + ' · ' + p.cls.nombre); }
     const r = await rl.run('desinstalar', { ...p, cls: undefined, etiqueta: p.cls.nombre, permitirVentana: true });
@@ -281,6 +335,7 @@ async function uninstallPrograms(list, motivo) {
     res.ok++;
     if (p.tipo === 'win32') {
       const rr = await rl.run('residuos', { nombre: p.nombre, editor: p.editor, carpeta: p.carpeta, clave: p.clave });
+      rr.restos = arr(rr.restos);
       const altos = rr.restos.filter((x) => x.confianza === 'alta');
       const dudosos = rr.restos.filter((x) => x.confianza !== 'alta');
       if (S.settings.restosAutomaticos && altos.length) {
@@ -298,12 +353,15 @@ async function fixAll() {
   const chosen = S.scan.findings.filter((f) => f.elegido && f.accion);
   if (!chosen.length) { toast(L('No hay nada seleccionado para arreglar.', 'Nothing selected to fix.'), 'err'); return; }
   S.fix = { steps: chosen.map((f) => ({ id: f.accion, titulo: f.titulo, state: 'wait', extra: '' })), done: false, summary: [] };
-  await task(L('Arreglando tu PC', 'Fixing your PC'), async () => {
+  await taskC(L('Arreglando tu PC', 'Fixing your PC'), async () => {
     S.busy.msg = L('Creando punto de restauración...', 'Creating restore point...'); render();
     await rl.run('restauracion', { accion: 'crear', motivo: L('Antes de arreglar todo', 'Before fix all') }).catch(() => {});
     const saved = S.settings.puntoRestauracion; S.settings.puntoRestauracion = false; // ya creado
     try {
+      let n = 0;
       for (const st of S.fix.steps) {
+        if (S.cancelRequested) { st.state = 'cancel'; st.extra = L('Cancelado', 'Cancelled'); continue; }
+        S.busy.pct = Math.round((n++ / S.fix.steps.length) * 100); S.busy.msg = st.titulo;
         st.state = 'run'; render();
         try {
           if (st.id === 'junk') {
@@ -334,13 +392,14 @@ async function fixAll() {
       }
     } finally { S.settings.puntoRestauracion = saved; }
     S.fix.done = true;
+    S.fix.cancelado = S.fix.steps.some((x) => x.state === 'cancel');
     // Re-escaneo rápido para actualizar la nota
     S.busy.label = L('Volviendo a medir', 'Measuring again'); S.busy.msg = ''; render();
     await Promise.allSettled([loadJunk(), loadPrograms(), loadStartup()]);
     S.updates = S.updates ? { ...S.updates, windows: [], apps: [] } : S.updates;
     S.scan.findings = buildFindings(); S.scan.score = computeScore();
   });
-  toast(L('¡Listo! Tu PC está más limpio.', 'Done! Your PC is cleaner.'));
+  if (S.fix && !S.fix.cancelado) toast(L('¡Listo! Tu PC está más limpio.', 'Done! Your PC is cleaner.'));
 }
 
 // ============================================================ Vistas
@@ -415,12 +474,14 @@ function viewInicio() {
       <div class="note">${L('Tarda de 1 a 4 minutos.', 'Takes 1 to 4 minutes.')}</div></div>${ring}</div>`;
   } else if (sc.state === 'running') {
     body = `<div class="hero"><div class="hero-text"><h1>${L('Revisando tu PC...', 'Checking your PC...')}</h1><p>${L('Puedes seguir usando el PC mientras tanto.', 'You can keep using your PC meanwhile.')}</p></div>${ring}</div>
-      <div class="stepper">${SCAN_STEPS.map(([id, es, en]) => `<div class="step ${sc.steps[id] || ''}"><span class="dot"></span>${L(es, en)}</div>`).join('')}</div>`;
+      ${progressHTML()}
+      <div class="stepper">${SCAN_STEPS.map(([id, , , es, en]) => `<div class="step ${sc.steps[id] || ''}"><span class="dot"></span>${L(es, en)}<span class="extra">${sc.steps[id] === 'err' ? L('No se pudo leer', 'Could not read') : sc.steps[id] === 'ok' ? L('Listo', 'Done') : ''}</span></div>`).join('')}</div>`;
   } else {
     const fx = S.fix;
     if (fx) {
-      body = `<div class="hero"><div class="hero-text"><h1>${fx.done ? L('¡Listo!', 'Done!') : L('Arreglando tu PC...', 'Fixing your PC...')}</h1><p>${fx.done ? L('Todo lo que se quitó está en la cuarentena unos días por si quieres deshacerlo.', 'Everything removed stays in quarantine for a few days in case you want to undo it.') : L('No apagues el PC. Esto puede tardar varios minutos si hay actualizaciones.', "Don't turn off your PC. This may take several minutes if there are updates.")}</p>
+      body = `<div class="hero"><div class="hero-text"><h1>${fx.done ? (fx.cancelado ? L('Detenido', 'Stopped') : L('¡Listo!', 'Done!')) : L('Arreglando tu PC...', 'Fixing your PC...')}</h1><p>${fx.done ? (fx.cancelado ? L('Se detuvo al terminar el paso que estaba en marcha. Lo que se llegó a hacer está en la cuarentena por si quieres deshacerlo.', 'Stopped after the step in progress. Anything already done is in quarantine in case you want to undo it.') : L('Todo lo que se quitó está en la cuarentena unos días por si quieres deshacerlo.', 'Everything removed stays in quarantine for a few days in case you want to undo it.')) : L('No apagues el PC. Esto puede tardar varios minutos si hay actualizaciones.', "Don't turn off your PC. This may take several minutes if there are updates.")}</p>
         ${fx.done ? `<button class="btn" data-act="closeFix">${L('Ver el resumen', 'See summary')}</button> <button class="btn ghost" data-act="report">${L('Guardar informe', 'Save report')}</button>` : ''}</div>${ring}</div>
+        ${fx.done ? '' : progressHTML()}
         <div class="stepper">${fx.steps.map((s) => `<div class="step ${s.state === 'wait' ? '' : s.state}"><span class="dot"></span>${esc(s.titulo)}<span class="extra">${esc(s.extra)}</span></div>`).join('')}</div>`;
     } else {
       const fs = sc.findings;
@@ -429,6 +490,7 @@ function viewInicio() {
         <h1>${fs.length ? L(`Encontramos ${fs.length} cosa(s) para mejorar`, `We found ${fs.length} thing(s) to improve`) : L('¡Tu PC está en muy buen estado!', 'Your PC is in great shape!')}</h1>
         <p>${fs.length ? L('Ya marcamos lo recomendado. Revísalo si quieres, o pulsa "Arreglar todo".', "We've already ticked what we recommend. Review it if you like, or press \"Fix all\".") : L('No hay nada importante que arreglar ahora mismo.', 'Nothing important to fix right now.')}</p>
         <button class="btn ghost" data-act="scan" ${S.busy ? 'disabled' : ''}>${L('Volver a revisar', 'Check again')}</button> <button class="btn ghost" data-act="report">${L('Guardar informe', 'Save report')}</button></div>${ring}</div>
+        ${Object.keys(sc.errors || {}).length ? `<div class="banner warn" style="margin-top:16px"><div class="grow"><b>${L('Algunas partes no se pudieron revisar', 'Some parts could not be checked')}</b> · ${SCAN_STEPS.filter(([id]) => sc.errors[id]).map(([, , , es, en]) => L(es, en)).join(', ')}. ${L('El resto del análisis es válido.', 'The rest of the check is valid.')}</div></div>` : ''}
         ${fs.length ? `<h2>${L('Lo que encontramos', 'What we found')}</h2>` : ''}
         ${fs.map((f) => `<div class="finding ${f.nivel}">
           ${f.accion ? `<input type="checkbox" class="check" data-finding="${f.id}" ${f.elegido ? 'checked' : ''}>` : '<span style="width:20px"></span>'}
@@ -675,7 +737,13 @@ function render() {
   const views = { inicio: viewInicio, programas: viewProgramas, limpieza: viewLimpieza, arranque: viewArranque, hardware: viewHardware, drivers: viewDrivers, actualizaciones: viewActualizaciones, deshacer: viewDeshacer, ajustes: viewAjustes };
   const focusSearch = document.activeElement && document.activeElement.id === 'search';
   const caret = focusSearch ? document.activeElement.selectionStart : 0;
-  $('#main').innerHTML = (views[S.view] || viewInicio)();
+  let html;
+  try { html = (views[S.view] || viewInicio)(); }
+  catch (e) {
+    console.error(e);
+    html = `<div class="view"><div class="banner bad"><div class="grow"><b>${L('Esta pantalla tuvo un problema', 'This screen had a problem')}</b> · ${esc(e.message)}</div><button class="btn small" data-nav="inicio">${L('Volver al inicio', 'Back to start')}</button></div></div>`;
+  }
+  $('#main').innerHTML = html;
   if (focusSearch) { const el = $('#search'); el.focus(); el.setSelectionRange(caret, caret); }
 }
 
@@ -689,14 +757,14 @@ document.addEventListener('click', async (e) => {
   if (t.dataset.nav) { S.view = t.dataset.nav; render(); $('#main').scrollTop = 0; return; }
   if (t.dataset.filter) { S.progFilter = t.dataset.filter; return render(); }
   if (t.dataset.restore) {
-    return task(L('Restaurando', 'Restoring'), async () => {
+    return taskC(L('Restaurando', 'Restoring'), async () => {
       const r = await rl.run('cuarentena', { accion: 'restaurar', id: t.dataset.restore });
       toast(r.ok ? L('Restaurado. Todo volvió a su sitio.', 'Restored. Everything is back in place.') : L('Se restauró una parte; algunos archivos estaban en uso.', 'Partly restored; some files were in use.'), r.ok ? 'ok' : 'err');
       await loadQuarantine();
     });
   }
   if (t.dataset.wu) {
-    return task(L('Instalando actualización', 'Installing update'), async () => {
+    return taskC(L('Instalando actualización', 'Installing update'), async () => {
       await restorePoint(L('Antes de actualizar', 'Before updating'));
       const r = await rl.run('actualizaciones', { accion: 'instalarWU', ids: [t.dataset.wu] });
       const ok = r.resultados.every((x) => x.ok);
@@ -706,7 +774,7 @@ document.addEventListener('click', async (e) => {
     });
   }
   if (t.dataset.wg) {
-    return task(L('Actualizando programa', 'Updating program'), async () => {
+    return taskC(L('Actualizando programa', 'Updating program'), async () => {
       const r = await rl.run('actualizaciones', { accion: 'winget', ids: [t.dataset.wg] });
       const ok = r.resultados.every((x) => x.ok);
       toast(ok ? L('Programa actualizado.', 'Program updated.') : L('No se pudo actualizar (quizá está abierto).', 'Could not update (it may be open).'), ok ? 'ok' : 'err');
@@ -714,6 +782,7 @@ document.addEventListener('click', async (e) => {
     });
   }
   switch (t.dataset.act) {
+    case 'cancel': return cancelTask();
     case 'scan': return scanAll();
     case 'fixAll': return fixAll();
     case 'closeFix': S.fix = null; return render();
@@ -722,7 +791,7 @@ document.addEventListener('click', async (e) => {
     case 'selNone': S.sel.clear(); return render();
     case 'uninstallSel': {
       const list = allPrograms().filter((p) => S.sel.has(p.id));
-      return task(L('Desinstalando', 'Uninstalling'), async () => {
+      return taskC(L('Desinstalando', 'Uninstalling'), async () => {
         const r = await uninstallPrograms(list, L('Desinstalar programas', 'Uninstall programs'));
         S.sel.clear();
         if (r.dudosos.length) S.pendingResidues = r.dudosos;
@@ -734,7 +803,7 @@ document.addEventListener('click', async (e) => {
     case 'moveResidues': {
       const items = S.pendingResidues.flatMap((g) => g.restos.filter((r) => r.elegido));
       if (!items.length) { S.pendingResidues = null; return render(); }
-      return task(L('Moviendo restos', 'Moving leftovers'), async () => {
+      return taskC(L('Moviendo restos', 'Moving leftovers'), async () => {
         const q = await rl.run('cuarentena', { accion: 'mover', items, motivo: L('Restos revisados', 'Reviewed leftovers') });
         toast(L(`${q.guardados} resto(s) en la cuarentena.`, `${q.guardados} leftover(s) quarantined.`));
         S.pendingResidues = null; S.quarantine = null;
@@ -742,7 +811,7 @@ document.addEventListener('click', async (e) => {
     }
     case 'skipResidues': S.pendingResidues = null; return render();
     case 'clean':
-      return task(L('Limpiando', 'Cleaning'), async () => {
+      return taskC(L('Limpiando', 'Cleaning'), async () => {
         const r = await rl.run('limpieza', { accion: 'limpiar', categorias: [...S.junkSel] });
         toast(L('¡Liberaste ', 'You freed ') + fmtBytes(r.liberado) + '!');
         await loadJunk();
@@ -751,12 +820,12 @@ document.addEventListener('click', async (e) => {
     case 'reloadHw': S.hardware = null; return render();
     case 'loadUpdates': return task(L('Buscando actualizaciones', 'Searching updates'), loadUpdates);
     case 'startupRec':
-      return task(L('Aplicando', 'Applying'), async () => {
+      return taskC(L('Aplicando', 'Applying'), async () => {
         for (const it of S.startup.elementos.filter((i) => i.activo && classifyStartup(i).rec === 'desactivar')) await rl.run('inicio', { accion: 'cambiar', id: it.id, activar: false });
         await loadStartup(); toast(L('Listo. El próximo arranque será más rápido.', 'Done. Next startup will be faster.'));
       });
     case 'updateAll':
-      return task(L('Actualizando todo', 'Updating everything'), async () => {
+      return taskC(L('Actualizando todo', 'Updating everything'), async () => {
         await restorePoint(L('Antes de actualizar todo', 'Before updating everything'));
         if (S.updates.windows.some((u) => !u.grande)) {
           S.busy.label = 'Windows Update';
@@ -768,7 +837,7 @@ document.addEventListener('click', async (e) => {
         await loadUpdates();
       });
     case 'backupDrivers':
-      return task(L('Copia de drivers', 'Driver backup'), async () => {
+      return taskC(L('Copia de drivers', 'Driver backup'), async () => {
         const r = await rl.run('drivers', { accion: 'respaldar' });
         toast(r.ok ? L('Copia guardada (', 'Backup saved (') + fmtBytes(r.tamano) + ').' : L('No se pudo hacer la copia.', 'Backup failed.'), r.ok ? 'ok' : 'err');
         await loadDrivers();
@@ -788,7 +857,7 @@ document.addEventListener('change', async (e) => {
   if (t.dataset.res) { const [g, r] = t.dataset.res.split(':').map(Number); S.pendingResidues[g].restos[r].elegido = t.checked; return; }
   if (t.dataset.startup) {
     const id = t.dataset.startup, on = t.checked;
-    return task(on ? L('Activando', 'Enabling') : L('Desactivando', 'Disabling'), async () => { await rl.run('inicio', { accion: 'cambiar', id, activar: on }); await loadStartup(); });
+    return taskC(on ? L('Activando', 'Enabling') : L('Desactivando', 'Disabling'), async () => { await rl.run('inicio', { accion: 'cambiar', id, activar: on }); await loadStartup(); });
   }
   if (t.dataset.setting) {
     const k = t.dataset.setting;
@@ -802,9 +871,18 @@ document.addEventListener('input', (e) => { if (e.target.id === 'search') { S.se
 
 rl.onProgress((p) => {
   if (!S.busy) return;
-  S.busy.pct = p.pct; S.busy.msg = S.settings.idioma === 'en' ? p.en : p.msg;
+  const msg = S.settings.idioma === 'en' ? p.en : p.msg;
+  if (S.scan.state === 'running') {
+    S.scan.pct[p.script] = p.pct;
+    S.busy.pct = scanPct();
+    if (p.pct < 100) S.busy.msg = msg;
+  } else if (!S.cancelRequested) {
+    S.busy.pct = p.pct; S.busy.msg = msg;
+  }
   updateProgressOnly();
 });
+// El tiempo restante se recalcula cada segundo aunque el motor no informe.
+setInterval(() => { if (S.busy) updateProgressOnly(); }, 1000);
 
 // ============================================================ Arranque
 (async function init() {

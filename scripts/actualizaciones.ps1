@@ -2,9 +2,10 @@
 #  - Windows Update (Windows, seguridad y drivers certificados por Microsoft)
 #  - winget (el gestor oficial de apps de Microsoft) para programas
 # Acciones: buscar, instalarWU, winget
-param([string]$P)
+# Ojo: PowerShell no distingue mayúsculas ($P y $p serían la misma variable)
+param([Alias('P')][string]$EntradaB64)
 . "$PSScriptRoot\common.ps1"
-$p = Read-Params $P
+$p = Read-Params $EntradaB64
 
 function Get-Winget {
     $cmd = Get-Command winget.exe -ErrorAction SilentlyContinue
@@ -38,7 +39,7 @@ function Get-WingetUpgrades {
             $out.Add(@{ nombre = $name; id = $id; actual = $cur; nueva = $new })
         }
     }
-    return @($out)
+    return $out.ToArray()
 }
 
 function Get-WUSession { return New-Object -ComObject Microsoft.Update.Session }
@@ -78,7 +79,7 @@ switch ($p.accion) {
             if ($wg) { $wingetOk = $true; try { $apps = Get-WingetUpgrades $wg } catch {} }
         }
         Send-Progress 100 'Listo' 'Done'
-        Send-Result @{ windows = @($wu); apps = @($apps); wingetDisponible = $wingetOk; error = $wuError }
+        Send-Result @{ windows = $wu.ToArray(); apps = @($apps); wingetDisponible = $wingetOk; error = $wuError }
     }
     'instalarWU' {
         $s = Get-WUSession
@@ -118,7 +119,7 @@ switch ($p.accion) {
         }
         Write-RLLog ('Windows Update: ' + $sel.Count + ' instaladas, reinicio=' + $reboot)
         Send-Progress 100 'Listo' 'Done'
-        Send-Result @{ resultados = @($results); reinicio = $reboot }
+        Send-Result @{ resultados = $results.ToArray(); reinicio = $reboot }
     }
     'winget' {
         $wg = Get-Winget
@@ -136,7 +137,7 @@ switch ($p.accion) {
         }
         Write-RLLog ('winget: ' + $ids.Count + ' actualizados')
         Send-Progress 100 'Listo' 'Done'
-        Send-Result @{ resultados = @($results) }
+        Send-Result @{ resultados = $results.ToArray() }
     }
     default { Send-Result @{ ok = $false } }
 }

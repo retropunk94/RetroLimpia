@@ -1,8 +1,9 @@
 ﻿# Busca restos (carpetas, accesos directos y registro) que deja un programa al desinstalarse.
 # Es conservador: solo marca como "seguro" lo que coincide exactamente con el nombre.
-param([string]$P)
+# Ojo: PowerShell no distingue mayúsculas ($P y $p serían la misma variable)
+param([Alias('P')][string]$EntradaB64)
 . "$PSScriptRoot\common.ps1"
-$p = Read-Params $P
+$p = Read-Params $EntradaB64
 
 function Get-CleanName {
     param([string]$n)
@@ -107,4 +108,4 @@ foreach ($rb in $regBases) {
 if ($p.clave -and (Test-Path -LiteralPath ('Registry::' + $p.clave))) { Add-Found 'registro' ([string]$p.clave) 'alta' }
 
 Send-Progress 100 'Listo' 'Done'
-Send-Result @{ nombre = $name; restos = @($found) }
+Send-Result @{ nombre = $name; restos = $found.ToArray() }

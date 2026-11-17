@@ -1,0 +1,76 @@
+// Motor de RetroLimpia: ejecuta los scripts de PowerShell de /scripts
+// de forma oculta (sin ventanas negras) y devuelve su resultado en JSON.
+//
+// Protocolo de salida de cada script:
+//   @@PROGRESS {"pct":40,"msg":"..."}   -> progreso en vivo
+//   @@RESULT {...}                      -> resultado final
+
+const { spawn, execFile } = require('child_process');
+const path = require('path');
+const demo = require('./demo');
+
+const SCRIPTS = new Set([
+  'programas', 'desinstalar', 'residuos', 'cuarentena', 'restauracion',
+  'hardware', 'drivers', 'actualizaciones', 'limpieza', 'inicio'
+]);
+
+let cfg = { demo: false, scriptsDir: '' };
+const running = new Set();
+
+function init(options) { cfg = { ...cfg, ...options }; }
+
+function run(script, params = {}, onProgress = () => {}) {
+  if (!SCRIPTS.has(script)) return Promise.reject(new Error('Script no permitido: ' + script));
+  if (cfg.demo) return demo.run(script, params, onProgress);
+
+  const file = path.join(cfg.scriptsDir, script + '.ps1');
+  const b64 = Buffer.from(JSON.stringify(params), 'utf8').toString('base64');
+  const args = ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', file, '-P', b64];
+
+  return new Promise((resolve, reject) => {
+    const child = spawn('powershell.exe', args, { windowsHide: true });
+    running.add(child);
+    let buffer = '';
+    let result = null;
+    let errText = '';
+
+    child.stdout.setEncoding('utf8');
+    child.stdout.on('data', (chunk) => {
+      buffer += chunk;
+      let idx;
+      while ((idx = buffer.indexOf('\n')) >= 0) {
+        const line = buffer.slice(0, idx).replace(/\r$/, '');
+        buffer = buffer.slice(idx + 1);
+        if (line.startsWith('@@PROGRESS ')) {
+          try { onProgress(JSON.parse(line.slice(11))); } catch { /* línea incompleta */ }
+        } else if (line.startsWith('@@RESULT ')) {
+          try { result = JSON.parse(line.slice(9)); } catch (e) { errText += 'Respuesta ilegible del motor. '; }
+        }
+      }
+    });
+    child.stderr.setEncoding('utf8');
+    child.stderr.on('data', (d) => { errText += d; });
+    child.on('error', (e) => { running.delete(child); reject(e); });
+    child.on('close', (code) => {
+      running.delete(child);
+      if (buffer.startsWith('@@RESULT ')) { try { result = JSON.parse(buffer.slice(9)); } catch { /* nada */ } }
+      if (result) resolve(result);
+      else reject(new Error(`El motor terminó sin respuesta (código ${code}). ${errText.slice(0, 600)}`));
+    });
+  });
+}
+
+function cancelAll() {
+  for (const c of running) { try { c.kill(); } catch { /* ya cerrado */ } }
+  running.clear();
+  return true;
+}
+
+function isAdmin() {
+  return new Promise((resolve) => {
+    if (process.platform !== 'win32') return resolve(false);
+    execFile('net', ['session'], { windowsHide: true }, (err) => resolve(!err));
+  });
+}
+
+module.exports = { init, run, cancelAll, isAdmin };

@@ -1,0 +1,48 @@
+﻿# Revisa los drivers instalados y los dispositivos con problemas.
+# Acciones: revisar, respaldar
+param([string]$P)
+. "$PSScriptRoot\common.ps1"
+$p = Read-Params $P
+
+if ($p.accion -eq 'respaldar') {
+    Send-Progress 10 'Haciendo copia de tus drivers actuales (puede tardar unos minutos)...' 'Backing up your current drivers (may take a few minutes)...'
+    $dest = Join-Path (Get-RLFolder 'RespaldoDrivers') (Get-Date -Format 'yyyy-MM-dd_HHmm')
+    New-Item -ItemType Directory -Path $dest -Force | Out-Null
+    $ok = $false; $msg = ''
+    try {
+        $null = & pnputil.exe /export-driver * $dest 2>&1
+        $ok = (@(Get-ChildItem -LiteralPath $dest -Recurse -Filter *.inf -ErrorAction SilentlyContinue).Count -gt 0)
+    } catch { $msg = $_.Exception.Message }
+    Write-RLLog ('Respaldo de drivers en ' + $dest + ': ' + $ok)
+    Send-Progress 100 'Listo' 'Done'
+    Send-Result @{ ok = $ok; carpeta = $dest; tamano = (Get-PathSize $dest); mensaje = $msg }
+    return
+}
+
+Send-Progress 10 'Leyendo los drivers instalados...' 'Reading installed drivers...'
+$important = 'DISPLAY|NET|MEDIA|SYSTEM|HDC|SCSIADAPTER|BLUETOOTH|USB|AUDIOENDPOINT|CAMERA|BIOMETRIC|MOUSE|KEYBOARD|HIDCLASS'
+$drivers = @(Get-CimInstance Win32_PnPSignedDriver -ErrorAction SilentlyContinue | Where-Object { $_.DeviceName -and $_.DriverVersion } | ForEach-Object {
+    $prov = [string]$_.DriverProviderName
+    @{
+        dispositivo = $_.DeviceName
+        clase       = [string]$_.DeviceClass
+        fabricante  = [string]$_.Manufacturer
+        proveedor   = $prov
+        version     = $_.DriverVersion
+        fecha       = (Format-WmiDate $_.DriverDate)
+        inf         = $_.InfName
+        firmado     = [bool]$_.IsSigned
+        generico    = ($prov -match '^Microsoft' -or [string]$_.Manufacturer -match '^\(Standard|^Microsoft|^Generic|^\(Estándar')
+        importante  = ([string]$_.DeviceClass -match $important)
+    }
+})
+
+Send-Progress 60 'Buscando dispositivos con problemas...' 'Looking for devices with problems...'
+$problems = @(Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue | Where-Object { $_.ConfigManagerErrorCode -and $_.ConfigManagerErrorCode -ne 0 -and $_.ConfigManagerErrorCode -ne 22 } | ForEach-Object {
+    @{ dispositivo = $(if ($_.Name) { $_.Name } else { $_.DeviceID }); codigo = [int]$_.ConfigManagerErrorCode; clase = [string]$_.PNPClass; id = $_.DeviceID }
+})
+
+$backups = @(Get-ChildItem -LiteralPath (Get-RLFolder 'RespaldoDrivers') -Directory -ErrorAction SilentlyContinue | Sort-Object Name -Descending | ForEach-Object { $_.Name })
+
+Send-Progress 100 'Listo' 'Done'
+Send-Result @{ drivers = $drivers; problemas = $problems; respaldos = $backups }

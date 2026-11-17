@@ -1,0 +1,39 @@
+﻿ANTES DE INSTALAR: ¿POR QUÉ WINDOWS O MI ANTIVIRUS AVISAN?
+
+Tranquilo: RetroLimpia no es un virus. Te explicamos con sinceridad por qué
+puedes haber visto un aviso al descargarlo o abrirlo.
+
+1) NO TIENE FIRMA DIGITAL DE PAGO
+   Las grandes empresas pagan cada año un certificado para "firmar" sus
+   programas. RetroLimpia es un proyecto independiente y gratuito, sin ese
+   certificado. Windows avisa de CUALQUIER programa nuevo sin firma
+   ("Windows protegió su PC"), aunque no tenga nada malo.
+   Ese aviso significa "no conozco a este autor", no "he encontrado un virus".
+   Para continuar: pulsa "Más información" y luego "Ejecutar de todas formas".
+
+2) HACE COSAS "PODEROSAS" A PROPÓSITO
+   Para limpiar de verdad necesita permisos de administrador, borrar archivos,
+   tocar el registro y manejar drivers. Los antivirus usan reglas automáticas,
+   y esas acciones también las hacen los programas malos. Por eso a veces dan
+   una "falsa alarma" con limpiadores y desinstaladores.
+
+3) PUEDES COMPROBARLO TÚ MISMO
+   - Su código es abierto: cualquiera puede leerlo en GitHub.
+   - Puedes subir este instalador a https://www.virustotal.com, que lo revisa
+     con más de 60 antivirus a la vez.
+   - RetroLimpia no envía ningún dato tuyo a internet (sin telemetría).
+
+4) TODO SE PUEDE DESHACER
+   Antes de cambiar nada crea un punto de restauración de Windows, y lo que
+   quita pasa unos días en una cuarentena antes de borrarse.
+
+------------------------------------------------------------------------------
+LICENCIA (MIT)
+
+Copyright (c) 2026 Retropunk94
+
+Se concede permiso, de forma gratuita, a cualquier persona que obtenga una
+copia de este software para usarlo, copiarlo, modificarlo y distribuirlo sin
+restricción, siempre que se incluya este aviso.
+
+EL SOFTWARE SE PROPORCIONA "TAL CUAL", SIN GARANTÍA DE NINGÚN TIPO.

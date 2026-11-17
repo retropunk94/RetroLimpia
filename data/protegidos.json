@@ -1,0 +1,30 @@
+{
+  "_info": "Programas clásicos que RetroLimpia marca en ROJO: el sistema u otros programas los necesitan. Solo se pueden quitar en modo experto.",
+  "win32": [
+    { "patron": "Microsoft Visual C++*", "es": "Otros programas y juegos lo necesitan para abrir.", "en": "Other programs and games need it to start." },
+    { "patron": "Microsoft .NET*", "es": "Otros programas lo necesitan.", "en": "Other programs need it." },
+    { "patron": "Microsoft Windows Desktop Runtime*", "es": "Otros programas lo necesitan.", "en": "Other programs need it." },
+    { "patron": "Microsoft ASP.NET*", "es": "Otros programas lo necesitan.", "en": "Other programs need it." },
+    { "patron": "Microsoft Edge*", "es": "Windows lo usa internamente aunque uses otro navegador.", "en": "Windows uses it internally even if you use another browser." },
+    { "patron": "Microsoft Update Health Tools", "es": "Mantiene Windows Update funcionando.", "en": "Keeps Windows Update working." },
+    { "patron": "Microsoft GameInput", "es": "Lo usan juegos para mandos y periféricos.", "en": "Games use it for controllers and peripherals." },
+    { "patron": "*DirectX*", "es": "Los juegos lo necesitan.", "en": "Games need it." },
+    { "patron": "Realtek*", "es": "Driver de audio o de red.", "en": "Audio or network driver." },
+    { "patron": "NVIDIA Graphics Driver*", "es": "El driver de tu tarjeta gráfica.", "en": "Your graphics card driver." },
+    { "patron": "NVIDIA HD Audio*", "es": "El audio por HDMI/DisplayPort.", "en": "HDMI/DisplayPort audio." },
+    { "patron": "NVIDIA FrameView SDK*", "es": "Componente de la app de NVIDIA.", "en": "NVIDIA app component." },
+    { "patron": "AMD Software*", "es": "El driver de tu tarjeta gráfica AMD.", "en": "Your AMD graphics driver." },
+    { "patron": "AMD Chipset*", "es": "Driver de la placa base.", "en": "Motherboard driver." },
+    { "patron": "Intel(R) Chipset*", "es": "Driver de la placa base.", "en": "Motherboard driver." },
+    { "patron": "Intel(R) Management Engine*", "es": "Componente de la placa base.", "en": "Motherboard component." },
+    { "patron": "Intel(R) Serial IO*", "es": "Driver de la placa base.", "en": "Motherboard driver." },
+    { "patron": "Intel(R) Wireless*", "es": "Driver del Wi-Fi o Bluetooth.", "en": "Wi-Fi or Bluetooth driver." },
+    { "patron": "Intel(R) Rapid Storage*", "es": "Driver de los discos.", "en": "Storage driver." },
+    { "patron": "Windows Driver Package*", "es": "Un driver de hardware.", "en": "A hardware driver." },
+    { "patron": "*Bluetooth*Driver*", "es": "Driver de Bluetooth.", "en": "Bluetooth driver." },
+    { "patron": "Steamworks Common Redistributables", "es": "Los juegos de Steam lo necesitan.", "en": "Steam games need it." },
+    { "patron": "Microsoft Windows SDK*", "es": "Herramientas de desarrollo que otros programas usan.", "en": "Development tools other software uses." },
+    { "patron": "Synaptics*", "es": "Driver del touchpad.", "en": "Touchpad driver." },
+    { "patron": "ELAN*", "es": "Driver del touchpad.", "en": "Touchpad driver." }
+  ]
+}

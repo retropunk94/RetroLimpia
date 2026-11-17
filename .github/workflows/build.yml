@@ -1,0 +1,75 @@
+# Compila RetroLimpia para Windows en los servidores de GitHub (gratis para código abierto).
+# - Cada cambio subido: genera el .exe para descargar desde la pestaña "Actions".
+# - Al crear una etiqueta de versión (ej. v2.0.1): publica una "Release" con el
+#   instalador, la versión portable y sus huellas SHA-256 para comprobarlos.
+
+name: Compilar RetroLimpia
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Comprobar sintaxis de los scripts de PowerShell
+        shell: pwsh
+        run: |
+          $fail = $false
+          Get-ChildItem scripts -Filter *.ps1 | ForEach-Object {
+            $errs = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$null, [ref]$errs) | Out-Null
+            if ($errs) { $fail = $true; $errs | ForEach-Object { Write-Host "::error file=$($_.Extent.File),line=$($_.Extent.StartLineNumber)::$($_.Message)" } }
+          }
+          if ($fail) { exit 1 }
+
+      - name: Instalar dependencias
+        run: npm install
+
+      - name: Compilar instalador y portable
+        run: npm run dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: Calcular huellas SHA-256
+        shell: pwsh
+        run: |
+          Get-ChildItem dist -Filter *.exe | ForEach-Object {
+            "$((Get-FileHash $_.FullName -Algorithm SHA256).Hash)  $($_.Name)"
+          } | Set-Content dist/SHA256.txt
+          Get-Content dist/SHA256.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RetroLimpia-windows
+          path: |
+            dist/*.exe
+            dist/SHA256.txt
+
+      - name: Publicar versión
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.exe
+            dist/SHA256.txt
+          body: |
+            ## Descarga
+            - **RetroLimpia-Instalador** → se instala como cualquier programa (recomendado).
+            - **RetroLimpia-Portable** → no se instala, se abre directamente.
+
+            ### ¿Windows dice "Windows protegió su PC"?
+            Es normal: el programa no tiene firma digital de pago. Pulsa **Más información → Ejecutar de todas formas**.
+            Lee [por qué pasa](docs/POR-QUE-AVISA-WINDOWS.md). Puedes comprobar el archivo en [VirusTotal](https://www.virustotal.com) y comparar su huella con `SHA256.txt`.

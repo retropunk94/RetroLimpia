@@ -19,6 +19,8 @@ const S = {
   appUpdate: null
 };
 
+const repoUrl = () => (S.info.repo && !S.info.repo.startsWith('TU_USUARIO') ? 'https://github.com/' + S.info.repo : null);
+const GH_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.19c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>';
 const L = (es, en) => (S.settings.idioma === 'en' ? (en ?? es) : es);
 const $ = (s) => document.querySelector(s);
 const esc = (v) => String(v ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -380,7 +382,7 @@ function renderNav() {
     if (n === 'sep') return '<div class="nav-sep"></div>';
     const [id, es, en] = n; const c = navCount(id);
     return `<button class="nav-item ${S.view === id ? 'active' : ''}" data-nav="${id}"><svg viewBox="0 0 24 24">${ICONS[id]}</svg><span>${L(es, en)}</span>${c ? `<span class="count ${c[1]}">${esc(c[0])}</span>` : ''}</button>`;
-  }).join('') + `<div class="nav-foot"><div class="trust">${L('Sin telemetría · Código abierto', 'No telemetry · Open source')}</div>${L('Todo lo que borra se puede deshacer.', 'Everything it removes can be undone.')}</div>`;
+  }).join('') + `<div class="nav-foot">${repoUrl() ? `<button class="gh-btn" data-open="${repoUrl()}" title="${L('Revisar el código abierto en GitHub', 'Review the open source code on GitHub')}">${GH_ICON}<span>${L('Ver el código en GitHub', 'View code on GitHub')}</span></button>` : ''}<div class="trust">${L('Sin telemetría · Código abierto', 'No telemetry · Open source')}</div>${L('Todo lo que borra se puede deshacer.', 'Everything it removes can be undone.')}</div>`;
 }
 
 function head(title, desc, right = '') {
@@ -606,7 +608,7 @@ function viewDeshacer() {
 function viewAjustes() {
   const s = S.settings;
   const sw = (key, title, desc) => `<div class="setting"><div class="grow"><b>${title}</b><span>${desc}</span></div><label class="switch"><input type="checkbox" data-setting="${key}" ${s[key] ? 'checked' : ''}><span></span></label></div>`;
-  const repoUrl = S.info.repo && !S.info.repo.startsWith('TU_USUARIO') ? 'https://github.com/' + S.info.repo : null;
+  const repo = repoUrl();
   return `<div class="view">${banners()}${head(L('Ajustes', 'Settings'), L('Casi nadie necesita cambiar nada aquí.', 'Most people never need to change anything here.'))}
     <div class="card">
       <div class="setting"><div class="grow"><b>${L('Idioma', 'Language')}</b></div><select data-setting="idioma"><option value="es" ${s.idioma === 'es' ? 'selected' : ''}>Español</option><option value="en" ${s.idioma === 'en' ? 'selected' : ''}>English</option></select></div>
@@ -618,7 +620,7 @@ function viewAjustes() {
     <h2>${L('Acerca de RetroLimpia', 'About RetroLimpia')}</h2>
     <div class="card"><div class="kv"><span>${L('Versión', 'Version')}</span><span>${esc(S.info.version)}</span><span>${L('Licencia', 'License')}</span><span>MIT (${L('código abierto', 'open source')})</span><span>${L('Privacidad', 'Privacy')}</span><span>${L('No envía ningún dato tuyo a internet.', 'Sends none of your data to the internet.')}</span></div>
       <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap"><button class="btn" data-act="trust">${L('¿Por qué Windows o mi antivirus avisan?', 'Why does Windows or my antivirus warn me?')}</button>
-      ${repoUrl ? `<button class="btn ghost" data-open="${repoUrl}">${L('Ver el código', 'View the code')}</button>` : ''}
+      ${repo ? `<button class="btn ghost" data-open="${repo}">${L('Ver el código', 'View the code')}</button>` : ''}
       <button class="btn ghost" data-act="checkUpdate">${L('Buscar versión nueva', 'Check for a new version')}</button></div></div></div>`;
 }
 
@@ -635,7 +637,7 @@ function loadingView(title, loader, msg) {
 
 // ============================================================ Confianza
 function showTrust() {
-  const repoUrl = S.info.repo && !S.info.repo.startsWith('TU_USUARIO') ? 'https://github.com/' + S.info.repo : null;
+  const repo = repoUrl();
   $('#modal').innerHTML = `<div class="modal" role="dialog" aria-modal="true">
     <h2>${L('Tranquilo: RetroLimpia no es un virus', "Relax: RetroLimpia isn't a virus")}</h2>
     <p class="lead">${L('Puede que Windows te haya mostrado una pantalla azul de "Windows protegió su PC" o que tu antivirus haya dudado. Te explicamos por qué pasa, con total sinceridad:', 'Windows may have shown a blue "Windows protected your PC" screen, or your antivirus may have hesitated. Here is honestly why:')}</p>
@@ -644,7 +646,7 @@ function showTrust() {
     <div class="why"><span class="n">3</span><div><b>${L('Puedes comprobarlo tú mismo', 'You can check it yourself')}</b><p>${L('Su código es abierto: cualquiera puede leerlo en GitHub. Puedes subir el instalador a VirusTotal, que lo revisa con más de 60 antivirus a la vez. Y RetroLimpia no envía ningún dato tuyo a internet.', 'Its code is open: anyone can read it on GitHub. You can upload the installer to VirusTotal, which scans it with 60+ antivirus engines. And RetroLimpia sends none of your data to the internet.')}</p></div></div>
     <div class="why"><span class="n">4</span><div><b>${L('Y todo se puede deshacer', 'And everything can be undone')}</b><p>${L('Antes de cambiar nada crea un punto de restauración, y lo que quita pasa unos días en la cuarentena antes de borrarse.', 'Before changing anything it creates a restore point, and anything it removes spends a few days in quarantine before deletion.')}</p></div></div>
     <div class="foot"><button class="btn primary" data-act="trustOk">${L('Entendido, empezar', 'Got it, let\'s start')}</button>
-      ${repoUrl ? `<button class="btn ghost" data-open="${repoUrl}">${L('Ver el código', 'View the code')}</button>` : ''}
+      ${repo ? `<button class="btn ghost" data-open="${repo}">${L('Ver el código', 'View the code')}</button>` : ''}
       <button class="btn ghost" data-open="https://www.virustotal.com/">VirusTotal</button></div></div>`;
   $('#modal').classList.remove('hidden');
 }

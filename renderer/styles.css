@@ -281,3 +281,6 @@ select { background: var(--panel-2); border: 1px solid var(--line-2); border-rad
 ::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 10px; border: 2px solid var(--bg); }
 ::-webkit-scrollbar-track { background: transparent; }
 .advice .badge { align-self: flex-start; flex-shrink: 0; margin-top: 2px; }
+.gh-btn { text-align: left; display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 12px; padding: 9px 12px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--panel); color: var(--text); cursor: pointer; font-size: 13px; font-weight: 600; }
+.gh-btn:hover { border-color: var(--violet); background: var(--panel-2); }
+.gh-btn svg { width: 16px; height: 16px; flex-shrink: 0; }

@@ -31,16 +31,21 @@ switch ($p.accion) {
             if (-not $groups.ContainsKey($name)) {
                 $desc = ''; $path = ''; $company = ''
                 try { $desc = $pr.Description; $path = $pr.Path; $company = $pr.Company } catch {}
-                $groups[$name] = @{ nombre = $name; descripcion = [string]$desc; ruta = [string]$path; empresa = [string]$company; cpu = 0.0; ram = [int64]0; cantidad = 0; pids = New-Object System.Collections.Generic.List[int]; critico = ($criticos -contains $name) }
+                $groups[$name] = @{ nombre = $name; descripcion = [string]$desc; ruta = [string]$path; empresa = [string]$company; cpu = 0.0; ram = [int64]0; cantidad = 0; pids = New-Object System.Collections.Generic.List[int]; critico = ($criticos -contains $name); ventana = $false; titulo = ''; windows = $false }
+                # ¿Es parte de Windows? (carpeta de Windows o componente de Microsoft del sistema)
+                if ($path -and $path.ToLowerInvariant().StartsWith(($env:windir).ToLowerInvariant())) { $groups[$name].windows = $true }
+                if (-not $path -and $pr.Id -lt 1000) { $groups[$name].windows = $true }
             }
             $g = $groups[$name]
             $g.cpu += [Math]::Max([double]0, [double]$cpu)
             $g.ram += [int64]$pr.WorkingSet64
             $g.cantidad++
             $g.pids.Add($pr.Id)
+            # ¿Tiene una ventana abierta? Entonces es un programa que la persona está usando
+            try { if ($pr.MainWindowHandle -ne [IntPtr]::Zero -and $pr.MainWindowTitle) { $g.ventana = $true; if (-not $g.titulo) { $g.titulo = [string]$pr.MainWindowTitle } } } catch {}
         }
         $out = foreach ($g in $groups.Values) {
-            @{ nombre = $g.nombre; descripcion = $g.descripcion; ruta = $g.ruta; empresa = $g.empresa; cpu = [Math]::Round($g.cpu, 1); ram = $g.ram; cantidad = $g.cantidad; pids = $g.pids.ToArray(); critico = $g.critico }
+            @{ nombre = $g.nombre; descripcion = $g.descripcion; ruta = $g.ruta; empresa = $g.empresa; cpu = [Math]::Round($g.cpu, 1); ram = $g.ram; cantidad = $g.cantidad; pids = $g.pids.ToArray(); critico = $g.critico; ventana = $g.ventana; titulo = $g.titulo; windows = ($g.windows -or $g.critico) }
         }
         $os = Get-CimInstance Win32_OperatingSystem -ErrorAction SilentlyContinue
         $total = [int64]$os.TotalVisibleMemorySize * 1024

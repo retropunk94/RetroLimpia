@@ -126,13 +126,22 @@ async function run(script, p, onProgress) {
       if (p.accion === 'terminar') { await wait(300); return { ok: true, terminados: (p.pids || []).length }; }
       await wait(500);
       const j = () => Math.random();
-      const mk = (nombre, descripcion, empresa, ram, cpu, cantidad = 1, critico = false) => ({ nombre, descripcion, empresa, ruta: 'C:\\Program Files\\' + nombre + '.exe', ram: Math.round(ram * (0.95 + j() * 0.1)), cpu: Math.round(cpu * (0.5 + j()) * 10) / 10, cantidad, pids: [1000 + nombre.length], critico });
+      const mk = (nombre, descripcion, empresa, ram, cpu, cantidad = 1, extra = {}) => ({ nombre, descripcion, empresa, ruta: 'C:\\Program Files\\' + nombre + '.exe', ram: Math.round(ram * (0.95 + j() * 0.1)), cpu: Math.round(cpu * (0.5 + j()) * 10) / 10, cantidad, pids: [1000 + nombre.length], critico: false, ventana: false, windows: false, titulo: '', ...extra });
+      const win = { windows: true }, crit = { windows: true, critico: true };
       return { ramTotal: 64 * GB, ramLibre: 41 * GB, cpuTotal: Math.round(14 + j() * 8), procesos: [
-        mk('chrome', 'Google Chrome', 'Google LLC', 3.1 * GB, 6, 28), mk('obs64', 'OBS Studio', 'OBS Project', 1.2 * GB, 9), mk('Discord', 'Discord', 'Discord Inc.', 820 * MB, 1.5, 7),
-        mk('steamwebhelper', 'Steam Client WebHelper', 'Valve Corporation', 610 * MB, 0.8, 9), mk('Code', 'Visual Studio Code', 'Microsoft Corporation', 540 * MB, 0.6, 12),
-        mk('MsMpEng', 'Antimalware Service Executable', 'Microsoft Corporation', 380 * MB, 0.9, 1, true), mk('explorer', 'Explorador de Windows', 'Microsoft Corporation', 290 * MB, 0.4),
-        mk('svchost', 'Proceso host para los servicios de Windows', 'Microsoft Corporation', 1.4 * GB, 1.1, 92, true), mk('Spotify', 'Spotify', 'Spotify AB', 260 * MB, 0.7, 6),
-        mk('dwm', 'Administrador de ventanas del escritorio', 'Microsoft Corporation', 180 * MB, 1.9, 1, true), mk('ollama', 'Ollama', 'Ollama', 4.6 * GB, 0.2, 2)
+        mk('chrome', 'Google Chrome', 'Google LLC', 3.1 * GB, 6, 28, { ventana: true, titulo: 'YouTube - Google Chrome' }),
+        mk('obs64', 'OBS Studio', 'OBS Project', 1.2 * GB, 9, 1, { ventana: true, titulo: 'OBS 31.1 - Perfil: Directo' }),
+        mk('Discord', 'Discord', 'Discord Inc.', 820 * MB, 1.5, 7, { ventana: true, titulo: '#general - Discord' }),
+        mk('Code', 'Visual Studio Code', 'Microsoft Corporation', 540 * MB, 0.6, 12, { ventana: true, titulo: 'app.js - RetroLimpia' }),
+        mk('steamwebhelper', 'Steam Client WebHelper', 'Valve Corporation', 610 * MB, 0.8, 9),
+        mk('ollama', 'Ollama', 'Ollama', 4.6 * GB, 0.2, 2),
+        mk('Spotify', 'Spotify', 'Spotify AB', 260 * MB, 0.7, 6),
+        mk('GoogleUpdate', 'Google Installer', 'Google LLC', 4 * MB, 0, 1),
+        mk('explorer', 'Explorador de Windows', 'Microsoft Corporation', 290 * MB, 0.4, 1, { ...win, ventana: true }),
+        mk('svchost', 'Proceso host para los servicios de Windows', 'Microsoft Corporation', 1.4 * GB, 1.1, 92, crit),
+        mk('MsMpEng', 'Antimalware Service Executable', 'Microsoft Corporation', 380 * MB, 0.9, 1, crit),
+        mk('dwm', 'Administrador de ventanas del escritorio', 'Microsoft Corporation', 180 * MB, 1.9, 1, crit),
+        mk('SearchHost', 'Búsqueda de Windows', 'Microsoft Corporation', 120 * MB, 0.1, 1, win)
       ] };
     }
     case 'desinstalar': await steps(onProgress, ['Desinstalando ' + p.nombre + ' en silencio...'], 1300); return { ok: true, metodo: 'silencioso-nsis', reinicio: false, nombre: p.nombre };

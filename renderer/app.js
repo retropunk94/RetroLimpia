@@ -479,7 +479,7 @@ function renderNav() {
     return `<button class="nav-item ${S.view === id ? 'active' : ''}" data-nav="${id}"><svg viewBox="0 0 24 24">${ICONS[id]}</svg><span>${L(es, en)}</span>${c ? `<span class="count ${c[1]}">${esc(c[0])}</span>` : ''}</button>`;
   }).join('') + `<div class="nav-foot">${/^https:\/\//.test(S.info.paypal || '') ? `<div class="donate"><div class="d-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.8 4.5c2.1 0 3.6 1.1 5.2 3 1.6-1.9 3.1-3 5.2-3 3.8 0 5.9 3.9 4.4 7.3C19.5 16.4 12 21 12 21z"/></svg>${L('Tu donación lo mantiene vivo', 'Your donation keeps it alive')}</div>
     <p>${L('No hay empresa detrás: hay una persona que le dedica sus noches. Si te ayudó, donar, por poco que sea, lo mantiene vivo para todos.', 'No company behind it: one person giving it their nights. If it helped you, donating, however little, keeps it alive for everyone.')}</p>
-    <button class="donate-btn" data-open="${esc(S.info.paypal)}">💜 ${L('Donar', 'Donate')}</button><div class="d-note">${L('Acepta PayPal · cada donación cuenta', 'PayPal accepted · every donation counts')}</div></div>` : ''}${repoUrl() ? `<button class="gh-btn" data-open="${repoUrl()}" title="${L('Revisar el código abierto en GitHub', 'Review the open source code on GitHub')}">${GH_ICON}<span>${L('Ver el código en GitHub', 'View code on GitHub')}</span></button>` : ''}<div class="trust">${L('Sin telemetría · Código abierto', 'No telemetry · Open source')}</div>${L('Todo lo que borra se puede deshacer.', 'Everything it removes can be undone.')}</div>`;
+    <button class="donate-btn big-donate" data-act="donateAsk">${L('Donar con PayPal', 'Donate with PayPal')}</button><div class="d-note">${L('Cada donación cuenta 💜', 'Every donation counts 💜')}</div></div>` : ''}${repoUrl() ? `<button class="gh-btn" data-open="${repoUrl()}" title="${L('Revisar el código abierto en GitHub', 'Review the open source code on GitHub')}">${GH_ICON}<span>${L('Ver el código en GitHub', 'View code on GitHub')}</span></button>` : ''}<div class="trust">${L('Sin telemetría · Código abierto', 'No telemetry · Open source')}</div>${L('Todo lo que borra se puede deshacer.', 'Everything it removes can be undone.')}</div>`;
 }
 
 function head(title, desc, right = '') {
@@ -758,39 +758,77 @@ function showProcWarning() {
   $('#modal').classList.remove('hidden');
 }
 
+const PROC_LVL = {
+  ram: (b) => (b >= 1.5 * GB ? ['rojo', 'Mucha', 'A lot'] : b >= 400 * 1024 ** 2 ? ['amarillo', 'Bastante', 'Quite a bit'] : ['verde', 'Poca', 'Little']),
+  cpu: (c) => (c >= 25 ? ['rojo', 'Mucho', 'A lot'] : c >= 5 ? ['amarillo', 'Algo', 'Some'] : ['verde', 'Poco', 'Little'])
+};
+function procRow(x, maxRam) {
+  const name = x.descripcion && x.descripcion.length < 60 ? x.descripcion : x.nombre;
+  const [rc, res, ren] = PROC_LVL.ram(x.ram), [cc, ces, cen] = PROC_LVL.cpu(x.cpu);
+  const heavy = !x.windows && (x.ram >= 1.5 * GB || x.cpu >= 25);
+  const confirming = S.procConfirm === x.nombre;
+  const hue = [...x.nombre].reduce((a, ch) => a + ch.charCodeAt(0), 0) % 360;
+  let action;
+  if (x.critico) action = `<span class="badge gris" title="${L('Windows lo necesita para funcionar', 'Windows needs it to work')}">🔒 ${L('Protegido', 'Protected')}</span>`;
+  else if (x.windows && !S.settings.modoExperto) action = `<span class="badge gris" title="${L('Es parte de Windows. Actívalo en modo experto si de verdad necesitas cerrarlo.', 'Part of Windows. Enable expert mode if you really need to close it.')}">${L('Mejor no tocar', 'Better leave it')}</span>`;
+  else if (confirming) action = `<button class="btn small danger" data-pkill="${esc(x.nombre)}">${L('Sí, cerrar', 'Yes, close')}</button><button class="btn small ghost" data-act="procNo">${L('No', 'No')}</button>`;
+  else action = `<button class="btn small ghost" data-pask="${esc(x.nombre)}">${L('Cerrar', 'Close')}</button>`;
+  return `<div class="row prow2 ${confirming ? 'confirming' : ''}">
+    <span class="pavatar" style="--h:${hue}">${esc((name[0] || '?').toUpperCase())}</span>
+    <div class="grow"><div class="name">${esc(name)}${x.cantidad > 1 ? ` <span class="meta" title="${L('Este programa funciona repartido en varias partes', 'This program runs split into several parts')}">· ${x.cantidad} ${L('partes', 'parts')}</span>` : ''}</div>
+      <div class="sub">${x.titulo ? '🪟 ' + esc(x.titulo) : esc(x.empresa || x.nombre + '.exe')}</div>
+      ${confirming ? `<div class="why-line">${L('¿Seguro? Se cerrará a la fuerza y se perderá lo que no hayas guardado.', 'Sure? It will be force-closed and anything unsaved will be lost.')}</div>` : heavy ? `<div class="why-line">💡 ${L('Está usando mucho. Si no lo necesitas ahora, cerrarlo liberará recursos.', 'It is using a lot. If you do not need it now, closing it frees resources.')}</div>` : ''}
+      ${S.settings.modoExperto && x.ruta ? `<div class="tech">${esc(x.ruta)}</div>` : ''}</div>
+    <div class="pmet"><small>${L('Memoria', 'Memory')}</small><b>${fmtBytes(x.ram)}</b><span class="lvl ${rc}">${L(res, ren)}</span></div>
+    <div class="pmet"><small>${L('Procesador', 'CPU')}</small><b>${x.cpu.toFixed(1)}%</b><span class="lvl ${cc}">${L(ces, cen)}</span></div>
+    <div class="pact">${action}</div></div>`;
+}
+
 function viewProcesos() {
-  const intro = head(L('Procesos (avanzado)', 'Processes (advanced)'), L('Lo que más está consumiendo tu PC ahora mismo. Se actualiza cada 3 segundos.', 'What is using your PC the most right now. Refreshes every 3 seconds.'),
+  const intro = head(L('Procesos (avanzado)', 'Processes (advanced)'), L('Qué programas están gastando la memoria y el procesador de tu PC ahora mismo.', 'Which programs are using your PC\'s memory and processor right now.'),
     `<button class="btn ghost" data-act="procPause">${S.procPaused ? L('Reanudar', 'Resume') : L('Pausar', 'Pause')}</button>`);
   if (!S.settings.procesosAviso) {
     if ($('#modal').classList.contains('hidden')) setTimeout(showProcWarning, 0);
     return `<div class="view">${banners()}${intro}</div>`;
   }
-  if (!S.procs) { loadProcs(); return `<div class="view">${banners()}${intro}<div class="progress-card"><div class="msg"><span><b>${L('Midiendo procesos...', 'Measuring processes...')}</b></span></div><div class="pbar indet"><i></i></div></div></div>`; }
+  if (!S.procs) { loadProcs(); return `<div class="view">${banners()}${intro}<div class="progress-card"><div class="msg"><span><b>${L('Mirando qué está funcionando...', 'Looking at what is running...')}</b></span></div><div class="pbar indet"><i></i></div></div></div>`; }
   const pr = S.procs;
   S.procSort = S.procSort || 'ram';
-  const list = [...pr.procesos].sort((a, b) => (S.procSort === 'cpu' ? b.cpu - a.cpu : b.ram - a.ram)).slice(0, 60);
-  const maxRam = Math.max(1, ...list.map((x) => x.ram));
+  const q = (S.procSearch || '').toLowerCase().trim();
+  const match = (x) => !q || [x.nombre, x.descripcion, x.titulo, x.empresa].join(' ').toLowerCase().includes(q);
+  const small = (x) => x.ram < 30 * 1024 ** 2 && x.cpu < 0.5;
+  const sorter = (a, b) => (S.procSort === 'cpu' ? b.cpu - a.cpu || b.ram - a.ram : b.ram - a.ram);
+  const all = pr.procesos.filter(match).sort(sorter);
+  const showSmall = S.procShowSmall || !!q;
+  const groups = [
+    ['usando', '🪟', L('Programas que estás usando', 'Programs you are using'), L('Tienen una ventana abierta.', 'They have an open window.'), all.filter((x) => x.ventana && !x.windows)],
+    ['fondo', '⚙️', L('Funcionando en segundo plano', 'Running in the background'), L('Sin ventana: actualizadores, ayudantes de otros programas, launchers...', 'No window: updaters, helpers of other programs, launchers...'), all.filter((x) => !x.ventana && !x.windows)],
+    ['windows', '🛡️', L('Partes de Windows', 'Parts of Windows'), L('Windows las necesita. Mejor no tocarlas.', 'Windows needs them. Better leave them alone.'), all.filter((x) => x.windows)]
+  ];
   const ramUsada = pr.ramTotal - pr.ramLibre;
   const ramPct = pr.ramTotal ? Math.round(100 * ramUsada / pr.ramTotal) : 0;
-  const lvl = (v, a, b) => (v >= b ? 'rojo' : v >= a ? 'amarillo' : '');
+  const mood = (pct) => (pct >= 90 ? ['rojo', 'Al límite', 'Maxed out'] : pct >= 70 ? ['amarillo', 'Ocupado', 'Busy'] : ['verde', 'Tranquilo', 'Relaxed']);
+  const [mc, mes, men] = mood(ramPct), [pc, pes, pen] = mood(pr.cpuTotal);
+  let hidden = 0;
+  const sections = groups.map(([id, ico, title, desc, list]) => {
+    const collapsed = id === 'windows' && !S.procShowWin && !q;
+    const vis = showSmall ? list : list.filter((x) => !small(x));
+    hidden += list.length - vis.length;
+    if (!list.length) return '';
+    return `<h2>${ico} ${title}<span class="sub">${list.length} · ${desc}</span>${id === 'windows' ? `<button class="link sel-all" data-act="procWin">${collapsed ? L('Mostrar', 'Show') : L('Ocultar', 'Hide')}</button>` : ''}</h2>
+      ${collapsed ? '' : vis.length ? `<div class="list">${vis.map((x) => procRow(x)).join('')}</div>` : `<div class="card meta">${L('Solo hay procesos pequeños aquí.', 'Only small processes here.')}</div>`}`;
+  }).join('');
   return `<div class="view">${banners()}${intro}
+    <div class="banner info"><div class="grow">💡 ${L('<b>¿Tu PC va lento?</b> Aquí ves quién tiene la culpa. Cada programa abierto usa parte de la memoria y del procesador. Cerrar algo desde aquí es cerrarlo a la fuerza: <b>no guarda nada</b>.', '<b>PC feeling slow?</b> Here you see who is to blame. Every open program uses some memory and processor. Closing something here force-closes it: <b>nothing is saved</b>.')}</div></div>
     <div class="grid c2" style="margin-bottom:14px">
-      <div class="card"><h3>${L('Procesador', 'CPU')}</h3><div class="big">${pr.cpuTotal}%</div><div class="meter"><i class="${lvl(pr.cpuTotal, 60, 90)}" style="width:${Math.max(1, pr.cpuTotal)}%"></i></div></div>
-      <div class="card"><h3>${L('Memoria RAM', 'RAM')}</h3><div class="big">${fmtBytes(ramUsada)} <span class="meta">/ ${fmtBytes(pr.ramTotal)}</span></div><div class="meter"><i class="${lvl(ramPct, 75, 90)}" style="width:${ramPct}%"></i></div></div>
+      <div class="card"><h3>${L('Memoria (RAM)', 'Memory (RAM)')}</h3><div class="big">${fmtBytes(ramUsada)} <span class="meta">${L('de', 'of')} ${fmtBytes(pr.ramTotal)}</span> <span class="lvl ${mc}">${L(mes, men)}</span></div><div class="meter"><i class="${mc === 'verde' ? '' : mc}" style="width:${ramPct}%"></i></div></div>
+      <div class="card"><h3>${L('Procesador', 'Processor')}</h3><div class="big">${pr.cpuTotal}% <span class="lvl ${pc}">${L(pes, pen)}</span></div><div class="meter"><i class="${pc === 'verde' ? '' : pc}" style="width:${Math.max(1, pr.cpuTotal)}%"></i></div></div>
     </div>
-    <div class="toolbar"><button class="chip ${S.procSort === 'ram' ? 'on' : ''}" data-psort="ram">${L('Más memoria', 'Most memory')}</button><button class="chip ${S.procSort === 'cpu' ? 'on' : ''}" data-psort="cpu">${L('Más procesador', 'Most CPU')}</button>
-      <span class="meta" style="margin-left:auto">${pr.procesos.length} ${L('programas en marcha', 'programs running')}${S.procPaused ? ' · ' + L('en pausa', 'paused') : ''}</span></div>
-    <div class="list">${list.map((x) => {
-      const name = x.descripcion && x.descripcion.length < 60 ? x.descripcion : x.nombre;
-      const confirming = S.procConfirm === x.nombre;
-      return `<div class="row ${confirming ? 'confirming' : ''}"><div class="grow"><div class="name">${esc(name)}${x.cantidad > 1 ? ` <span class="meta">×${x.cantidad}</span>` : ''}</div>
-        <div class="sub">${esc(x.nombre + '.exe')}${x.empresa ? ' · ' + esc(x.empresa) : ''}</div>${S.settings.modoExperto && x.ruta ? `<div class="tech">${esc(x.ruta)}</div>` : ''}</div>
-        <div class="pstat"><span>${x.cpu.toFixed(1)}%</span><small>CPU</small></div>
-        <div class="weight"><b>${fmtBytes(x.ram)}</b><i style="width:${Math.max(3, Math.round(100 * x.ram / maxRam))}%"></i></div>
-        <div class="pact">${x.critico ? `<span class="badge gris" title="${L('Windows lo necesita para funcionar', 'Windows needs it to work')}">🔒 ${L('Protegido', 'Protected')}</span>`
-          : confirming ? `<button class="btn small danger" data-pkill="${esc(x.nombre)}">${L('Sí, cerrar', 'Yes, close')}</button><button class="btn small ghost" data-act="procNo">${L('No', 'No')}</button>`
-          : `<button class="btn small ghost" data-pask="${esc(x.nombre)}">${L('Terminar', 'End')}</button>`}</div></div>`;
-    }).join('')}</div></div>`;
+    <div class="toolbar"><input class="search" id="procSearch" placeholder="${L('Buscar un programa (ej. chrome, discord, obs)...', 'Search a program (e.g. chrome, discord, obs)...')}" value="${esc(S.procSearch || '')}">
+      <button class="chip ${S.procSort === 'ram' ? 'on' : ''}" data-psort="ram">${L('Más memoria', 'Most memory')}</button><button class="chip ${S.procSort === 'cpu' ? 'on' : ''}" data-psort="cpu">${L('Más procesador', 'Most CPU')}</button></div>
+    ${q && !all.length ? `<div class="empty">${L('No hay nada funcionando con ese nombre.', 'Nothing running with that name.')}</div>` : sections}
+    ${hidden ? `<p class="meta" style="margin-top:14px;text-align:center"><button class="link" data-act="procSmall">${L(`Mostrar también ${hidden} procesos pequeños`, `Also show ${hidden} small processes`)}</button></p>` : S.procShowSmall && !q ? `<p class="meta" style="margin-top:14px;text-align:center"><button class="link" data-act="procSmall">${L('Ocultar los procesos pequeños', 'Hide small processes')}</button></p>` : ''}
+    ${S.procPaused ? `<p class="meta" style="text-align:center">${L('En pausa: los datos no se actualizan.', 'Paused: data is not refreshing.')}</p>` : ''}</div>`;
 }
 
 function viewDeshacer() {
@@ -885,6 +923,18 @@ function showReminders() {
   $('#modal').classList.remove('hidden');
 }
 
+function showDonate() {
+  $('#modal').innerHTML = `<div class="modal donate-modal" role="dialog" aria-modal="true">
+    <div class="heart-anim" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.8 4.5c2.1 0 3.6 1.1 5.2 3 1.6-1.9 3.1-3 5.2-3 3.8 0 5.9 3.9 4.4 7.3C19.5 16.4 12 21 12 21z"/></svg><span></span><span></span><span></span></div>
+    <h2>${L('¡Gracias de corazón!', 'Thank you from the heart!')}</h2>
+    <p class="lead">${L('Cualquier monto que envíes se agradece muchísimo. Gracias a gente como tú, RetroLimpia sigue siendo gratis, sin anuncios y mejorando cada día.', 'Any amount you send is deeply appreciated. Thanks to people like you, RetroLimpia stays free, ad-free and keeps improving.')}</p>
+    <div class="why"><span class="n">💜</span><div><b>${L('Tú eliges el monto', 'You choose the amount')}</b><p>${L('Te llevaremos a un enlace de donación donde podrás poner la cantidad que quieras y, si te apetece, un mensaje.', 'We will take you to a donation link where you can enter any amount you like and, if you want, a message.')}</p></div></div>
+    <div class="why"><span class="n">🔒</span><div><b>${L('Pago seguro a través de PayPal', 'Secure payment through PayPal')}</b><p>${L('El pago lo procesa PayPal de forma segura. RetroLimpia no ve ni guarda ningún dato personal tuyo: ni tu nombre, ni tu correo, ni tu tarjeta.', 'PayPal processes the payment securely. RetroLimpia never sees or stores any of your personal data: not your name, email or card.')}</p></div></div>
+    <div class="banner good" style="margin-top:14px"><div class="grow">😊 <b>${L('Puedes estar tranquilo.', 'You can relax.')}</b> ${L('Se abrirá en tu navegador y puedes cerrarlo cuando quieras.', 'It opens in your browser and you can close it whenever you like.')}</div></div>
+    <div class="foot"><button class="btn primary" data-act="donateGo">💜 ${L('Ir a donar', 'Go to donate')}</button><button class="btn ghost" data-act="modalClose">${L('Ahora no', 'Not now')}</button></div></div>`;
+  $('#modal').classList.remove('hidden');
+}
+
 // ============================================================ Informe
 function buildReport() {
   const h = S.hardware;
@@ -907,8 +957,8 @@ function buildReport() {
 function render() {
   renderNav();
   const views = { inicio: viewInicio, programas: viewProgramas, limpieza: viewLimpieza, arranque: viewArranque, hardware: viewHardware, drivers: viewDrivers, actualizaciones: viewActualizaciones, procesos: viewProcesos, deshacer: viewDeshacer, ajustes: viewAjustes };
-  const focusSearch = document.activeElement && document.activeElement.id === 'search';
-  const caret = focusSearch ? document.activeElement.selectionStart : 0;
+  const focusId = document.activeElement && ['search', 'procSearch'].includes(document.activeElement.id) ? document.activeElement.id : null;
+  const caret = focusId ? document.activeElement.selectionStart : 0;
   let html;
   try { html = (views[S.view] || viewInicio)(); }
   catch (e) {
@@ -916,7 +966,7 @@ function render() {
     html = `<div class="view"><div class="banner bad"><div class="grow"><b>${L('Esta pantalla tuvo un problema', 'This screen had a problem')}</b> · ${esc(e.message)}</div><button class="btn small" data-nav="inicio">${L('Volver al inicio', 'Back to start')}</button></div></div>`;
   }
   $('#main').innerHTML = html;
-  if (focusSearch) { const el = $('#search'); el.focus(); el.setSelectionRange(caret, caret); }
+  if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); el.setSelectionRange(caret, caret); } }
 }
 
 document.addEventListener('click', async (e) => {
@@ -969,6 +1019,11 @@ document.addEventListener('click', async (e) => {
     case 'procOk': S.settings = await rl.setSettings({ procesosAviso: true }); $('#modal').classList.add('hidden'); return render();
     case 'procBack': $('#modal').classList.add('hidden'); S.view = 'inicio'; return render();
     case 'procPause': S.procPaused = !S.procPaused; return render();
+    case 'donateAsk': return showDonate();
+    case 'donateGo': $('#modal').classList.add('hidden'); return rl.open(S.info.paypal);
+    case 'modalClose': $('#modal').classList.add('hidden'); return;
+    case 'procWin': S.procShowWin = !S.procShowWin; return render();
+    case 'procSmall': S.procShowSmall = !S.procShowSmall; return render();
     case 'procNo': S.procConfirm = null; return render();
     case 'updNone': S.updSel.clear(); return render();
     case 'updateSel': return updateSelected();
@@ -1086,7 +1141,10 @@ document.addEventListener('change', async (e) => {
     render();
   }
 });
-document.addEventListener('input', (e) => { if (e.target.id === 'search') { S.search = e.target.value; render(); } });
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'search') { S.search = e.target.value; render(); }
+  if (e.target.id === 'procSearch') { S.procSearch = e.target.value; render(); }
+});
 
 rl.onProgress((p) => {
   if (!S.busy) return;

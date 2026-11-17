@@ -42,6 +42,7 @@ switch ($p.accion) {
                     try {
                         Remove-Item -LiteralPath ('Registry::' + $it.ruta) -Recurse -Force -ErrorAction Stop
                         $saved.Add(@{ tipo = 'registro'; origen = $it.ruta; guardado = $regFile; tamano = 0 })
+                        Send-Log 'ok' 'Entrada del registro copiada a la cuarentena y borrada' 'Registry entry backed up to quarantine and removed' $it.ruta
                     } catch { $failed.Add(@{ ruta = $it.ruta; error = $_.Exception.Message }) }
                 } else { $failed.Add(@{ ruta = $it.ruta; error = 'No se pudo respaldar la clave' }) }
             } else {
@@ -50,9 +51,12 @@ switch ($p.accion) {
                 $target = Join-Path $dest (Split-Path -Leaf $it.ruta)
                 if (Move-Safe $it.ruta $target) {
                     $saved.Add(@{ tipo = $it.tipo; origen = $it.ruta; guardado = $target; tamano = $size })
-                } else { $failed.Add(@{ ruta = $it.ruta; error = 'En uso o sin permiso' }) }
+                    $tam = $(if ($size -ge 1MB) { [string][math]::Round($size / 1MB, 1) + ' MB' } else { [string][math]::Max(1, [math]::Round($size / 1KB)) + ' KB' })
+                    Send-Log 'ok' ('Movido a la cuarentena (' + $tam + ')') ('Moved to quarantine (' + $tam + ')') $it.ruta
+                } else { $failed.Add(@{ ruta = $it.ruta; error = 'En uso o sin permiso' }); Send-Log 'error' 'No se pudo mover (en uso o sin permiso)' 'Could not move (in use or no permission)' $it.ruta }
             }
         }
+        Send-Log 'info' 'Todo lo quitado está guardado aquí unos días por si quieres restaurarlo' 'Everything removed is kept here for a few days in case you want to restore it' $dir
         $manifest = @{ id = $id; fecha = (Get-Date).ToString('o'); motivo = [string]$p.motivo; items = $saved.ToArray() }
         $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $dir 'manifest.json') -Encoding UTF8
         Write-RLLog ('Cuarentena ' + $id + ': ' + $saved.Count + ' guardados, ' + $failed.Count + ' fallidos')

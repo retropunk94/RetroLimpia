@@ -1,7 +1,7 @@
 {
   "name": "retrolimpia",
   "productName": "RetroLimpia",
-  "version": "2.4.0",
+  "version": "2.5.0",
   "description": "Limpia, desinstala sin dejar restos, revisa tu hardware y mantiene tus drivers al día. Guiado paso a paso.",
   "main": "src/main.js",
   "author": "Retropunk94",
@@ -53,12 +53,6 @@
           "arch": [
             "x64"
           ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
         }
       ],
       "requestedExecutionLevel": "requireAdministrator",
@@ -77,9 +71,6 @@
       "createDesktopShortcut": true,
       "shortcutName": "RetroLimpia",
       "artifactName": "RetroLimpia-Instalador-${version}.exe"
-    },
-    "portable": {
-      "artifactName": "RetroLimpia-Portable-${version}.exe"
     },
     "publish": [
       {

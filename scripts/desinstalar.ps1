@@ -70,7 +70,10 @@ function Stop-AppProcesses {
     $f = $Folder.TrimEnd('\').ToLowerInvariant() + '\'
     Get-Process -ErrorAction SilentlyContinue | Where-Object {
         try { $_.Path -and $_.Path.ToLowerInvariant().StartsWith($f) } catch { $false }
-    } | ForEach-Object { try { $_ | Stop-Process -Force -ErrorAction SilentlyContinue } catch {} }
+    } | ForEach-Object {
+        Send-Log 'paso' ('Cerrando ' + $_.ProcessName + ' (estaba abierto)') ('Closing ' + $_.ProcessName + ' (it was open)') ([string]$_.Path)
+        try { $_ | Stop-Process -Force -ErrorAction SilentlyContinue } catch {}
+    }
 }
 
 $label = [string]$p.nombre
@@ -80,6 +83,8 @@ $result = @{ ok = $false; metodo = ''; reinicio = $false; mensaje = ''; nombre =
 # ---------------- Apps de Microsoft Store ----------------
 if ($p.tipo -eq 'appx') {
     Send-Progress 20 ('Quitando ' + $label + '...') ('Removing ' + $label + '...')
+    Send-Log 'paso' 'Quitando la app de Microsoft Store' 'Removing the Microsoft Store app' ([string]$p.paquete)
+    if ($p.carpeta) { Send-Log 'info' 'Carpeta de la app' 'App folder' ([string]$p.carpeta) }
     try {
         try { Remove-AppxPackage -Package $p.paquete -AllUsers -ErrorAction Stop }
         catch { Remove-AppxPackage -Package $p.paquete -ErrorAction Stop }
@@ -87,11 +92,16 @@ if ($p.tipo -eq 'appx') {
         try {
             Get-AppxProvisionedPackage -Online -ErrorAction SilentlyContinue |
                 Where-Object { $_.DisplayName -eq $p.nombre } |
-                ForEach-Object { Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null }
+                ForEach-Object {
+                    Send-Log 'paso' 'Quitando la copia que Windows reinstala a usuarios nuevos' 'Removing the copy Windows reinstalls for new users' $_.PackageName
+                    Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue | Out-Null
+                }
         } catch {}
-        $result.ok = $true; $result.metodo = 'appx'
+        $result.ok = $true; $result.metodo = 'appx'; $result.registroLimpio = $true
+        Send-Log 'ok' 'App quitada correctamente' 'App removed successfully'
     } catch {
         $result.mensaje = $_.Exception.Message
+        Send-Log 'error' ('No se pudo quitar: ' + $_.Exception.Message) ('Could not remove: ' + $_.Exception.Message)
     }
     Write-RLLog ('Desinstalar appx ' + $p.nombre + ' -> ' + $result.ok)
     Send-Progress 100 'Listo' 'Done'
@@ -101,6 +111,9 @@ if ($p.tipo -eq 'appx') {
 
 # ---------------- Programas clásicos ----------------
 $key = [string]$p.clave
+Send-Log 'info' ('Programa: ' + $label + $(if ($p.version) { ' ' + $p.version } else { '' })) ('Program: ' + $label)
+if ($p.carpeta) { Send-Log 'info' 'Carpeta de instalación' 'Install folder' ([string]$p.carpeta) }
+if ($key) { Send-Log 'info' 'Su entrada en el registro de Windows' 'Its Windows registry entry' $key }
 if ($p.cerrarProcesos -ne $false) { Stop-AppProcesses $p.carpeta }
 
 $cmd = [string]$p.desinstalar
@@ -111,6 +124,7 @@ Send-Progress 15 ('Desinstalando ' + $label + ' en silencio...') ('Silently unin
 try {
     if ($cmd -match 'msiexec' -and $cmd -match '(\{[0-9A-Fa-f\-]{36}\})') {
         $guid = $Matches[1]
+        Send-Log 'paso' 'Ejecutando su desinstalador (Windows Installer) en silencio' 'Running its uninstaller (Windows Installer) silently' "msiexec.exe /x $guid /qn"
         $proc = Start-Process -FilePath 'msiexec.exe' -ArgumentList "/x $guid /qn /norestart" -PassThru -WindowStyle Hidden
         $proc.WaitForExit()
         $code = $proc.ExitCode
@@ -120,6 +134,7 @@ try {
     }
     elseif ($quiet) {
         $c = Split-Command $quiet
+        Send-Log 'paso' 'Ejecutando su desinstalador silencioso oficial' 'Running its official silent uninstaller' ($c.exe + ' ' + $c.args)
         $proc = Start-Cmd $c.exe $c.args -Hidden
         Wait-Uninstall $proc $key
         $result.metodo = 'silencioso-oficial'
@@ -136,6 +151,7 @@ try {
         }
         if ($silentArgs) {
             $args2 = ($c.args + ' ' + $silentArgs).Trim()
+            Send-Log 'paso' ('Ejecutando su desinstalador en silencio (tipo ' + $kind + ')') ('Running its uninstaller silently (' + $kind + ')') ($c.exe + ' ' + $args2)
             $proc = Start-Cmd $c.exe $args2 -Hidden
             Wait-Uninstall $proc $key
             $result.metodo = 'silencioso-' + $kind
@@ -149,6 +165,7 @@ try {
 # Último recurso: el desinstalador normal del programa (una ventana, inevitable)
 if (-not $result.ok -and $cmd -and $p.permitirVentana -ne $false) {
     Send-Progress 50 ('Este programa necesita su propio asistente. Sigue sus pasos en la ventana que se abre.') ('This program needs its own uninstaller. Follow the window that opens.')
+    Send-Log 'aviso' 'No admite modo silencioso: se abre su propio asistente. Sigue sus pasos.' 'No silent mode: its own wizard opens. Follow its steps.' $cmd
     try {
         if ($cmd -match 'msiexec' -and $cmd -match '(\{[0-9A-Fa-f\-]{36}\})') {
             $proc = Start-Process -FilePath 'msiexec.exe' -ArgumentList ('/x ' + $Matches[1]) -PassThru
@@ -164,6 +181,17 @@ if (-not $result.ok -and $cmd -and $p.permitirVentana -ne $false) {
     }
 }
 
+# Comprobación final: ¿se borró su entrada del registro? ¿queda su carpeta?
+$result.registroLimpio = (-not $key) -or (Test-Gone $key)
+if ($key) {
+    if ($result.registroLimpio) { Send-Log 'ok' 'Su entrada del registro se borró' 'Its registry entry was removed' $key }
+    else { Send-Log 'aviso' 'Su entrada del registro sigue ahí' 'Its registry entry is still there' $key }
+}
+$loc = ([string]$p.carpeta).Trim('"')
+$result.carpetaQueda = [bool]($loc -and (Test-Path -LiteralPath $loc))
+if ($result.carpetaQueda) { Send-Log 'aviso' 'Su carpeta sigue en el disco (se revisará como resto)' 'Its folder is still on disk (checked as leftover)' $loc }
+if ($result.ok) { Send-Log 'ok' ('Desinstalado correctamente (' + $result.metodo + ')') ('Uninstalled successfully (' + $result.metodo + ')') }
+else { Send-Log 'error' 'No se pudo desinstalar' 'Could not uninstall' }
 Write-RLLog ('Desinstalar ' + $p.nombre + ' metodo=' + $result.metodo + ' ok=' + $result.ok)
 Send-Progress 100 'Listo' 'Done'
 Send-Result $result

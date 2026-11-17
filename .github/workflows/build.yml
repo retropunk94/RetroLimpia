@@ -1,7 +1,7 @@
 # Compila RetroLimpia para Windows en los servidores de GitHub (gratis para código abierto).
 # - Cada cambio subido: genera el .exe para descargar desde la pestaña "Actions".
 # - Al crear una etiqueta de versión (ej. v2.0.1): publica una "Release" con el
-#   instalador, la versión portable y sus huellas SHA-256 para comprobarlos.
+#   instalador y su huella SHA-256 para comprobarlo.
 
 name: Compilar RetroLimpia
 
@@ -38,7 +38,7 @@ jobs:
       - name: Instalar dependencias
         run: npm install
 
-      - name: Compilar instalador y portable
+      - name: Compilar instalador
         run: npm run dist
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: false
@@ -70,9 +70,7 @@ jobs:
             dist/SHA256.txt
           body: |
             ## Descarga
-            👉 **Solo necesitas UNO de estos dos archivos:**
-            - **RetroLimpia-Instalador-x.x.x.exe** → se instala como cualquier programa y se actualiza solo (recomendado).
-            - **RetroLimpia-Portable-x.x.x.exe** → no se instala, se abre directamente (por ejemplo desde un USB).
+            👉 **Descarga solo `RetroLimpia-Instalador-x.x.x.exe`**: se instala como cualquier programa y después se actualiza solo.
 
             <sub>Los demás archivos (`latest.yml`, `.blockmap` y `SHA256.txt`) **puedes ignorarlos**: los usa el propio programa para actualizarse solo y descargando solo lo que cambió, y `SHA256.txt` sirve para quien quiera comprobar que el archivo es original.</sub>
 

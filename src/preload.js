@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('rl', {
   info: () => ipcRenderer.invoke('rl:info'),
   open: (url) => ipcRenderer.invoke('rl:open', url),
   openFolder: (which) => ipcRenderer.invoke('rl:openFolder', which),
+  reveal: (ruta) => ipcRenderer.invoke('rl:reveal', ruta),
   saveReport: (html) => ipcRenderer.invoke('rl:saveReport', html),
   checkUpdate: () => ipcRenderer.invoke('rl:checkUpdate'),
   autostart: (on, dias) => ipcRenderer.invoke('rl:autostart', on, dias),

@@ -43,6 +43,8 @@ function run(script, params = {}, onProgress = () => {}) {
         buffer = buffer.slice(idx + 1);
         if (line.startsWith('@@PROGRESS ')) {
           try { onProgress(JSON.parse(line.slice(11))); } catch { /* línea incompleta */ }
+        } else if (line.startsWith('@@LOG ')) {
+          try { onProgress({ log: JSON.parse(line.slice(6)) }); } catch { /* línea incompleta */ }
         } else if (line.startsWith('@@RESULT ')) {
           try { result = JSON.parse(line.slice(9)); } catch (e) { errText += 'Respuesta ilegible del motor. '; }
         }

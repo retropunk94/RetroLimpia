@@ -32,6 +32,9 @@ function Add-Found {
     $size = [int64]0
     if ($Tipo -ne 'registro') { $size = Get-PathSize $Ruta }
     $found.Add([pscustomobject]@{ tipo = $Tipo; ruta = $Ruta; tamano = $size; confianza = $Confianza })
+    $que = switch ($Tipo) { 'registro' { 'Entrada del registro' } 'carpeta' { 'Carpeta' } default { 'Archivo' } }
+    $what = switch ($Tipo) { 'registro' { 'Registry entry' } 'carpeta' { 'Folder' } default { 'File' } }
+    Send-Log 'hallado' ($que + ' que dejó el programa' + $(if ($Confianza -ne 'alta') { ' (posible, te lo preguntaremos)' } else { '' })) ($what + ' left behind' + $(if ($Confianza -ne 'alta') { ' (possible, we will ask you)' } else { '' })) $Ruta
 }
 
 Send-Progress 10 ('Buscando restos de ' + $name + '...') ('Looking for leftovers of ' + $name + '...')
@@ -45,6 +48,7 @@ $bases = @($env:ProgramFiles, ${env:ProgramFiles(x86)}, $env:ProgramData, $env:A
 
 $docs = "$env:USERPROFILE\Documents"
 foreach ($b in $bases) {
+    Send-Log 'buscar' 'Buscando restos en' 'Looking for leftovers in' $b
     # En Documentos puede haber trabajos del usuario: nunca se quita sin preguntar
     $conf = 'alta'
     if ($b -eq $docs) { $conf = 'media' }
@@ -74,6 +78,7 @@ $shell = New-Object -ComObject WScript.Shell
 $lnkDirs = @("$env:ProgramData\Microsoft\Windows\Start Menu\Programs", "$env:APPDATA\Microsoft\Windows\Start Menu\Programs", "$env:PUBLIC\Desktop", [Environment]::GetFolderPath('Desktop'))
 foreach ($d in $lnkDirs) {
     if (-not $d -or -not (Test-Path -LiteralPath $d)) { continue }
+    Send-Log 'buscar' 'Buscando accesos directos en' 'Looking for shortcuts in' $d
     foreach ($n in $names) {
         $sub = Join-Path $d $n
         if (Test-Path -LiteralPath $sub) { Add-Found 'carpeta' $sub 'alta' }
@@ -95,6 +100,7 @@ Send-Progress 70 'Revisando el registro...' 'Checking the registry...'
 # 4) Registro
 $regBases = @('HKCU:\Software', 'HKLM:\SOFTWARE', 'HKLM:\SOFTWARE\WOW6432Node')
 foreach ($rb in $regBases) {
+    Send-Log 'buscar' 'Revisando el registro de Windows en' 'Checking the Windows registry in' (Convert-Path $rb)
     foreach ($n in $names) {
         $k1 = Join-Path $rb $n
         if (Test-Path $k1) { Add-Found 'registro' (Convert-Path $k1) 'alta' }
@@ -107,5 +113,9 @@ foreach ($rb in $regBases) {
 # Entrada de desinstalación huérfana
 if ($p.clave -and (Test-Path -LiteralPath ('Registry::' + $p.clave))) { Add-Found 'registro' ([string]$p.clave) 'alta' }
 
+$nReg = @($found | Where-Object { $_.tipo -eq 'registro' }).Count
+if ($found.Count -eq 0) { Send-Log 'ok' 'No quedó nada: ni carpetas ni registro' 'Nothing left: no folders, no registry' }
+elseif ($nReg -eq 0) { Send-Log 'ok' ('El registro quedó limpio. Restos en disco: ' + $found.Count) ('Registry is clean. Leftovers on disk: ' + $found.Count) }
+else { Send-Log 'aviso' ('Quedaron ' + $nReg + ' entrada(s) en el registro y ' + ($found.Count - $nReg) + ' resto(s) en disco') ($nReg.ToString() + ' registry entries and ' + ($found.Count - $nReg) + ' leftovers on disk remained') }
 Send-Progress 100 'Listo' 'Done'
 Send-Result @{ nombre = $name; restos = $found.ToArray() }

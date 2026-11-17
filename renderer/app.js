@@ -132,6 +132,7 @@ async function cancelTask() {
   if (!S.busy.cambios) await rl.cancel();   // solo lectura: se corta ya
   else S.busy.msg = L('Cancelando al terminar el paso actual (para no dejar nada a medias)...', 'Cancelling after the current step (so nothing is left half-done)...');
   render();
+  if (S.mon && !S.mon.done) renderMonitor();
 }
 function fmtEta(start, pct) {
   const el = (Date.now() - start) / 1000;
@@ -321,32 +322,110 @@ async function scanAll() {
   if (S.scan.state === 'running') S.scan.state = 'idle';   // por si algo inesperado cortó el análisis
 }
 
+// ============================================================ Ventana de seguimiento al desinstalar
+// Enseña en vivo qué hace RetroLimpia y dónde (rutas reales), y al final si quedó algo en el registro.
+function monStart(list) {
+  S.mon = { items: list.map((p) => ({ nombre: p.cls.nombre, estado: 'wait', log: [], res: null })), cur: -1, done: false };
+  $('#monitor').classList.remove('hidden');
+  renderMonitor();
+}
+function monLog(entry) {
+  if (!S.mon || S.mon.cur < 0) return;
+  const it = S.mon.items[S.mon.cur];
+  it.log.push(entry);
+  const box = document.getElementById('monLog');
+  if (box) { box.insertAdjacentHTML('beforeend', monLine(entry)); box.scrollTop = box.scrollHeight; }
+}
+const MON_ICO = { paso: '▶', info: '•', buscar: '🔍', hallado: '📌', ok: '✔', aviso: '⚠', error: '✖' };
+function monLine(l) {
+  const ruta = l.ruta ? `<div class="mon-path"><code>${esc(l.ruta)}</code>${l.tipo !== 'paso' && /^[a-z]:\\/i.test(l.ruta) ? `<button class="link" data-reveal="${esc(l.ruta)}">${L('Abrir ubicación', 'Show in folder')}</button>` : /^HKEY_/.test(l.ruta) ? `<button class="link" data-copy="${esc(l.ruta)}">${L('Copiar', 'Copy')}</button>` : ''}</div>` : '';
+  return `<div class="mon-line t-${esc(l.tipo)}"><span class="ico">${MON_ICO[l.tipo] || '•'}</span><div><div>${esc(S.settings.idioma === 'en' ? l.en : l.msg)}</div>${ruta}</div></div>`;
+}
+function monSummary(it) {
+  const r = it.res;
+  if (!r) return '';
+  if (!r.ok) return `<div class="mon-sum bad">✖ ${L('No se pudo desinstalar', 'Could not uninstall')}${r.mensaje ? ': ' + esc(r.mensaje) : ''}</div>`;
+  const reg = r.regRestos || [];
+  const regAllMoved = reg.length && reg.every((x) => x.movido) && r.registroLimpio;
+  const regTxt = !reg.length && r.registroLimpio
+    ? `<div class="mon-sum good">✔ <b>${L('Registro limpio:', 'Registry clean:')}</b> ${L('no quedó ninguna entrada del programa.', 'no entries of the program remain.')}</div>`
+    : regAllMoved
+    ? `<div class="mon-sum good">✔ <b>${L('Registro limpio:', 'Registry clean:')}</b> ${L(`el programa dejó ${reg.length} entrada(s) y se movieron a la cuarentena.`, `the program left ${reg.length} entr(ies), moved to quarantine.`)}<ul>${reg.map((x) => `<li><code>${esc(x.ruta)}</code></li>`).join('')}</ul></div>`
+    : `<div class="mon-sum warn">⚠ <b>${L(`Quedaron ${reg.length + (r.registroLimpio ? 0 : 1)} entrada(s) en el registro`, `${reg.length + (r.registroLimpio ? 0 : 1)} registry entries remained`)}</b>
+        <ul>${reg.map((x) => `<li><code>${esc(x.ruta)}</code> · ${x.movido ? `<span class="ok">${L('movida a la cuarentena ✔', 'moved to quarantine ✔')}</span>` : `<span class="warn">${L('pendiente de que lo revises', 'waiting for your review')}</span>`}</li>`).join('')}
+        ${r.registroLimpio ? '' : `<li><code>${esc(r.clave || '')}</code> · ${L('su entrada de desinstalación', 'its uninstall entry')}</li>`}</ul></div>`;
+  const disco = r.archivos || [];
+  const discoTxt = disco.length ? `<div class="mon-sum ${disco.every((x) => x.movido) ? 'good' : 'warn'}">${disco.every((x) => x.movido) ? '✔' : '⚠'} <b>${L(`${disco.length} resto(s) en disco`, `${disco.length} leftover(s) on disk`)}</b>
+        <ul>${disco.map((x) => `<li><code>${esc(x.ruta)}</code> · ${x.movido ? `<span class="ok">${L('movido a la cuarentena ✔', 'moved to quarantine ✔')}</span>` : `<span class="warn">${L('pendiente de que lo revises', 'waiting for your review')}</span>`}</li>`).join('')}</ul></div>`
+    : `<div class="mon-sum good">✔ <b>${L('Disco limpio:', 'Disk clean:')}</b> ${L('no quedaron carpetas ni archivos.', 'no folders or files remain.')}</div>`;
+  return regTxt + discoTxt + (r.cuarentena ? `<div class="mon-sum info">🛟 ${L('Lo quitado está en la cuarentena unos días, por si quieres restaurarlo:', 'Removed items are kept in quarantine for a few days in case you want to restore them:')} <code>${esc(r.cuarentena)}</code> <button class="link" data-reveal="${esc(r.cuarentena)}">${L('Abrir', 'Open')}</button></div>` : '');
+}
+function renderMonitor() {
+  const m = S.mon;
+  if (!m) return;
+  const total = m.items.length;
+  const doneN = m.items.filter((x) => x.estado === 'ok' || x.estado === 'err' || x.estado === 'cancel').length;
+  const sel = m.view != null ? m.view : Math.max(0, m.cur);
+  const it = m.items[sel] || m.items[0];
+  const anyRegLeft = m.items.some((x) => x.res && x.res.ok && ((x.res.regRestos || []).some((r) => !r.movido) || !x.res.registroLimpio));
+  $('#monitor').innerHTML = `<div class="monitor">
+    <div class="mon-head"><div><h2>${m.done ? L('Desinstalación terminada', 'Uninstall finished') : L('Desinstalando...', 'Uninstalling...')}</h2>
+      <p class="meta">${m.done ? (anyRegLeft ? L('Algunas entradas del registro quedaron pendientes: revísalas abajo.', 'Some registry entries are waiting for review below.') : L('Todo revisado. Aquí tienes lo que se hizo y dónde.', 'All checked. Here is what was done and where.')) : L(`Programa ${Math.min(doneN + 1, total)} de ${total} · Aquí ves en vivo qué hace RetroLimpia y en qué carpeta.`, `Program ${Math.min(doneN + 1, total)} of ${total} · Watch live what RetroLimpia does and where.`)}</p></div>
+      <div class="mon-pct">${Math.round((doneN / total) * 100)}%</div></div>
+    <div class="pbar"><i style="width:${Math.round((doneN / total) * 100)}%"></i></div>
+    <div class="mon-body">
+      <div class="mon-list">${m.items.map((x, i) => `<button class="mon-item ${i === sel ? 'on' : ''} s-${x.estado}" data-monview="${i}"><span class="dot"></span><span class="n">${esc(x.nombre)}</span>${x.res && x.res.ok ? ((x.res.regRestos || []).some((r) => !r.movido) || !x.res.registroLimpio ? '<span class="tag warn">⚠</span>' : '<span class="tag ok">✔</span>') : ''}</button>`).join('')}</div>
+      <div class="mon-detail"><h3>${esc(it.nombre)}</h3>
+        <div class="mon-log" id="${sel === m.cur && !m.done ? 'monLog' : 'monLogStatic'}">${it.log.map(monLine).join('') || `<p class="meta">${L('Esperando su turno...', 'Waiting for its turn...')}</p>`}</div>
+        ${monSummary(it)}</div>
+    </div>
+    <div class="mon-foot">${m.done
+      ? `<button class="btn ghost" data-act="monQuar">${L('Ver la cuarentena', 'Open quarantine')}</button><button class="btn primary" data-act="monClose">${L('Cerrar', 'Close')}</button>`
+      : `<span class="meta">${L('No cierres RetroLimpia mientras trabaja.', 'Do not close RetroLimpia while it works.')}</span><button class="btn ghost danger" data-act="cancel" ${S.cancelRequested ? 'disabled' : ''}>${S.cancelRequested ? L('Se detendrá tras este programa...', 'Will stop after this program...') : L('Detener después de este', 'Stop after this one')}</button>`}</div></div>`;
+  const box = document.getElementById('monLog') || document.getElementById('monLogStatic');
+  if (box) box.scrollTop = box.scrollHeight;
+}
+
 async function uninstallPrograms(list, motivo) {
   // list: programas ya clasificados. Devuelve resumen.
   const res = { ok: 0, fail: [], restosMovidos: 0, bytes: 0, dudosos: [], reinicio: false };
+  monStart(list);
   await restorePoint(motivo);
   let i = 0;
   for (const p of list) {
-    if (S.cancelRequested) { res.cancelado = true; break; }
+    if (S.cancelRequested) { S.mon.items.slice(i).forEach((x) => { x.estado = 'cancel'; }); res.cancelado = true; break; }
+    const it = S.mon.items[i];
+    S.mon.cur = i; S.mon.view = null; it.estado = 'run'; renderMonitor();
     i++;
     if (S.busy) { S.busy.label = L(`Desinstalando (${i}/${list.length})`, `Uninstalling (${i}/${list.length})`); S.busy.msg = p.cls.nombre; S.busy.pct = Math.round(((i - 1) / list.length) * 100); updateProgressOnly(); setStatus(S.busy.label + ' · ' + p.cls.nombre); }
-    const r = await rl.run('desinstalar', { ...p, cls: undefined, etiqueta: p.cls.nombre, permitirVentana: true });
+    const r = obj(await rl.run('desinstalar', { ...p, cls: undefined, imp: undefined, etiqueta: p.cls.nombre, permitirVentana: true }).catch((e) => ({ ok: false, mensaje: String(e.message || e) })));
     if (r.reinicio) res.reinicio = true;
-    if (!r.ok) { res.fail.push(p.cls.nombre); continue; }
+    it.res = { ok: !!r.ok, metodo: r.metodo, registroLimpio: r.registroLimpio !== false, clave: p.clave, mensaje: r.mensaje, regRestos: [], archivos: [] };
+    if (!r.ok) { it.estado = 'err'; res.fail.push(p.cls.nombre); renderMonitor(); continue; }
     res.ok++;
     if (p.tipo === 'win32') {
-      const rr = await rl.run('residuos', { nombre: p.nombre, editor: p.editor, carpeta: p.carpeta, clave: p.clave });
-      rr.restos = arr(rr.restos);
-      const altos = rr.restos.filter((x) => x.confianza === 'alta');
-      const dudosos = rr.restos.filter((x) => x.confianza !== 'alta');
+      const rr = obj(await rl.run('residuos', { nombre: p.nombre, editor: p.editor, carpeta: p.carpeta, clave: p.clave }).catch(() => ({})));
+      const restos = arr(rr.restos);
+      const altos = restos.filter((x) => x.confianza === 'alta');
+      const dudosos = restos.filter((x) => x.confianza !== 'alta');
+      let movidos = [];
       if (S.settings.restosAutomaticos && altos.length) {
-        const q = await rl.run('cuarentena', { accion: 'mover', items: altos, motivo: L('Restos de ', 'Leftovers of ') + p.nombre });
-        res.restosMovidos += q.guardados; res.bytes += q.bytes || 0;
+        monLog({ tipo: 'paso', msg: 'Guardando los restos en la cuarentena...', en: 'Moving leftovers to quarantine...' });
+        const q = obj(await rl.run('cuarentena', { accion: 'mover', items: altos, motivo: L('Restos de ', 'Leftovers of ') + p.nombre }));
+        const fallidos = arr(q.fallidos).map((f) => f.ruta);
+        movidos = altos.filter((x) => !fallidos.includes(x.ruta));
+        res.restosMovidos += q.guardados || 0; res.bytes += q.bytes || 0;
+        if (q.id) it.res.cuarentena = 'C:\\ProgramData\\RetroLimpia\\Cuarentena\\' + q.id;
       } else dudosos.unshift(...altos);
+      const mark = (x) => ({ ...x, movido: movidos.some((m) => m.ruta === x.ruta) });
+      it.res.regRestos = restos.filter((x) => x.tipo === 'registro').map(mark);
+      it.res.archivos = restos.filter((x) => x.tipo !== 'registro').map(mark);
       if (dudosos.length) res.dudosos.push({ programa: p.nombre, restos: dudosos.map((d) => ({ ...d, elegido: d.confianza === 'alta' })) });
     }
+    it.estado = 'ok'; renderMonitor();
   }
   if (res.reinicio) S.needsReboot = true;
+  S.mon.done = true; S.mon.view = null; renderMonitor();
   return res;
 }
 
@@ -461,7 +540,7 @@ function updBannerHTML() {
 setInterval(() => {
   const up = S.upd || {};
   if (up.estado !== 'lista' || S.updLater || S.updInstalling) return;
-  const modalOpen = !$('#tour').classList.contains('hidden') || !$('#modal').classList.contains('hidden');
+  const modalOpen = !$('#tour').classList.contains('hidden') || !$('#modal').classList.contains('hidden') || !$('#monitor').classList.contains('hidden');
   if (S.busy || modalOpen) { S.updCount = null; return; }
   S.updCount = S.updCount == null ? 15 : S.updCount - 1;
   if (S.updCount <= 0) { S.updInstalling = true; render(); rl.installUpdate(); return; }
@@ -526,7 +605,7 @@ function banners() {
   const up = S.upd || {};
   if (up.estado === 'lista') h += updBannerHTML();
   else if (up.estado === 'descargando') h += `<div class="banner info"><div class="grow"><b>${L('Descargando RetroLimpia ' + esc(up.version || ''), 'Downloading RetroLimpia ' + esc(up.version || ''))}</b> · ${up.pct || 0}% · ${L('puedes seguir usándolo mientras tanto', 'you can keep using it meanwhile')}</div></div>`;
-  else if (S.appUpdate?.disponible && S.appUpdate.modo === 'manual') h += `<div class="banner good"><div class="grow"><b>${L('Hay una versión nueva de RetroLimpia', 'A new RetroLimpia version is available')} (${esc(S.appUpdate.version)})</b> · ${L('La versión portable no se actualiza sola: descarga la nueva y reemplaza este archivo.', 'The portable version cannot self-update: download the new one and replace this file.')}</div><button class="btn small" data-open="${esc(S.appUpdate.url)}">${L('Descargar', 'Download')}</button></div>`;
+  else if (S.appUpdate?.disponible && S.appUpdate.modo === 'manual') h += `<div class="banner good"><div class="grow"><b>${L('Hay una versión nueva de RetroLimpia', 'A new RetroLimpia version is available')} (${esc(S.appUpdate.version)})</b> · ${L('Descárgala e instálala encima.', 'Download it and install it over this one.')}</div><button class="btn small" data-open="${esc(S.appUpdate.url)}">${L('Descargar', 'Download')}</button></div>`;
   return h;
 }
 
@@ -1096,8 +1175,11 @@ function render() {
 }
 
 document.addEventListener('click', async (e) => {
-  const t = e.target.closest('[data-psort],[data-pask],[data-pkill],[data-updall],[data-retry],[data-nav],[data-act],[data-win],[data-open],[data-filter],[data-folder],[data-restore],[data-wu],[data-wg]');
+  const t = e.target.closest('[data-reveal],[data-copy],[data-monview],[data-psort],[data-pask],[data-pkill],[data-updall],[data-retry],[data-nav],[data-act],[data-win],[data-open],[data-filter],[data-folder],[data-restore],[data-wu],[data-wg]');
   if (!t) return;
+  if (t.dataset.reveal) { const ok = await rl.reveal(t.dataset.reveal); if (!ok) toast(L('Esa ubicación ya no existe (se movió a la cuarentena o se borró).', 'That location no longer exists (moved to quarantine or deleted).'), 'err'); return; }
+  if (t.dataset.copy) { try { await navigator.clipboard.writeText(t.dataset.copy); toast(L('Ruta copiada.', 'Path copied.')); } catch { toast(t.dataset.copy); } return; }
+  if (t.dataset.monview) { S.mon.view = Number(t.dataset.monview); return renderMonitor(); }
   if (t.dataset.psort) { S.procSort = t.dataset.psort; return render(); }
   if (t.dataset.pask) { S.procConfirm = t.dataset.pask; return render(); }
   if (t.dataset.pkill) {
@@ -1146,6 +1228,8 @@ document.addEventListener('click', async (e) => {
     case 'procBack': $('#modal').classList.add('hidden'); S.view = 'inicio'; return render();
     case 'procPause': S.procPaused = !S.procPaused; return render();
     case 'tour': return startTour();
+    case 'monClose': $('#monitor').classList.add('hidden'); S.mon = null; return render();
+    case 'monQuar': $('#monitor').classList.add('hidden'); S.mon = null; S.quarantine = null; S.view = 'deshacer'; return render();
     case 'donateAsk': return showDonate();
     case 'donateGo': $('#modal').classList.add('hidden'); return rl.open(S.info.paypal);
     case 'modalClose': $('#modal').classList.add('hidden'); return;
@@ -1275,6 +1359,7 @@ document.addEventListener('input', (e) => {
 });
 
 rl.onProgress((p) => {
+  if (p.log) { monLog(p.log); return; }
   if (!S.busy) return;
   const msg = S.settings.idioma === 'en' ? p.en : p.msg;
   if (S.scan.state === 'running') {
@@ -1310,7 +1395,7 @@ setInterval(() => { if (S.busy) updateProgressOnly(); }, 1000);
   rl.onResumen(async () => { S.settings = await rl.getSettings(); render(); });
   rl.updateState().then((st) => {
     S.upd = st;
-    // La versión portable no se actualiza sola: solo avisamos
+    // Sin actualizador automático (modo desarrollo): solo avisamos
     if (!st.auto) rl.checkUpdate().then((u) => { S.appUpdate = u; if (u.disponible) render(); }).catch(() => {});
     render();
   }).catch(() => {});

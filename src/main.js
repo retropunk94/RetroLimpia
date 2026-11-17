@@ -112,7 +112,7 @@ function showWindow() {
 // Se usa el Programador de tareas (y no la carpeta Inicio) porque RetroLimpia necesita
 // permisos de administrador: así arranca sin que Windows pregunte en cada inicio.
 const TASK_NAME = 'RetroLimpia (recordatorios)';
-function exePath() { return process.env.PORTABLE_EXECUTABLE_FILE || process.execPath; }
+function exePath() { return process.execPath; }
 function schtasks(args) {
   return new Promise((resolve) => {
     if (DEMO) return resolve(true);
@@ -252,6 +252,13 @@ ipcMain.handle('rl:openFolder', (e, which) => {
   fs.mkdirSync(p, { recursive: true });
   return shell.openPath(p);
 });
+ipcMain.handle('rl:reveal', (e, ruta) => {
+  // Muestra en el Explorador una carpeta o archivo (solo rutas que existen)
+  if (typeof ruta !== 'string' || !/^[a-z]:\\/i.test(ruta)) return false;
+  if (!fs.existsSync(ruta)) return false;
+  shell.showItemInFolder(ruta);
+  return true;
+});
 ipcMain.handle('rl:saveReport', async (e, html) => {
   const dir = path.join(app.getPath('documents'), 'RetroLimpia');
   fs.mkdirSync(dir, { recursive: true });
@@ -263,16 +270,13 @@ ipcMain.handle('rl:saveReport', async (e, html) => {
   return file;
 });
 // ---------- Actualizaciones de RetroLimpia ----------
-// Todo automático, sin pasos para el usuario:
-//  - Versión instalada: electron-updater descarga solo lo que cambió y lo instala en silencio.
-//  - Versión portable: descarga el nuevo .exe junto al actual, lo sustituye y lo abre.
+// Todo automático, sin pasos para el usuario: electron-updater descarga solo lo que
+// cambió y lo instala en silencio.
 // Si la ventana está abierta, la interfaz muestra una cuenta atrás (con "Más tarde").
 // Si está en la bandeja o cerrada, se instala sola en cuanto no haya ninguna tarea en marcha.
 let autoUpdater = null;
 let updateState = { estado: 'nada' };
 let rendererBusy = false;
-let portableNew = null;   // ruta del .exe portable nuevo ya descargado
-const isPortable = () => !!process.env.PORTABLE_EXECUTABLE_FILE;
 function sendUpdate(st) {
   updateState = { ...updateState, ...st };
   if (win && !win.isDestroyed()) win.webContents.send('rl:update', updateState);
@@ -289,19 +293,14 @@ function installWhenIdle() {
   doInstall();
 }
 function doInstall() {
+  if (!autoUpdater) return false;
   quitting = true;
-  if (autoUpdater) { autoUpdater.quitAndInstall(true, true); return true; }   // silencioso y vuelve a abrirse
-  if (portableNew) return swapPortable();
-  return false;
+  autoUpdater.quitAndInstall(true, true);   // silencioso y vuelve a abrirse
+  return true;
 }
 
 function initUpdater() {
   if (DEMO || !app.isPackaged) return;
-  if (isPortable()) {
-    setTimeout(() => portableUpdate().catch(() => {}), 8000);
-    setInterval(() => portableUpdate().catch(() => {}), 6 * 60 * 60 * 1000);
-    return;
-  }
   try { ({ autoUpdater } = require('electron-updater')); } catch { autoUpdater = null; return; }
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
@@ -315,68 +314,11 @@ function initUpdater() {
   setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000);
 }
 
-// ----- Portable: descargar el .exe nuevo y sustituir el viejo al cerrar -----
 async function latestRelease() {
   const r = await net.fetch(`https://api.github.com/repos/${pkg.retrolimpia.repo}/releases/latest`, { headers: { 'User-Agent': 'RetroLimpia' } });
   if (!r.ok) throw new Error('GitHub ' + r.status);
   return r.json();
 }
-async function portableUpdate() {
-  if (portableNew || updateState.estado === 'descargando') return;
-  sendUpdate({ estado: 'buscando' });
-  const j = await latestRelease();
-  const version = String(j.tag_name || '').replace(/^v/i, '');
-  if (!newer(version, pkg.version)) return sendUpdate({ estado: 'al-dia', revisado: Date.now() });
-  const asset = (j.assets || []).find((x) => /Portable.*\.exe$/i.test(x.name));
-  if (!asset) return sendUpdate({ estado: 'error', mensaje: 'Sin archivo portable en la versión nueva' });
-  const dir = path.dirname(process.env.PORTABLE_EXECUTABLE_FILE);
-  const dest = path.join(dir, asset.name);
-  const part = dest + '.descargando';
-  sendUpdate({ estado: 'descargando', version, pct: 0 });
-  const res = await net.fetch(asset.browser_download_url, { headers: { 'User-Agent': 'RetroLimpia' } });
-  if (!res.ok || !res.body) throw new Error('Descarga ' + res.status);
-  const total = Number(res.headers.get('content-length')) || asset.size || 0;
-  const out = fs.createWriteStream(part);
-  const reader = res.body.getReader();
-  let got = 0, lastPct = -1;
-  for (;;) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    got += value.length;
-    if (!out.write(Buffer.from(value))) await new Promise((r) => out.once('drain', r));
-    const pct = total ? Math.floor((got / total) * 100) : 0;
-    if (pct !== lastPct) { lastPct = pct; sendUpdate({ estado: 'descargando', pct }); }
-  }
-  await new Promise((r) => out.end(r));
-  if (total && got < total) { fs.rmSync(part, { force: true }); throw new Error('Descarga incompleta'); }
-  fs.renameSync(part, dest);
-  portableNew = dest;
-  sendUpdate({ estado: 'lista', version });
-  installWhenIdle();
-}
-// Un pequeño script espera a que se cierre esta versión, borra el .exe viejo y abre el nuevo
-let swapped = false;
-function swapPortable(quit = true, relaunch = true) {
-  if (swapped) return true;
-  swapped = true;
-  const oldExe = process.env.PORTABLE_EXECUTABLE_FILE;
-  const script = path.join(os.tmpdir(), `retrolimpia-actualizar-${Date.now()}.cmd`);
-  const lines = [
-    '@echo off',
-    'set /a n=0',
-    ':esperar',
-    `del /f /q "${oldExe}" >nul 2>&1`,
-    `if exist "${oldExe}" (set /a n+=1 & if %n% lss 60 (timeout /t 1 /nobreak >nul & goto esperar))`,
-    relaunch ? `start "" "${portableNew}"` : 'rem sin volver a abrir',
-    'del "%~f0"'
-  ];
-  fs.writeFileSync(script, lines.join('\r\n'), 'utf8');
-  const { spawn } = require('child_process');
-  spawn('cmd.exe', ['/c', script], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
-  if (quit) app.quit();
-  return true;
-}
-
 async function checkManually() {
   if (autoUpdater) {
     try {
@@ -385,15 +327,7 @@ async function checkManually() {
       return { modo: 'auto', disponible: !!(v && newer(v, pkg.version)), version: v, estado: updateState.estado };
     } catch (e) { return { modo: 'auto', disponible: false, error: String(e.message || e) }; }
   }
-  if (isPortable() && app.isPackaged) {
-    try {
-      const j = await latestRelease();
-      const v = String(j.tag_name || '').replace(/^v/i, '');
-      const disponible = newer(v, pkg.version);
-      if (disponible) portableUpdate().catch((e) => sendUpdate({ estado: 'error', mensaje: String(e.message || e) }));
-      return { modo: 'auto', disponible, version: v, estado: updateState.estado };
-    } catch { return { modo: 'auto', disponible: false, error: 'sin conexión' }; }
-  }
+  // Sin actualizador (modo desarrollo): solo consultar la última versión publicada
   try {
     const j = await latestRelease();
     const ultima = String(j.tag_name || '').replace(/^v/i, '');
@@ -401,13 +335,11 @@ async function checkManually() {
   } catch { return { modo: 'manual', disponible: false, error: 'sin conexión' }; }
 }
 ipcMain.handle('rl:checkUpdate', () => checkManually());
-ipcMain.handle('rl:updateState', () => ({ ...updateState, portable: isPortable(), auto: !!autoUpdater || (isPortable() && app.isPackaged) }));
+ipcMain.handle('rl:updateState', () => ({ ...updateState, auto: !!autoUpdater }));
 ipcMain.handle('rl:installUpdate', () => {
   if (updateState.estado !== 'lista') return false;
   return doInstall();
 });
-// Si alguien cierra la versión portable con una actualización lista, se aplica al cerrar
-app.on('will-quit', () => { if (portableNew && !swapped) swapPortable(false, false); });
 
 function newer(a, b) {
   const pa = a.split('.').map(Number), pb = b.split('.').map(Number);

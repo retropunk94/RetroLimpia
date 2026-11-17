@@ -367,3 +367,43 @@ select { background: var(--panel-2); border: 1px solid var(--line-2); border-rad
 .upd-bar { height: 4px; border-radius: 4px; background: var(--line); margin-top: 8px; overflow: hidden; }
 .upd-bar i { display: block; height: 100%; background: var(--grad); transition: width 1s linear; }
 #updBanner .btn + .btn { margin-left: 6px; }
+/* ---------- Ventana de seguimiento al desinstalar ---------- */
+.monitor-back { position: fixed; inset: 0; z-index: 45; background: rgba(6, 4, 14, .72); backdrop-filter: blur(5px); display: grid; place-items: center; }
+.monitor { width: min(1040px, 94vw); height: min(680px, 90vh); display: flex; flex-direction: column; gap: 12px; background: var(--bg-2);
+  border: 1px solid var(--line-2); border-radius: 20px; padding: 22px 24px; box-shadow: 0 30px 80px rgba(0, 0, 0, .6); }
+.mon-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+.mon-head h2 { margin: 0 0 4px; font-family: var(--display); font-weight: 400; font-size: 22px; }
+.mon-head .meta { margin: 0; }
+.mon-pct { font-family: var(--display); font-size: 28px; }
+.mon-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 250px 1fr; gap: 14px; }
+.mon-list { overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding-right: 4px; }
+.mon-item { display: flex; align-items: center; gap: 10px; padding: 9px 10px; border-radius: 10px; border: 1px solid transparent; background: none; cursor: pointer; text-align: left; color: var(--muted); }
+.mon-item:hover { background: var(--panel); }
+.mon-item.on { background: var(--panel-2); border-color: var(--line-2); color: var(--text); }
+.mon-item .n { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mon-item .dot { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--line-2); flex-shrink: 0; }
+.mon-item.s-run .dot { border-color: var(--cyan); border-top-color: transparent; animation: spin .8s linear infinite; }
+.mon-item.s-ok .dot { background: var(--verde); border-color: var(--verde); }
+.mon-item.s-err .dot { background: var(--rojo); border-color: var(--rojo); }
+.mon-item.s-cancel .dot { background: var(--line-2); }
+.mon-item .tag { font-size: 12px; } .mon-item .tag.ok { color: var(--verde); } .mon-item .tag.warn { color: var(--amarillo); }
+.mon-detail { min-height: 0; display: flex; flex-direction: column; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; }
+.mon-detail h3 { margin: 0; font-size: 15px; }
+.mon-log { flex: 1; min-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 6px; }
+.mon-line { display: flex; gap: 10px; font-size: 13.5px; animation: tin .2s ease; }
+.mon-line .ico { width: 18px; flex-shrink: 0; text-align: center; }
+.mon-line.t-ok .ico { color: var(--verde); } .mon-line.t-aviso .ico, .mon-line.t-hallado .ico { color: var(--amarillo); }
+.mon-line.t-error .ico { color: var(--rojo); } .mon-line.t-buscar { color: var(--muted); } .mon-line.t-paso { color: var(--text); font-weight: 600; }
+.mon-path { display: flex; align-items: center; gap: 10px; margin-top: 2px; flex-wrap: wrap; }
+.mon-path code, .mon-sum code { font-family: Consolas, monospace; font-size: 12px; color: var(--cyan); background: rgba(45, 226, 230, .07); padding: 1px 6px; border-radius: 5px; word-break: break-all; }
+.mon-path .link { font-size: 12px; }
+.mon-sum { font-size: 13.5px; padding: 10px 12px; border-radius: 10px; border: 1px solid; }
+.mon-sum ul { margin: 6px 0 0; padding-left: 18px; } .mon-sum li { margin: 3px 0; }
+.mon-sum.good { border-color: rgba(57, 229, 140, .35); background: rgba(57, 229, 140, .06); }
+.mon-sum.warn { border-color: rgba(255, 200, 69, .4); background: rgba(255, 200, 69, .06); }
+.mon-sum.bad { border-color: rgba(255, 84, 112, .45); background: rgba(255, 84, 112, .07); }
+.mon-sum.info { border-color: rgba(45, 226, 230, .3); background: rgba(45, 226, 230, .05); }
+.mon-sum .ok { color: var(--verde); } .mon-sum .warn { color: var(--amarillo); }
+.mon-foot { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
+.mon-foot .meta { margin-right: auto; }
+.mon-detail { overflow-y: auto; }

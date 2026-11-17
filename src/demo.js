@@ -144,9 +144,32 @@ async function run(script, p, onProgress) {
         mk('SearchHost', 'Búsqueda de Windows', 'Microsoft Corporation', 120 * MB, 0.1, 1, win)
       ] };
     }
-    case 'desinstalar': await steps(onProgress, ['Desinstalando ' + p.nombre + ' en silencio...'], 1300); return { ok: true, metodo: 'silencioso-nsis', reinicio: false, nombre: p.nombre };
-    case 'residuos':
-      await steps(onProgress, ['Buscando restos...', 'Revisando el registro...'], 900);
+    case 'desinstalar': {
+      const log = async (tipo, msg, ruta = '', ms = 350) => { onProgress({ log: { tipo, msg, en: msg, ruta } }); await wait(ms); };
+      if (p.tipo === 'appx') {
+        await log('paso', 'Quitando la app de Microsoft Store', p.paquete);
+        await log('ok', 'App quitada correctamente', '', 500);
+        return { ok: true, metodo: 'appx', registroLimpio: true, nombre: p.nombre };
+      }
+      await log('info', 'Programa: ' + (p.etiqueta || p.nombre) + ' ' + (p.version || ''));
+      if (p.carpeta) await log('info', 'Carpeta de instalación', p.carpeta);
+      await log('info', 'Su entrada en el registro de Windows', 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\' + p.nombre);
+      await log('paso', 'Ejecutando su desinstalador en silencio (tipo nsis)', (p.carpeta || 'C:\\Program Files\\' + p.nombre) + '\\uninstall.exe /S', 900);
+      await log('ok', 'Su entrada del registro se borró', 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\' + p.nombre);
+      await log('ok', 'Desinstalado correctamente (silencioso-nsis)');
+      return { ok: true, metodo: 'silencioso-nsis', reinicio: false, registroLimpio: true, nombre: p.nombre };
+    }
+    case 'residuos': {
+      const log = async (tipo, msg, ruta = '', ms = 160) => { onProgress({ log: { tipo, msg, en: msg, ruta } }); await wait(ms); };
+      for (const b of ['C:\\Program Files', 'C:\\Program Files (x86)', 'C:\\ProgramData', 'C:\\Users\\Demo\\AppData\\Roaming', 'C:\\Users\\Demo\\AppData\\Local']) await log('buscar', 'Buscando restos en', b);
+      await log('hallado', 'Carpeta que dejó el programa', `C:\\ProgramData\\${p.nombre}`);
+      await log('hallado', 'Carpeta que dejó el programa', `C:\\Users\\Demo\\AppData\\Local\\${p.nombre}`);
+      await log('buscar', 'Revisando el registro de Windows en', 'HKEY_CURRENT_USER\\Software');
+      await log('hallado', 'Entrada del registro que dejó el programa', `HKEY_CURRENT_USER\\Software\\${p.nombre}`);
+      await log('buscar', 'Revisando el registro de Windows en', 'HKEY_LOCAL_MACHINE\\SOFTWARE');
+      await log('hallado', 'Carpeta que dejó el programa (posible, te lo preguntaremos)', `C:\\Program Files\\${(p.editor || 'Editor').split(/[ ,]/)[0]}`);
+      await log('aviso', 'Quedaron 1 entrada(s) en el registro y 3 resto(s) en disco');
+    }
       return { nombre: p.nombre, restos: [
         { tipo: 'carpeta', ruta: `C:\\ProgramData\\${p.nombre}`, tamano: 84 * MB, confianza: 'alta' },
         { tipo: 'carpeta', ruta: `C:\\Users\\Demo\\AppData\\Local\\${p.nombre}`, tamano: 31 * MB, confianza: 'alta' },
@@ -155,7 +178,8 @@ async function run(script, p, onProgress) {
       ] };
     case 'cuarentena':
       if (p.accion === 'mover') {
-        await steps(onProgress, ['Guardando en cuarentena...'], 700);
+        for (const it of p.items) { onProgress({ log: { tipo: 'ok', msg: it.tipo === 'registro' ? 'Entrada del registro copiada a la cuarentena y borrada' : 'Movido a la cuarentena', en: 'Moved to quarantine', ruta: it.ruta } }); await wait(250); }
+        onProgress({ log: { tipo: 'info', msg: 'Todo lo quitado está guardado aquí unos días por si quieres restaurarlo', en: 'Kept here for a few days', ruta: 'C:\\ProgramData\\RetroLimpia\\Cuarentena\\20261117-0315' } });
         const lote = { id: String(Date.now()), fecha: new Date().toISOString(), motivo: p.motivo, cantidad: p.items.length, bytes: p.items.reduce((a, i) => a + (i.tamano || 0), 0), items: p.items };
         cuarentena.unshift(lote); return { id: lote.id, guardados: p.items.length, fallidos: [], bytes: lote.bytes };
       }

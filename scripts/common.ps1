@@ -15,6 +15,16 @@ function Send-Progress {
     [Console]::Out.Flush()
 }
 
+# Registro en vivo para la ventana de seguimiento: qué se hace y dónde
+# Tipos: paso, info, buscar, hallado, ok, aviso, error
+function Send-Log {
+    param([string]$Tipo, [string]$Es, [string]$En = '', [string]$Ruta = '')
+    if (-not $En) { $En = $Es }
+    $line = '@@LOG ' + (@{ tipo = $Tipo; msg = $Es; en = $En; ruta = $Ruta } | ConvertTo-Json -Compress)
+    [Console]::Out.WriteLine($line)
+    [Console]::Out.Flush()
+}
+
 function Send-Result {
     param($Obj)
     $json = ConvertTo-Json -InputObject $Obj -Depth 8 -Compress

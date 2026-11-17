@@ -341,3 +341,26 @@ select { background: var(--panel-2); border: 1px solid var(--line-2); border-rad
 @keyframes heartbeat { 0%, 100% { transform: scale(1); } 14% { transform: scale(1.18); } 28% { transform: scale(1); } 42% { transform: scale(1.12); } 70% { transform: scale(1); } }
 @keyframes ripple { from { transform: scale(.6); opacity: .9; } to { transform: scale(1.6); opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .heart-anim svg, .heart-anim span { animation: none; } }
+/* ---------- Tour de bienvenida ---------- */
+.tour { position: fixed; inset: 0; z-index: 60; }
+.tour-dim { position: absolute; inset: 0; background: rgba(6, 4, 14, .78); backdrop-filter: blur(3px); }
+.tour-spot { position: absolute; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(6, 4, 14, .78); outline: 2px solid var(--cyan);
+  transition: all .35s ease; pointer-events: none; animation: spotGlow 1.8s ease-in-out infinite; }
+@keyframes spotGlow { 0%, 100% { outline-color: var(--cyan); } 50% { outline-color: var(--pink); } }
+.tour-card { position: absolute; width: 400px; max-width: calc(100vw - 32px); background: var(--bg-2); border: 1px solid var(--line-2);
+  border-radius: 18px; padding: 22px 24px 18px; box-shadow: 0 24px 70px rgba(0, 0, 0, .6); animation: tourIn .3s ease; }
+.tour-card.center { width: 480px; text-align: center; }
+@keyframes tourIn { from { opacity: 0; transform: translateY(6px); } }
+.tour-card.center { animation: none; }
+.tour-arrow { position: absolute; left: -9px; width: 16px; height: 16px; background: var(--bg-2); border-left: 1px solid var(--line-2); border-bottom: 1px solid var(--line-2); transform: rotate(45deg); }
+.tour-ico { font-size: 34px; line-height: 1; margin-bottom: 8px; }
+.tour-card h3 { margin: 0 0 8px; font-family: var(--display); font-weight: 400; font-size: 21px; color: var(--text); text-transform: none; letter-spacing: .2px; }
+.tour-card p { margin: 0 0 16px; color: var(--muted); font-size: 15px; line-height: 1.55; }
+.tour-card p b { color: var(--text); }
+.tour-dots { display: flex; gap: 6px; margin-bottom: 16px; }
+.tour-card.center .tour-dots { justify-content: center; }
+.tour-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--line-2); }
+.tour-dots i.done { background: var(--violet); }
+.tour-dots i.on { width: 22px; border-radius: 6px; background: var(--grad); }
+.tour-foot { display: flex; align-items: center; gap: 8px; }
+.tour-count { position: absolute; top: 18px; right: 22px; font-size: 12px; color: var(--dim); }

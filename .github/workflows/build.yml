@@ -70,8 +70,11 @@ jobs:
             dist/SHA256.txt
           body: |
             ## Descarga
-            - **RetroLimpia-Instalador** → se instala como cualquier programa (recomendado).
-            - **RetroLimpia-Portable** → no se instala, se abre directamente.
+            👉 **Solo necesitas UNO de estos dos archivos:**
+            - **RetroLimpia-Instalador-x.x.x.exe** → se instala como cualquier programa y se actualiza solo (recomendado).
+            - **RetroLimpia-Portable-x.x.x.exe** → no se instala, se abre directamente (por ejemplo desde un USB).
+
+            <sub>Los demás archivos (`latest.yml`, `.blockmap` y `SHA256.txt`) **puedes ignorarlos**: los usa el propio programa para actualizarse solo y descargando solo lo que cambió, y `SHA256.txt` sirve para quien quiera comprobar que el archivo es original.</sub>
 
             ### ¿Windows dice "Windows protegió su PC"?
             Es normal: el programa no tiene firma digital de pago. Pulsa **Más información → Ejecutar de todas formas**.

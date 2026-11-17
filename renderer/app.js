@@ -873,7 +873,7 @@ function viewAjustes() {
     </div>
     <h2>${L('Acerca de RetroLimpia', 'About RetroLimpia')}</h2>
     <div class="card"><div class="kv"><span>${L('Versión', 'Version')}</span><span>${esc(S.info.version)}</span><span>${L('Licencia', 'License')}</span><span>MIT (${L('código abierto', 'open source')})</span><span>${L('Privacidad', 'Privacy')}</span><span>${L('No envía ningún dato tuyo a internet.', 'Sends none of your data to the internet.')}</span></div>
-      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap"><button class="btn" data-act="trust">${L('¿Por qué Windows o mi antivirus avisan?', 'Why does Windows or my antivirus warn me?')}</button>
+      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap"><button class="btn" data-act="tour">🧭 ${L('Ver el tour de bienvenida', 'Watch the welcome tour')}</button><button class="btn" data-act="trust">${L('¿Por qué Windows o mi antivirus avisan?', 'Why does Windows or my antivirus warn me?')}</button>
       ${repo ? `<button class="btn ghost" data-open="${repo}">${L('Ver el código', 'View the code')}</button>` : ''}
       <button class="btn ghost" data-act="checkUpdate" ${S.checkingUpd ? 'disabled' : ''}>${S.checkingUpd ? L('Buscando...', 'Checking...') : L('Buscar actualizaciones', 'Check for updates')}</button></div>
       <p class="meta" style="margin-top:12px">${updStatusText()}</p></div></div>`;
@@ -934,6 +934,99 @@ function showDonate() {
     <div class="foot"><button class="btn primary" data-act="donateGo">💜 ${L('Ir a donar', 'Go to donate')}</button><button class="btn ghost" data-act="modalClose">${L('Ahora no', 'Not now')}</button></div></div>`;
   $('#modal').classList.remove('hidden');
 }
+
+// ============================================================ Tour de bienvenida
+const TOUR = [
+  [null, '👋', '¡Bienvenido a RetroLimpia!', 'Welcome to RetroLimpia!',
+    'Te enseño en un minuto para qué sirve cada parte. <b>No necesitas saber nada de informática</b>: RetroLimpia te guía y nunca cambia nada sin preguntarte.',
+    'Let me show you what each part does in one minute. <b>You do not need to know anything about computers</b>: RetroLimpia guides you and never changes anything without asking.'],
+  ['inicio', '🩺', 'Revisar mi PC', 'Check my PC',
+    'Empieza siempre aquí. Con <b>un solo botón</b> revisa todo tu PC y le pone una <b>nota de salud del 1 al 100</b>. Después, con "Arreglar todo", aplica lo recomendado.',
+    'Always start here. <b>One button</b> checks your whole PC and gives it a <b>health score from 1 to 100</b>. Then "Fix all" applies what is recommended.'],
+  ['programas', '📦', 'Programas y bloatware', 'Programs & bloatware',
+    'Los PCs vienen con programas que casi nadie usa (se llaman <b>bloatware</b>). Aquí los quitas sin dejar restos. Los colores ayudan: <b style="color:var(--verde)">verde</b> es seguro quitarlo, <b style="color:var(--amarillo)">amarillo</b> es opcional y <b style="color:var(--rojo)">rojo</b> mejor no tocarlo.',
+    'PCs come with programs hardly anyone uses (called <b>bloatware</b>). Remove them here without leftovers. Colours help: <b style="color:var(--verde)">green</b> is safe, <b style="color:var(--amarillo)">yellow</b> optional, <b style="color:var(--rojo)">red</b> better leave it.'],
+  ['limpieza', '🧹', 'Limpieza', 'Cleanup',
+    'Con el uso se acumulan <b>archivos basura</b>: temporales, restos de actualizaciones, cachés... Aquí los borras para recuperar espacio. Tus fotos, documentos y contraseñas no se tocan.',
+    'Over time <b>junk files</b> pile up: temp files, update leftovers, caches... Delete them here to free space. Your photos, documents and passwords are never touched.'],
+  ['arranque', '⚡', 'Arranque de Windows', 'Windows startup',
+    'Programas que se abren solos al encender el PC y lo hacen arrancar más lento. Desactivar los que no necesitas es como un interruptor: <b>no borra nada</b>.',
+    'Programs that open by themselves when you turn on the PC and slow down startup. Turning off the ones you do not need is like a switch: <b>nothing is deleted</b>.'],
+  ['hardware', '🔧', 'Hardware y salud', 'Hardware & health',
+    'Lo que tiene tu PC por dentro (procesador, gráfica, memoria...) y <b>si algo está fallando</b>, como un disco cansado o una temperatura alta. Te lo explica con consejos sencillos.',
+    'What is inside your PC (processor, graphics, memory...) and <b>whether something is failing</b>, like a tired disk or high temperature. Explained with simple tips.'],
+  ['drivers', '🔌', 'Drivers', 'Drivers',
+    'Los drivers son los <b>"traductores"</b> entre Windows y tus piezas (sonido, red, gráfica). Aquí ves si alguno falla y los actualizas solo desde <b>fuentes oficiales</b>.',
+    'Drivers are the <b>"translators"</b> between Windows and your parts (sound, network, graphics). See if any is failing and update them only from <b>official sources</b>.'],
+  ['actualizaciones', '🔄', 'Actualizaciones', 'Updates',
+    'Mantiene <b>Windows y tus programas al día</b>, lo más importante para estar protegido de virus. Puedes marcar lo que quieras o actualizarlo todo de una vez.',
+    'Keeps <b>Windows and your programs up to date</b>, the most important thing to stay safe from viruses. Tick what you want or update everything at once.'],
+  ['procesos', '📊', 'Procesos (avanzado)', 'Processes (advanced)',
+    'Muestra qué está gastando la memoria y el procesador <b>ahora mismo</b>. Útil si el PC va lento. Es para quien sabe lo que hace: si no estás seguro, no cierres nada aquí.',
+    'Shows what is using memory and processor <b>right now</b>. Useful if the PC is slow. It is for people who know what they are doing: if unsure, do not close anything here.'],
+  ['deshacer', '🛟', 'Deshacer y cuarentena', 'Undo & quarantine',
+    'Tu <b>red de seguridad</b>. Todo lo que RetroLimpia quita se guarda aquí unos días. Si algo deja de funcionar, lo <b>restauras con un clic</b>.',
+    'Your <b>safety net</b>. Everything RetroLimpia removes is kept here for a few days. If something stops working, <b>restore it with one click</b>.'],
+  ['ajustes', '⚙️', 'Ajustes', 'Settings',
+    'Idioma, recordatorios automáticos, notificaciones... Y si algún día quieres <b>repetir este tour</b>, lo encuentras aquí.',
+    'Language, automatic reminders, notifications... And if you ever want to <b>repeat this tour</b>, you will find it here.'],
+  [null, '🚀', '¡Ya está! Así de fácil', "That's it! Easy as that",
+    'Ahora pulsa <b>"Revisar mi PC"</b> y deja que RetroLimpia haga el trabajo. Recuerda: <b>nada cambia sin que tú lo confirmes</b>, y todo se puede deshacer.',
+    'Now press <b>"Check my PC"</b> and let RetroLimpia do the work. Remember: <b>nothing changes without your OK</b>, and everything can be undone.']
+];
+let tourStep = 0;
+function startTour() { tourStep = 0; S.view = 'inicio'; render(); $('#tour').classList.remove('hidden'); renderTour(); }
+async function endTour(skipped) {
+  $('#tour').classList.add('hidden'); $('#tour').innerHTML = '';
+  S.view = 'inicio'; render();
+  S.settings = await rl.setSettings({ tourVisto: true });
+  if (skipped) toast(L('Tour saltado. Puedes verlo cuando quieras en Ajustes.', 'Tour skipped. You can watch it any time in Settings.'));
+  if (!S.settings.recordatoriosPreguntado) showReminders();
+}
+function renderTour() {
+  const [nav, ico, tes, ten, des, den] = TOUR[tourStep];
+  const last = tourStep === TOUR.length - 1, first = tourStep === 0;
+  const target = nav ? document.querySelector(`.nav-item[data-nav="${nav}"]`) : null;
+  if (target) target.scrollIntoView({ block: 'nearest' });
+  let spot = '', pos = 'left:50%;top:50%;transform:translate(-50%,-50%)';
+  if (target) {
+    const r = target.getBoundingClientRect(), pad = 6;
+    spot = `<div class="tour-spot" style="left:${r.left - pad}px;top:${r.top - pad}px;width:${r.width + pad * 2}px;height:${r.height + pad * 2}px"></div>`;
+    const top = Math.max(16, Math.min(window.innerHeight - 330, r.top - 40));
+    pos = `left:${r.right + 26}px;top:${top}px`;
+  }
+  $('#tour').innerHTML = `${target ? spot : '<div class="tour-dim"></div>'}
+    <div class="tour-card ${target ? 'side' : 'center'}" style="${pos}">
+      ${target ? `<div class="tour-arrow" style="top:${Math.max(18, target.getBoundingClientRect().top - Math.max(16, Math.min(window.innerHeight - 330, target.getBoundingClientRect().top - 40)) + target.getBoundingClientRect().height / 2 - 9)}px"></div>` : ''}
+      <div class="tour-ico">${ico}</div>
+      <h3>${L(tes, ten)}</h3>
+      <p>${L(des, den)}</p>
+      <div class="tour-dots">${TOUR.map((_, i) => `<i class="${i === tourStep ? 'on' : i < tourStep ? 'done' : ''}"></i>`).join('')}</div>
+      <div class="tour-foot">
+        ${last ? '' : `<button class="link" data-tour="skip">${L('Saltar tour', 'Skip tour')}</button>`}
+        <span style="flex:1"></span>
+        ${first ? '' : `<button class="btn small ghost" data-tour="back">${L('Atrás', 'Back')}</button>`}
+        <button class="btn small primary" data-tour="next">${first ? L('Empezar el tour', 'Start the tour') : last ? L('¡A revisar mi PC!', "Let's check my PC!") : L('Siguiente', 'Next')} ${last ? '' : '→'}</button>
+      </div>
+      ${first ? '' : `<div class="tour-count">${tourStep} / ${TOUR.length - 1}</div>`}
+    </div>`;
+  const btn = $('#tour [data-tour="next"]'); if (btn) btn.focus();
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('[data-tour]');
+  if (!b) return;
+  const a = b.dataset.tour;
+  if (a === 'skip') return endTour(true);
+  if (a === 'back') { tourStep = Math.max(0, tourStep - 1); return renderTour(); }
+  if (a === 'next') { if (tourStep === TOUR.length - 1) return endTour(false); tourStep++; return renderTour(); }
+});
+document.addEventListener('keydown', (e) => {
+  if ($('#tour').classList.contains('hidden')) return;
+  if (e.key === 'Escape') endTour(true);
+  else if (e.key === 'ArrowRight') { if (tourStep < TOUR.length - 1) { tourStep++; renderTour(); } }
+  else if (e.key === 'ArrowLeft') { if (tourStep > 0) { tourStep--; renderTour(); } }
+});
+window.addEventListener('resize', () => { if (!$('#tour').classList.contains('hidden')) renderTour(); });
 
 // ============================================================ Informe
 function buildReport() {
@@ -1019,6 +1112,7 @@ document.addEventListener('click', async (e) => {
     case 'procOk': S.settings = await rl.setSettings({ procesosAviso: true }); $('#modal').classList.add('hidden'); return render();
     case 'procBack': $('#modal').classList.add('hidden'); S.view = 'inicio'; return render();
     case 'procPause': S.procPaused = !S.procPaused; return render();
+    case 'tour': return startTour();
     case 'donateAsk': return showDonate();
     case 'donateGo': $('#modal').classList.add('hidden'); return rl.open(S.info.paypal);
     case 'modalClose': $('#modal').classList.add('hidden'); return;
@@ -1088,7 +1182,7 @@ document.addEventListener('click', async (e) => {
       });
     case 'openRestore': return rl.run('restauracion', { accion: 'abrir' });
     case 'trust': return showTrust();
-    case 'trustOk': $('#modal').classList.add('hidden'); S.settings = await rl.setSettings({ confianzaVista: true }); if (!S.settings.recordatoriosPreguntado) showReminders(); return;
+    case 'trustOk': $('#modal').classList.add('hidden'); S.settings = await rl.setSettings({ confianzaVista: true }); if (!S.settings.tourVisto) startTour(); else if (!S.settings.recordatoriosPreguntado) showReminders(); return;
     case 'remindYes': {
       const dias = Number(($('#remFreq') || {}).value) || 3;
       const r = await rl.autostart(true, dias); S.settings = r.settings; $('#modal').classList.add('hidden');
@@ -1170,6 +1264,7 @@ setInterval(() => { if (S.busy) updateProgressOnly(); }, 1000);
   $('#ver').textContent = 'v' + S.info.version;
   render();
   if (!S.settings.confianzaVista) showTrust();
+  else if (!S.settings.tourVisto) startTour();
   else if (!S.settings.recordatoriosPreguntado) showReminders();
   rl.onUpdate((st) => { S.upd = st; render(); });
   rl.onSettings((st) => { S.settings = st; render(); });

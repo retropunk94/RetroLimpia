@@ -34,6 +34,7 @@ const defaultSettings = {
   procesosAviso: false,
   bandejaAvisada: false,
   notificaciones: true,
+  tourVisto: false,
   ultimoResumen: ''
 };
 function loadSettings() {

@@ -311,29 +311,48 @@ function installWhenIdle() {
   doInstall();
 }
 function doInstall() {
+  // Plan B: instalador descargado por nosotros
+  if (fallbackFile && fs.existsSync(fallbackFile)) {
+    quitting = true; installing = true;
+    updLog('Instalando (plan B) ' + fallbackFile);
+    try {
+      relaunchHelper(4);
+      // /S = silencioso; --updated = es una actualización (conserva accesos directos)
+      spawn(fallbackFile, ['/S', '--updated'], { detached: true, stdio: 'ignore' }).unref();
+      setTimeout(() => app.exit(0), 500);
+      return true;
+    } catch (e) { updLog('No se pudo lanzar el instalador: ' + e); quitting = false; installing = false; return false; }
+  }
   if (!autoUpdater) return false;
   quitting = true; installing = true;
   if (app.isPackaged && process.platform === 'win32') {
-    // El instalador reabre el programa "como usuario" y Windows deja el aviso de administrador
-    // escondido en la barra de tareas (parecía que no abría). Así que lo reabrimos nosotros:
-    // un ayudante oculto, ya con permisos, espera a que termine el instalador y abre RetroLimpia.
-    const exe = process.execPath.replace(/'/g, "''");
-    const ps = `$ErrorActionPreference='SilentlyContinue'; Wait-Process -Id ${process.pid} -Timeout 60; Start-Sleep -Seconds 2; ` +
-      `$t=[Diagnostics.Stopwatch]::StartNew(); while ($t.Elapsed.TotalSeconds -lt 300 -and (Get-Process | Where-Object { $_.ProcessName -like 'RetroLimpia-Instalador*' -or $_.ProcessName -like 'Un_A*' })) { Start-Sleep -Seconds 1 }; ` +
-      `Start-Sleep -Seconds 1; if (-not (Get-Process -Name 'RetroLimpia' -ErrorAction SilentlyContinue)) { Start-Process -FilePath '${exe}' }`;
     try {
-      spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-Command', ps], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+      relaunchHelper(2);
       autoUpdater.quitAndInstall(true, false);   // silencioso; el ayudante lo vuelve a abrir
       return true;
-    } catch {}
+    } catch (e) { updLog('quitAndInstall: ' + e); }
   }
   autoUpdater.quitAndInstall(true, true);   // silencioso y vuelve a abrirse
   return true;
 }
 
+// Registro del actualizador: si algo falla queda escrito en %APPDATA%\RetroLimpia\actualizador.log
+function updLog(msg) {
+  try { fs.appendFileSync(path.join(app.getPath('userData'), 'actualizador.log'), `[${new Date().toISOString()}] v${pkg.version} ${msg}\n`); } catch {}
+}
+let updaterTries = 0;
 function initUpdater() {
   if (DEMO || !app.isPackaged) return;
-  try { ({ autoUpdater } = require('electron-updater')); } catch { autoUpdater = null; return; }
+  try { ({ autoUpdater } = require('electron-updater')); }
+  catch (e) {
+    autoUpdater = null;
+    updLog('No se pudo cargar electron-updater: ' + (e && e.stack || e));
+    // Nunca se deja al usuario sin actualizaciones: plan B propio y nuevo intento más tarde
+    if (++updaterTries < 3) setTimeout(initUpdater, 60 * 1000);
+    setTimeout(() => fallbackCheck().catch((er) => updLog('Plan B: ' + er)), 8000);
+    return;
+  }
+  autoUpdater.logger = { info: () => {}, debug: () => {}, warn: (m) => updLog('aviso: ' + m), error: (m) => updLog('error: ' + m) };
   autoUpdater.autoDownload = true;
   autoUpdater.autoInstallOnAppQuit = true;
   autoUpdater.on('checking-for-update', () => { if (updateState.estado !== 'lista') sendUpdate({ estado: 'buscando' }); });
@@ -341,9 +360,74 @@ function initUpdater() {
   autoUpdater.on('update-available', (i) => sendUpdate({ estado: 'descargando', version: i.version, pct: 0 }));
   autoUpdater.on('download-progress', (p) => sendUpdate({ estado: 'descargando', pct: Math.round(p.percent || 0) }));
   autoUpdater.on('update-downloaded', (i) => { sendUpdate({ estado: 'lista', version: i.version }); installWhenIdle(); });
-  autoUpdater.on('error', (e) => { if (updateState.estado !== 'lista') sendUpdate({ estado: 'error', mensaje: String(e && e.message || e).slice(0, 200) }); });
+  autoUpdater.on('error', (e) => {
+    updLog('error del actualizador: ' + (e && e.message || e));
+    if (updateState.estado !== 'lista') sendUpdate({ estado: 'error', mensaje: String(e && e.message || e).slice(0, 200) });
+    // Si el actualizador oficial falla, se intenta con el plan B (misma descarga, comprobada igual)
+    if (updateState.estado !== 'lista' && updateState.estado !== 'descargando') setTimeout(() => fallbackCheck().catch((er) => updLog('Plan B: ' + er)), 5000);
+  });
   setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000);
   setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000);
+}
+
+// ---------- Plan B: actualizar sin electron-updater ----------
+// Descarga el instalador de la última versión desde GitHub, comprueba su huella SHA-512
+// (la misma que publica latest.yml) y lo deja listo para instalarse en silencio.
+let fallbackFile = null;
+let fallbackBusy = false;
+async function fallbackCheck() {
+  if (!app.isPackaged || DEMO || fallbackBusy || updateState.estado === 'lista') return false;
+  fallbackBusy = true;
+  try {
+    const j = await latestRelease();
+    const v = String(j.tag_name || '').replace(/^v/i, '');
+    if (!newer(v, pkg.version)) { sendUpdate({ estado: 'al-dia', revisado: Date.now() }); return false; }
+    const assets = j.assets || [];
+    const exe = assets.find((a) => /^RetroLimpia-Instalador-.*\.exe$/i.test(a.name));
+    const yml = assets.find((a) => a.name === 'latest.yml');
+    if (!exe || !yml) throw new Error('la versión ' + v + ' aún no tiene sus archivos');
+    const ymlTxt = await (await net.fetch(yml.browser_download_url)).text();
+    const m = ymlTxt.match(/^sha512:\s*(\S+)/m);
+    if (!m) throw new Error('latest.yml sin huella');
+    sendUpdate({ estado: 'descargando', version: v, pct: 0 });
+    const r = await net.fetch(exe.browser_download_url);
+    if (!r.ok) throw new Error('descarga ' + r.status);
+    const total = Number(r.headers.get('content-length')) || exe.size || 0;
+    const file = path.join(os.tmpdir(), exe.name);
+    const hash = require('crypto').createHash('sha512');
+    const out = fs.createWriteStream(file);
+    const reader = r.body.getReader();
+    let got = 0, lastPct = -1;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const b = Buffer.from(value);
+      hash.update(b); got += b.length;
+      if (!out.write(b)) await new Promise((res) => out.once('drain', res));
+      const pct = total ? Math.floor((got / total) * 100) : 0;
+      if (pct !== lastPct) { lastPct = pct; sendUpdate({ estado: 'descargando', version: v, pct }); }
+    }
+    await new Promise((res, rej) => out.end((e) => (e ? rej(e) : res())));
+    if (hash.digest('base64') !== m[1]) { try { fs.unlinkSync(file); } catch {} throw new Error('la huella no coincide: descarga descartada'); }
+    fallbackFile = file;
+    updLog('Plan B listo: ' + file);
+    sendUpdate({ estado: 'lista', version: v });
+    installWhenIdle();
+    return true;
+  } catch (e) {
+    updLog('Plan B falló: ' + (e && e.message || e));
+    if (updateState.estado !== 'lista') sendUpdate({ estado: 'error', mensaje: String(e && e.message || e).slice(0, 200) });
+    return false;
+  } finally { fallbackBusy = false; }
+}
+function relaunchHelper(extraWait) {
+  // Ayudante oculto (con permisos de administrador, como RetroLimpia) que espera a que termine
+  // el instalador y vuelve a abrir el programa. Así no queda escondido el aviso de Windows.
+  const exe = process.execPath.replace(/'/g, "''");
+  const ps = `$ErrorActionPreference='SilentlyContinue'; Wait-Process -Id ${process.pid} -Timeout 60; Start-Sleep -Seconds ${extraWait || 2}; ` +
+    `$t=[Diagnostics.Stopwatch]::StartNew(); while ($t.Elapsed.TotalSeconds -lt 300 -and (Get-Process | Where-Object { $_.ProcessName -like 'RetroLimpia-Instalador*' -or $_.ProcessName -like 'installer' -or $_.ProcessName -like 'Un_A*' })) { Start-Sleep -Seconds 1 }; ` +
+    `Start-Sleep -Seconds 1; if (-not (Get-Process -Name 'RetroLimpia' -ErrorAction SilentlyContinue)) { Start-Process -FilePath '${exe}' }`;
+  spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-Command', ps], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
 }
 
 async function latestRelease() {
@@ -359,7 +443,18 @@ async function checkManually() {
       return { modo: 'auto', disponible: !!(v && newer(v, pkg.version)), version: v, estado: updateState.estado };
     } catch (e) { return { modo: 'auto', disponible: false, error: String(e.message || e) }; }
   }
-  // Sin actualizador (modo desarrollo): solo consultar la última versión publicada
+  // Versión instalada sin actualizador oficial: plan B (descarga e instala sola)
+  if (app.isPackaged && !DEMO) {
+    if (updateState.estado === 'lista' || updateState.estado === 'descargando') return { modo: 'auto', disponible: true, version: updateState.version, estado: updateState.estado };
+    try {
+      const j = await latestRelease();
+      const ultima = String(j.tag_name || '').replace(/^v/i, '');
+      const hay = newer(ultima, pkg.version);
+      if (hay) fallbackCheck().catch(() => {});
+      return { modo: 'auto', disponible: hay, version: ultima };
+    } catch { return { modo: 'auto', disponible: false, error: 'sin conexión' }; }
+  }
+  // Modo desarrollo: solo consultar la última versión publicada
   try {
     const j = await latestRelease();
     const ultima = String(j.tag_name || '').replace(/^v/i, '');
@@ -367,9 +462,11 @@ async function checkManually() {
   } catch { return { modo: 'manual', disponible: false, error: 'sin conexión' }; }
 }
 ipcMain.handle('rl:checkUpdate', () => checkManually());
-ipcMain.handle('rl:updateState', () => ({ ...updateState, auto: !!autoUpdater }));
+// "auto" = la versión instalada se actualiza sola (con el actualizador oficial o con el plan B)
+ipcMain.handle('rl:updateState', () => ({ ...updateState, auto: !!autoUpdater || (app.isPackaged && !DEMO) }));
 ipcMain.handle('rl:installUpdate', () => {
   if (updateState.estado !== 'lista') return false;
+  saveSettings({ ...loadSettings(), relanzarEnBandeja: false });
   return doInstall();
 });
 

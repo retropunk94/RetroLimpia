@@ -158,7 +158,30 @@ function updateProgressOnly() {
 // PowerShell a veces devuelve un objeto suelto en vez de una lista: lo normalizamos siempre.
 const arr = (x) => (Array.isArray(x) ? x : x == null ? [] : [x]);
 const obj = (x) => (x && typeof x === 'object' ? x : {});
-async function loadPrograms() { const r = obj(await rl.run('programas', {})); S.programs = { programas: arr(r.programas), apps: arr(r.apps) }; }
+async function loadPrograms() { const r = obj(await rl.run('programas', {})); S.programs = { programas: arr(r.programas), apps: arr(r.apps) }; S.programsAt = Date.now(); }
+// Si se instala o desinstala algo FUERA de RetroLimpia (Steam, Ajustes de Windows...), la lista se
+// pone al día sola: al volver a la ventana o al entrar en Programas. Es silencioso: no borra la pantalla.
+let refrescandoProgs = false;
+async function refreshProgramsQuiet(motivo) {
+  if (!S.programs || refrescandoProgs || S.busy || (S.mon && !S.mon.done)) return;
+  if (Date.now() - (S.programsAt || 0) < 15000) return;
+  refrescandoProgs = true;
+  try {
+    const antes = new Set(allPrograms().map((p) => p.id));
+    const r = obj(await rl.run('programas', {}));
+    S.programs = { programas: arr(r.programas), apps: arr(r.apps) }; S.programsAt = Date.now();
+    const ahora = new Set(allPrograms().map((p) => p.id));
+    [...S.sel].forEach((id) => { if (!ahora.has(id)) S.sel.delete(id); });
+    const quitados = [...antes].filter((id) => !ahora.has(id)).length, nuevos = [...ahora].filter((id) => !antes.has(id)).length;
+    if (quitados || nuevos) {
+      if (S.view === 'programas') render();
+      toast(L('Lista de programas al día', 'Program list updated') + (quitados ? L(` · ${quitados} ya no está(n)`, ` · ${quitados} removed`) : '') + (nuevos ? L(` · ${nuevos} nuevo(s)`, ` · ${nuevos} new`) : ''));
+    }
+  } catch { /* si falla, se intenta la próxima vez */ }
+  finally { refrescandoProgs = false; }
+}
+window.addEventListener('focus', () => refreshProgramsQuiet('foco'));
+document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshProgramsQuiet('visible'); });
 async function loadHardware() {
   const r = obj(await rl.run('hardware', {}));
   S.hardware = { ...r, equipo: obj(r.equipo), sistema: obj(r.sistema), cpu: obj(r.cpu), ram: obj(r.ram), placa: obj(r.placa), bios: obj(r.bios), gpus: arr(r.gpus), discos: arr(r.discos), unidades: arr(r.unidades), bateria: r.bateria || null };
@@ -1417,7 +1440,7 @@ document.addEventListener('click', async (e) => {
   if (t.dataset.win) return rl.win(t.dataset.win);
   if (t.dataset.open) return rl.open(t.dataset.open);
   if (t.dataset.folder) return rl.openFolder(t.dataset.folder);
-  if (t.dataset.nav) { S.view = t.dataset.nav; render(); $('#main').scrollTop = 0; return; }
+  if (t.dataset.nav) { S.view = t.dataset.nav; render(); $('#main').scrollTop = 0; if (S.view === 'programas') refreshProgramsQuiet('entrar'); return; }
   if (t.dataset.filter) { S.progFilter = t.dataset.filter; return render(); }
   if (t.dataset.restore) {
     return taskC(L('Restaurando', 'Restoring'), async () => {

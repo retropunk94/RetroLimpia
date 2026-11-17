@@ -2,6 +2,18 @@
   "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
   "versiones": [
     {
+      "version": "2.7.1",
+      "fecha": "2026-11-17",
+      "es": [
+        "La lista de programas se pone al día sola: si instalas o desinstalas algo fuera de RetroLimpia (desde Steam, Ajustes de Windows o su propio desinstalador), al volver a RetroLimpia ya no aparece.",
+        "Te avisa con un mensaje cuando la lista cambia (programas quitados o nuevos)."
+      ],
+      "en": [
+        "The program list updates itself: if you install or uninstall something outside RetroLimpia (from Steam, Windows Settings or its own uninstaller), it is gone when you come back to RetroLimpia.",
+        "A message tells you when the list changes (removed or new programs)."
+      ]
+    },
+    {
       "version": "2.7.0",
       "fecha": "2026-11-17",
       "es": [

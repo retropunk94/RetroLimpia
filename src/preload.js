@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('rl', {
   checkNow: () => ipcRenderer.invoke('rl:checkNow'),
   updateState: () => ipcRenderer.invoke('rl:updateState'),
   installUpdate: () => ipcRenderer.invoke('rl:installUpdate'),
+  setBusy: (b) => ipcRenderer.send('rl:busy', b),
   onSettings: (cb) => { const fn = (e, st) => cb(st); ipcRenderer.on('rl:settings', fn); return () => ipcRenderer.removeListener('rl:settings', fn); },
   onResumen: (cb) => { const fn = (e, r) => cb(r); ipcRenderer.on('rl:resumen', fn); return () => ipcRenderer.removeListener('rl:resumen', fn); },
   onUpdate: (cb) => { const fn = (e, st) => cb(st); ipcRenderer.on('rl:update', fn); return () => ipcRenderer.removeListener('rl:update', fn); },

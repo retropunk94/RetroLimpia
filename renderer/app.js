@@ -114,13 +114,14 @@ async function task(label, fn, opts = {}) {
   if (S.busy) { toast(L('Espera a que termine la tarea actual o cancélala.', 'Wait for the current task to finish or cancel it.'), 'err'); return; }
   S.cancelRequested = false;
   S.busy = { label, pct: 0, msg: '', start: Date.now(), cambios: !!opts.cambios };
+  rl.setBusy && rl.setBusy(true);
   setStatus(label); render();
   try { return await fn(); }
   catch (e) {
     if (isCancel(e)) toast(L('Tarea cancelada.', 'Task cancelled.'));
     else { console.error(e); toast(L('Algo falló: ', 'Something failed: ') + (e.message || e), 'err'); }
   }
-  finally { S.busy = null; S.cancelRequested = false; setStatus(''); render(); }
+  finally { S.busy = null; S.cancelRequested = false; rl.setBusy && rl.setBusy(false); setStatus(''); render(); }
 }
 const taskC = (label, fn) => task(label, fn, { cambios: true });
 const isCancel = (e) => S.cancelRequested || /CANCELADO/.test(String(e && e.message || e));
@@ -436,6 +437,38 @@ async function fixAll() {
   if (S.fix && !S.fix.cancelado) toast(L('¡Listo! Tu PC está más limpio.', 'Done! Your PC is cleaner.'));
 }
 
+// ---------- Actualización automática con cuenta atrás ----------
+function updBannerHTML() {
+  const up = S.upd || {};
+  const v = esc(up.version || '');
+  let body, btns;
+  if (S.updInstalling) {
+    body = `<b>${L('Instalando RetroLimpia ' + v + '...', 'Installing RetroLimpia ' + v + '...')}</b> · ${L('Se cerrará y se volverá a abrir solo en unos segundos.', 'It will close and reopen by itself in a few seconds.')}`;
+    btns = '';
+  } else if (S.updLater) {
+    body = `<b>${L('RetroLimpia ' + v + ' está lista', 'RetroLimpia ' + v + ' is ready')}</b> · ${L('Se instalará sola cuando cierres el programa.', 'It will install by itself when you close the program.')}`;
+    btns = `<button class="btn small" data-act="installUpdate">${L('Actualizar ahora', 'Update now')}</button>`;
+  } else if (S.busy) {
+    body = `<b>${L('RetroLimpia ' + v + ' está lista', 'RetroLimpia ' + v + ' is ready')}</b> · ${L('Se instalará sola en cuanto termine la tarea actual.', 'It will install as soon as the current task finishes.')}`;
+    btns = '';
+  } else {
+    const n = S.updCount == null ? 15 : S.updCount;
+    body = `<b>✨ ${L('Actualizando a la versión ' + v + ' en ' + n + ' s', 'Updating to version ' + v + ' in ' + n + ' s')}</b> · ${L('No tienes que hacer nada: se cierra y se vuelve a abrir solo.', 'Nothing to do: it closes and reopens by itself.')}<div class="upd-bar"><i style="width:${Math.round(((15 - n) / 15) * 100)}%"></i></div>`;
+    btns = `<button class="btn small ghost" data-act="updLater">${L('Más tarde', 'Later')}</button><button class="btn small primary" data-act="installUpdate">${L('Actualizar ya', 'Update now')}</button>`;
+  }
+  return `<div class="banner good" id="updBanner"><div class="grow">${body}</div>${btns}</div>`;
+}
+setInterval(() => {
+  const up = S.upd || {};
+  if (up.estado !== 'lista' || S.updLater || S.updInstalling) return;
+  const modalOpen = !$('#tour').classList.contains('hidden') || !$('#modal').classList.contains('hidden');
+  if (S.busy || modalOpen) { S.updCount = null; return; }
+  S.updCount = S.updCount == null ? 15 : S.updCount - 1;
+  if (S.updCount <= 0) { S.updInstalling = true; render(); rl.installUpdate(); return; }
+  const el = document.getElementById('updBanner');
+  if (el) el.outerHTML = updBannerHTML(); else render();
+}, 1000);
+
 // ============================================================ Vistas
 const ICONS = {
   inicio: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
@@ -491,7 +524,7 @@ function banners() {
   if (!S.info.esAdmin) h += `<div class="banner warn"><div class="grow"><b>${L('Abre RetroLimpia como administrador', 'Run RetroLimpia as administrator')}</b> · ${L('Sin permisos de administrador no puede desinstalar ni actualizar drivers. Ciérralo, haz clic derecho en su icono y elige "Ejecutar como administrador".', 'Without admin rights it cannot uninstall or update drivers. Close it, right-click its icon and choose "Run as administrator".')}</div></div>`;
   if (S.needsReboot) h += `<div class="banner warn"><div class="grow"><b>${L('Reinicia el PC cuando puedas', 'Restart your PC when you can')}</b> · ${L('Algunas actualizaciones o desinstalaciones terminan al reiniciar.', 'Some updates or uninstalls finish after a restart.')}</div></div>`;
   const up = S.upd || {};
-  if (up.estado === 'lista') h += `<div class="banner good"><div class="grow"><b>${L('¡RetroLimpia ' + esc(up.version) + ' está lista!', 'RetroLimpia ' + esc(up.version) + ' is ready!')}</b> · ${L('Ya se descargó. Tarda unos segundos y vuelve a abrirse solo.', 'Already downloaded. Takes a few seconds and reopens by itself.')}</div><button class="btn primary small" data-act="installUpdate" ${S.busy ? 'disabled' : ''}>${L('Reiniciar y actualizar', 'Restart and update')}</button></div>`;
+  if (up.estado === 'lista') h += updBannerHTML();
   else if (up.estado === 'descargando') h += `<div class="banner info"><div class="grow"><b>${L('Descargando RetroLimpia ' + esc(up.version || ''), 'Downloading RetroLimpia ' + esc(up.version || ''))}</b> · ${up.pct || 0}% · ${L('puedes seguir usándolo mientras tanto', 'you can keep using it meanwhile')}</div></div>`;
   else if (S.appUpdate?.disponible && S.appUpdate.modo === 'manual') h += `<div class="banner good"><div class="grow"><b>${L('Hay una versión nueva de RetroLimpia', 'A new RetroLimpia version is available')} (${esc(S.appUpdate.version)})</b> · ${L('La versión portable no se actualiza sola: descarga la nueva y reemplaza este archivo.', 'The portable version cannot self-update: download the new one and replace this file.')}</div><button class="btn small" data-open="${esc(S.appUpdate.url)}">${L('Descargar', 'Download')}</button></div>`;
   return h;
@@ -1206,7 +1239,8 @@ document.addEventListener('click', async (e) => {
       else toast(r.modo === 'auto' ? L(`Versión ${r.version} encontrada: se está descargando sola.`, `Version ${r.version} found: downloading by itself.`) : L(`Hay una versión nueva: ${r.version}.`, `New version: ${r.version}.`));
       return render();
     }
-    case 'installUpdate': toast(L('Actualizando... RetroLimpia se volverá a abrir en unos segundos.', 'Updating... RetroLimpia will reopen in a few seconds.')); return rl.installUpdate();
+    case 'installUpdate': S.updInstalling = true; S.updLater = false; render(); return rl.installUpdate();
+    case 'updLater': S.updLater = true; S.updCount = null; return render();
   }
 });
 
@@ -1266,7 +1300,12 @@ setInterval(() => { if (S.busy) updateProgressOnly(); }, 1000);
   if (!S.settings.confianzaVista) showTrust();
   else if (!S.settings.tourVisto) startTour();
   else if (!S.settings.recordatoriosPreguntado) showReminders();
-  rl.onUpdate((st) => { S.upd = st; render(); });
+  rl.onUpdate((st) => { const was = S.upd && S.upd.estado; S.upd = st; if (st.estado !== 'lista') S.updCount = null; if (was !== st.estado) render(); else { const el = document.getElementById('updBanner'); if (el) el.outerHTML = updBannerHTML(); else if (st.estado === 'descargando') render(); } });
+  // ¿Venimos de una actualización? Se avisa una sola vez
+  if (S.settings.ultimaVersion && S.settings.ultimaVersion !== S.info.version) {
+    setTimeout(() => toast('✨ ' + L(`RetroLimpia se actualizó a la versión ${S.info.version}. ¡Ya estás al día!`, `RetroLimpia was updated to version ${S.info.version}. You're up to date!`)), 1200);
+  }
+  if (S.settings.ultimaVersion !== S.info.version) rl.setSettings({ ultimaVersion: S.info.version }).then((st) => { S.settings = st; });
   rl.onSettings((st) => { S.settings = st; render(); });
   rl.onResumen(async () => { S.settings = await rl.getSettings(); render(); });
   rl.updateState().then((st) => {

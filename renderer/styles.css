@@ -364,3 +364,6 @@ select { background: var(--panel-2); border: 1px solid var(--line-2); border-rad
 .tour-dots i.on { width: 22px; border-radius: 6px; background: var(--grad); }
 .tour-foot { display: flex; align-items: center; gap: 8px; }
 .tour-count { position: absolute; top: 18px; right: 22px; font-size: 12px; color: var(--dim); }
+.upd-bar { height: 4px; border-radius: 4px; background: var(--line); margin-top: 8px; overflow: hidden; }
+.upd-bar i { display: block; height: 100%; background: var(--grad); transition: width 1s linear; }
+#updBanner .btn + .btn { margin-left: 6px; }

@@ -29,7 +29,7 @@ Ve a **[Releases](../../releases/latest)** y elige una opción:
 | **Actualizaciones** | Windows, drivers y programas (con winget): marca los que quieras o actualiza **todo de una vez**. |
 | **Recordatorios** | Opcional: arranca en silencio con Windows y te avisa con una notificación cuando hay basura acumulada o actualizaciones pendientes. |
 | **Procesos (avanzado)** | Qué consume más CPU y RAM ahora mismo, con opción de cerrarlo. Los procesos vitales de Windows están protegidos. |
-| **Se actualiza solo** | Al abrirse busca versión nueva en GitHub, la descarga en segundo plano y se instala con un clic. También puedes buscar a mano en Ajustes. |
+| **Se actualiza solo** | Busca versión nueva en GitHub, descarga solo lo que cambió y se instala sola: con una cuenta atrás si lo estás usando (con botón "Más tarde") o en silencio si está en la bandeja. También funciona en la versión portable. |
 | **Deshacer** | Punto de restauración antes de cada cambio y **cuarentena de 7 días** con botón de restaurar. |
 
 ![Programas](docs/capturas/programas.png)

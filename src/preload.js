@@ -14,6 +14,11 @@ contextBridge.exposeInMainWorld('rl', {
   checkUpdate: () => ipcRenderer.invoke('rl:checkUpdate'),
   autostart: (on, dias) => ipcRenderer.invoke('rl:autostart', on, dias),
   checkNow: () => ipcRenderer.invoke('rl:checkNow'),
+  updateState: () => ipcRenderer.invoke('rl:updateState'),
+  installUpdate: () => ipcRenderer.invoke('rl:installUpdate'),
+  onSettings: (cb) => { const fn = (e, st) => cb(st); ipcRenderer.on('rl:settings', fn); return () => ipcRenderer.removeListener('rl:settings', fn); },
+  onResumen: (cb) => { const fn = (e, r) => cb(r); ipcRenderer.on('rl:resumen', fn); return () => ipcRenderer.removeListener('rl:resumen', fn); },
+  onUpdate: (cb) => { const fn = (e, st) => cb(st); ipcRenderer.on('rl:update', fn); return () => ipcRenderer.removeListener('rl:update', fn); },
   win: (action) => ipcRenderer.send('rl:win', action),
   onProgress: (cb) => {
     const fn = (e, p) => cb(p);

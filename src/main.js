@@ -32,7 +32,9 @@ const defaultSettings = {
   frecuenciaDias: 3,
   ultimaRevision: 0,
   procesosAviso: false,
-  bandejaAvisada: false
+  bandejaAvisada: false,
+  notificaciones: true,
+  ultimoResumen: ''
 };
 function loadSettings() {
   try { return { ...defaultSettings, ...JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) }; }
@@ -89,8 +91,9 @@ function createWindow() {
       win.hide();
       if (!s.bandejaAvisada) {
         saveSettings({ ...s, bandejaAvisada: true });
+        // este aviso es solo una vez y explica dónde quedó el programa: se muestra siempre
         notify(T('RetroLimpia sigue cuidando tu PC', 'RetroLimpia keeps looking after your PC'),
-          T('Está en la bandeja (junto al reloj) para avisarte cuando toque limpiar o actualizar. Clic derecho en su icono para salir.', 'It is in the tray (next to the clock) to remind you when to clean or update. Right-click its icon to quit.'));
+          T('Está en la bandeja (junto al reloj) para avisarte cuando toque limpiar o actualizar. Clic derecho en su icono para salir.', 'It is in the tray (next to the clock) to remind you when to clean or update. Right-click its icon to quit.'), null, true);
       }
     }
   });
@@ -118,8 +121,10 @@ function setAutostart(on) {
 }
 
 // ---------- Bandeja, notificaciones y revisiones automáticas ----------
-function notify(title, body, onClick) {
+// Respeta el ajuste "Notificaciones". Solo lo que pide el usuario a mano (force) se muestra siempre.
+function notify(title, body, onClick, force = false) {
   if (!Notification.isSupported()) return;
+  if (!force && loadSettings().notificaciones === false) return;
   const n = new Notification({ title, body, icon: path.join(__dirname, '..', 'renderer', 'icon.png') });
   n.on('click', () => { showWindow(); if (onClick) onClick(); });
   n.show();
@@ -132,6 +137,7 @@ function createTray() {
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: T('Abrir RetroLimpia', 'Open RetroLimpia'), click: showWindow },
     { label: T('Revisar ahora', 'Check now'), click: () => backgroundCheck(true) },
+    { label: T('Notificaciones', 'Notifications'), type: 'checkbox', checked: loadSettings().notificaciones !== false, click: (m) => { saveSettings({ ...loadSettings(), notificaciones: m.checked }); if (win && !win.isDestroyed()) win.webContents.send('rl:settings', loadSettings()); } },
     { type: 'separator' },
     { label: T('Salir', 'Quit'), click: () => { quitting = true; app.quit(); } }
   ]));
@@ -163,16 +169,22 @@ async function backgroundCheck(force) {
     const basura = arr(junk && junk.categorias).filter((c) => c.color === 'verde').reduce((a, c) => a + (c.tamano || 0), 0);
     const nWin = arr(upd && upd.windows).filter((u) => !u.opcional && !u.grande).length;
     const nApps = arr(upd && upd.apps).length;
-    saveSettings({ ...loadSettings(), ultimaRevision: Date.now() });
+
     const partes = [];
     if (basura > 500 * 1024 ** 2) partes.push(T(`${fmtBytes(basura)} de archivos basura`, `${fmtBytes(basura)} of junk files`));
     if (nWin) partes.push(T(`${nWin} actualización(es) de Windows`, `${nWin} Windows update(s)`));
     if (nApps) partes.push(T(`${nApps} programa(s) por actualizar`, `${nApps} program(s) to update`));
+    const resumen = partes.length ? partes.join(' · ') : T('Todo en orden', 'All good');
+    saveSettings({ ...loadSettings(), ultimaRevision: Date.now(), ultimoResumen: resumen });
+    // Aviso silencioso siempre disponible: pasando el ratón por el icono de la bandeja
+    if (tray) tray.setToolTip(('RetroLimpia · ' + resumen).slice(0, 127));
+    if (win && !win.isDestroyed()) win.webContents.send('rl:resumen', resumen);
     if (partes.length) {
-      notify(T('Tu PC necesita un repaso', 'Your PC needs a tune-up'), partes.join(' · ') + T('. Haz clic para revisarlo.', '. Click to review.'));
+      notify(T('Tu PC necesita un repaso', 'Your PC needs a tune-up'), resumen + T('. Haz clic para revisarlo.', '. Click to review.'), null, force);
     } else if (force) {
-      notify(T('Todo en orden', 'All good'), T('No hay basura importante ni actualizaciones pendientes.', 'No significant junk or pending updates.'));
+      notify(T('Todo en orden', 'All good'), T('No hay basura importante ni actualizaciones pendientes.', 'No significant junk or pending updates.'), null, true);
     }
+    return resumen;
   } finally { checking = false; }
 }
 
@@ -187,6 +199,7 @@ if (!app.requestSingleInstanceLock()) {
     const s = loadSettings();
     if (s.inicioWindows || BACKGROUND) { createTray(); startTimers(); }
     if (!BACKGROUND) createWindow();
+    initUpdater();
     // Mantenimiento silencioso: vacía la cuarentena vieja al arrancar
     engine.run('cuarentena', { accion: 'purgar', dias: s.diasCuarentena }).catch(() => {});
   });
@@ -242,17 +255,58 @@ ipcMain.handle('rl:saveReport', async (e, html) => {
   shell.openPath(file);
   return file;
 });
-ipcMain.handle('rl:checkUpdate', async () => {
-  // Solo consulta la última versión publicada en GitHub. No envía datos del PC.
+// ---------- Actualizaciones de RetroLimpia ----------
+// Versión instalada: busca en GitHub al abrir, descarga sola en segundo plano y
+// se instala con un clic ("Reiniciar y actualizar"). Versión portable: avisa y abre la descarga.
+let autoUpdater = null;
+let updateState = { estado: 'nada' };
+const isPortable = () => !!process.env.PORTABLE_EXECUTABLE_FILE;
+function sendUpdate(st) {
+  updateState = { ...updateState, ...st };
+  if (win && !win.isDestroyed()) win.webContents.send('rl:update', updateState);
+}
+function initUpdater() {
+  if (DEMO || !app.isPackaged || isPortable()) return;
+  try { ({ autoUpdater } = require('electron-updater')); } catch { autoUpdater = null; return; }
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.on('checking-for-update', () => sendUpdate({ estado: 'buscando' }));
+  autoUpdater.on('update-not-available', () => sendUpdate({ estado: 'al-dia', revisado: Date.now() }));
+  autoUpdater.on('update-available', (i) => sendUpdate({ estado: 'descargando', version: i.version, pct: 0 }));
+  autoUpdater.on('download-progress', (p) => sendUpdate({ estado: 'descargando', pct: Math.round(p.percent || 0) }));
+  autoUpdater.on('update-downloaded', (i) => {
+    sendUpdate({ estado: 'lista', version: i.version });
+    if (!win || !win.isVisible()) notify(T('RetroLimpia se ha actualizado', 'RetroLimpia has been updated'), T(`La versión ${i.version} está lista. Se instalará al cerrar el programa, o ábrelo y pulsa "Reiniciar y actualizar".`, `Version ${i.version} is ready. It installs when you quit, or open it and press "Restart and update".`));
+  });
+  autoUpdater.on('error', (e) => sendUpdate({ estado: 'error', mensaje: String(e && e.message || e).slice(0, 200) }));
+  setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000);
+  setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000);
+}
+async function checkManually() {
+  if (autoUpdater) {
+    try {
+      const r = await autoUpdater.checkForUpdates();
+      const v = r && r.updateInfo && r.updateInfo.version;
+      return { modo: 'auto', disponible: !!(v && newer(v, pkg.version)), version: v, estado: updateState.estado };
+    } catch (e) { return { modo: 'auto', disponible: false, error: String(e.message || e) }; }
+  }
+  // Portable o sin actualizador: preguntar a GitHub la última versión publicada
   const repo = pkg.retrolimpia.repo;
-  if (!repo || repo.startsWith('TU_USUARIO')) return { disponible: false };
   try {
     const r = await net.fetch(`https://api.github.com/repos/${repo}/releases/latest`, { headers: { 'User-Agent': 'RetroLimpia' } });
-    if (!r.ok) return { disponible: false };
+    if (!r.ok) return { modo: 'manual', disponible: false };
     const j = await r.json();
     const ultima = String(j.tag_name || '').replace(/^v/i, '');
-    return { disponible: newer(ultima, pkg.version), version: ultima, url: j.html_url };
-  } catch { return { disponible: false }; }
+    return { modo: 'manual', disponible: newer(ultima, pkg.version), version: ultima, url: j.html_url };
+  } catch { return { modo: 'manual', disponible: false, error: 'sin conexión' }; }
+}
+ipcMain.handle('rl:checkUpdate', () => checkManually());
+ipcMain.handle('rl:updateState', () => ({ ...updateState, portable: isPortable(), auto: !!autoUpdater }));
+ipcMain.handle('rl:installUpdate', () => {
+  if (!autoUpdater || updateState.estado !== 'lista') return false;
+  quitting = true;
+  autoUpdater.quitAndInstall(true, true);   // instala en silencio y vuelve a abrir RetroLimpia
+  return true;
 });
 function newer(a, b) {
   const pa = a.split('.').map(Number), pb = b.split('.').map(Number);

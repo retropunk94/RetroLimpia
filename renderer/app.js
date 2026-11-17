@@ -477,9 +477,9 @@ function renderNav() {
     if (n === 'sep') return '<div class="nav-sep"></div>';
     const [id, es, en] = n; const c = navCount(id);
     return `<button class="nav-item ${S.view === id ? 'active' : ''}" data-nav="${id}"><svg viewBox="0 0 24 24">${ICONS[id]}</svg><span>${L(es, en)}</span>${c ? `<span class="count ${c[1]}">${esc(c[0])}</span>` : ''}</button>`;
-  }).join('') + `<div class="nav-foot">${/^https:\/\//.test(S.info.paypal || '') ? `<div class="donate"><div class="d-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.8 4.5c2.1 0 3.6 1.1 5.2 3 1.6-1.9 3.1-3 5.2-3 3.8 0 5.9 3.9 4.4 7.3C19.5 16.4 12 21 12 21z"/></svg>${L('¿Te ha servido?', 'Did it help you?')}</div>
-    <p>${L('RetroLimpia es gratis, sin anuncios y no vende tus datos. Lo hace una sola persona: tu café hace que siga mejorando.', "RetroLimpia is free, ad-free and never sells your data. One person builds it: your coffee keeps it improving.")}</p>
-    <button class="donate-btn" data-open="${esc(S.info.paypal)}">☕ ${L('Invítame un café', 'Buy me a coffee')}</button><div class="d-note">${L('Acepta PayPal · cualquier cantidad ayuda', 'PayPal accepted · any amount helps')}</div></div>` : ''}${repoUrl() ? `<button class="gh-btn" data-open="${repoUrl()}" title="${L('Revisar el código abierto en GitHub', 'Review the open source code on GitHub')}">${GH_ICON}<span>${L('Ver el código en GitHub', 'View code on GitHub')}</span></button>` : ''}<div class="trust">${L('Sin telemetría · Código abierto', 'No telemetry · Open source')}</div>${L('Todo lo que borra se puede deshacer.', 'Everything it removes can be undone.')}</div>`;
+  }).join('') + `<div class="nav-foot">${/^https:\/\//.test(S.info.paypal || '') ? `<div class="donate"><div class="d-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.8 4.5c2.1 0 3.6 1.1 5.2 3 1.6-1.9 3.1-3 5.2-3 3.8 0 5.9 3.9 4.4 7.3C19.5 16.4 12 21 12 21z"/></svg>${L('Tu donación lo mantiene vivo', 'Your donation keeps it alive')}</div>
+    <p>${L('No hay empresa detrás: hay una persona que le dedica sus noches. Si te ayudó, donar, por poco que sea, lo mantiene vivo para todos.', 'No company behind it: one person giving it their nights. If it helped you, donating, however little, keeps it alive for everyone.')}</p>
+    <button class="donate-btn" data-open="${esc(S.info.paypal)}">💜 ${L('Donar', 'Donate')}</button><div class="d-note">${L('Acepta PayPal · cada donación cuenta', 'PayPal accepted · every donation counts')}</div></div>` : ''}${repoUrl() ? `<button class="gh-btn" data-open="${repoUrl()}" title="${L('Revisar el código abierto en GitHub', 'Review the open source code on GitHub')}">${GH_ICON}<span>${L('Ver el código en GitHub', 'View code on GitHub')}</span></button>` : ''}<div class="trust">${L('Sin telemetría · Código abierto', 'No telemetry · Open source')}</div>${L('Todo lo que borra se puede deshacer.', 'Everything it removes can be undone.')}</div>`;
 }
 
 function head(title, desc, right = '') {
@@ -490,7 +490,10 @@ function banners() {
   if (S.info.demo) h += `<div class="banner info"><div class="grow"><b>${L('Modo demostración', 'Demo mode')}</b> · ${L('Los datos son de ejemplo y no se cambia nada en este equipo.', 'Sample data; nothing on this computer is changed.')}</div></div>`;
   if (!S.info.esAdmin) h += `<div class="banner warn"><div class="grow"><b>${L('Abre RetroLimpia como administrador', 'Run RetroLimpia as administrator')}</b> · ${L('Sin permisos de administrador no puede desinstalar ni actualizar drivers. Ciérralo, haz clic derecho en su icono y elige "Ejecutar como administrador".', 'Without admin rights it cannot uninstall or update drivers. Close it, right-click its icon and choose "Run as administrator".')}</div></div>`;
   if (S.needsReboot) h += `<div class="banner warn"><div class="grow"><b>${L('Reinicia el PC cuando puedas', 'Restart your PC when you can')}</b> · ${L('Algunas actualizaciones o desinstalaciones terminan al reiniciar.', 'Some updates or uninstalls finish after a restart.')}</div></div>`;
-  if (S.appUpdate?.disponible) h += `<div class="banner good"><div class="grow"><b>${L('Hay una versión nueva de RetroLimpia', 'A new RetroLimpia version is available')} (${esc(S.appUpdate.version)})</b></div><button class="btn small" data-open="${esc(S.appUpdate.url)}">${L('Descargar', 'Download')}</button></div>`;
+  const up = S.upd || {};
+  if (up.estado === 'lista') h += `<div class="banner good"><div class="grow"><b>${L('¡RetroLimpia ' + esc(up.version) + ' está lista!', 'RetroLimpia ' + esc(up.version) + ' is ready!')}</b> · ${L('Ya se descargó. Tarda unos segundos y vuelve a abrirse solo.', 'Already downloaded. Takes a few seconds and reopens by itself.')}</div><button class="btn primary small" data-act="installUpdate" ${S.busy ? 'disabled' : ''}>${L('Reiniciar y actualizar', 'Restart and update')}</button></div>`;
+  else if (up.estado === 'descargando') h += `<div class="banner info"><div class="grow"><b>${L('Descargando RetroLimpia ' + esc(up.version || ''), 'Downloading RetroLimpia ' + esc(up.version || ''))}</b> · ${up.pct || 0}% · ${L('puedes seguir usándolo mientras tanto', 'you can keep using it meanwhile')}</div></div>`;
+  else if (S.appUpdate?.disponible && S.appUpdate.modo === 'manual') h += `<div class="banner good"><div class="grow"><b>${L('Hay una versión nueva de RetroLimpia', 'A new RetroLimpia version is available')} (${esc(S.appUpdate.version)})</b> · ${L('La versión portable no se actualiza sola: descarga la nueva y reemplaza este archivo.', 'The portable version cannot self-update: download the new one and replace this file.')}</div><button class="btn small" data-open="${esc(S.appUpdate.url)}">${L('Descargar', 'Download')}</button></div>`;
   return h;
 }
 
@@ -805,15 +808,26 @@ function viewDeshacer() {
     <p class="meta" style="margin-top:16px"><button class="link" data-folder="cuarentena">${L('Abrir carpeta de cuarentena', 'Open quarantine folder')}</button> · <button class="link" data-folder="drivers">${L('Copias de drivers', 'Driver backups')}</button> · <button class="link" data-folder="logs">${L('Registro de cambios', 'Change log')}</button></p></div>`;
 }
 
+function updStatusText() {
+  const up = S.upd || {};
+  if (up.estado === 'lista') return L(`La versión ${up.version} está descargada y lista para instalar.`, `Version ${up.version} is downloaded and ready to install.`);
+  if (up.estado === 'descargando') return L(`Descargando la versión ${up.version || ''}... ${up.pct || 0}%`, `Downloading version ${up.version || ''}... ${up.pct || 0}%`);
+  if (up.estado === 'error') return L('No se pudo comprobar (¿sin internet?). Se volverá a intentar solo.', 'Could not check (offline?). It will retry by itself.');
+  if (S.appUpdate && S.appUpdate.modo === 'manual') return S.appUpdate.disponible ? L(`Hay una versión nueva: ${S.appUpdate.version}.`, `New version available: ${S.appUpdate.version}.`) : L('Tienes la última versión.', 'You have the latest version.');
+  if (up.estado === 'al-dia') return L('Tienes la última versión. RetroLimpia lo comprueba solo cada vez que se abre.', 'You have the latest version. RetroLimpia checks by itself every time it opens.');
+  return L('RetroLimpia busca actualizaciones solo cada vez que se abre y las instala con un clic.', 'RetroLimpia checks for updates every time it opens and installs them with one click.');
+}
+
 function viewAjustes() {
   const s = S.settings;
-  const sw = (key, title, desc) => `<div class="setting"><div class="grow"><b>${title}</b><span>${desc}</span></div><label class="switch"><input type="checkbox" data-setting="${key}" ${s[key] ? 'checked' : ''}><span></span></label></div>`;
+  const sw = (key, title, desc) => `<div class="setting"><div class="grow"><b>${title}</b><span>${desc}</span></div><label class="switch"><input type="checkbox" data-setting="${key}" ${(key === 'notificaciones' ? s[key] !== false : s[key]) ? 'checked' : ''}><span></span></label></div>`;
   const repo = repoUrl();
   return `<div class="view">${banners()}${head(L('Ajustes', 'Settings'), L('Casi nadie necesita cambiar nada aquí.', 'Most people never need to change anything here.'))}
     <div class="card">
       <div class="setting"><div class="grow"><b>${L('Idioma', 'Language')}</b></div><select data-setting="idioma"><option value="es" ${s.idioma === 'es' ? 'selected' : ''}>Español</option><option value="en" ${s.idioma === 'en' ? 'selected' : ''}>English</option></select></div>
       <div class="setting"><div class="grow"><b>${L('Iniciar con Windows y avisarme', 'Start with Windows and remind me')}</b><span>${L('Revisa en silencio cada cierto tiempo y te manda una notificación si hay basura o actualizaciones. Recomendado.', 'Quietly checks every so often and notifies you about junk or updates. Recommended.')}</span></div><label class="switch"><input type="checkbox" data-autostart ${s.inicioWindows ? 'checked' : ''}><span></span></label></div>
       ${s.inicioWindows ? `<div class="setting"><div class="grow"><b>${L('Frecuencia de revisión', 'Check frequency')}</b><span>${s.ultimaRevision ? L('Última revisión: ', 'Last check: ') + new Date(s.ultimaRevision).toLocaleString() : L('Todavía no ha revisado.', 'No check yet.')}</span></div>${freqSelect('data-setting="frecuenciaDias"')} <button class="btn small ghost" data-act="checkNow">${L('Revisar ahora', 'Check now')}</button></div>` : ''}
+      ${s.inicioWindows ? sw('notificaciones', L('Notificaciones', 'Notifications'), L('Si las desactivas, RetroLimpia sigue revisando en silencio: verás el resumen pasando el ratón por su icono junto al reloj, o aquí al abrirlo.', 'If you turn them off, RetroLimpia keeps checking quietly: hover its icon next to the clock or open it here to see the summary.')) + (s.ultimoResumen ? `<div class="setting"><div class="grow"><b>${L('Última revisión automática', 'Last automatic check')}</b><span>${esc(s.ultimoResumen)}</span></div></div>` : '') : ''}
       ${sw('restosAutomaticos', L('Borrar restos seguros automáticamente', 'Remove safe leftovers automatically'), L('Al desinstalar, mueve a la cuarentena los restos que seguro son del programa, sin preguntar.', 'After uninstalling, quarantine leftovers that surely belong to the program without asking.'))}
       ${sw('puntoRestauracion', L('Crear punto de restauración antes de cambios', 'Create a restore point before changes'), L('Muy recomendado. Tarda unos segundos.', 'Highly recommended. Takes a few seconds.'))}
       <div class="setting"><div class="grow"><b>${L('Días en cuarentena', 'Days in quarantine')}</b><span>${L('Cuánto tiempo se guardan las cosas quitadas antes de borrarlas.', 'How long removed items are kept before deletion.')}</span></div><select data-setting="diasCuarentena">${[3, 7, 14, 30].map((d) => `<option value="${d}" ${s.diasCuarentena == d ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
@@ -823,7 +837,8 @@ function viewAjustes() {
     <div class="card"><div class="kv"><span>${L('Versión', 'Version')}</span><span>${esc(S.info.version)}</span><span>${L('Licencia', 'License')}</span><span>MIT (${L('código abierto', 'open source')})</span><span>${L('Privacidad', 'Privacy')}</span><span>${L('No envía ningún dato tuyo a internet.', 'Sends none of your data to the internet.')}</span></div>
       <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap"><button class="btn" data-act="trust">${L('¿Por qué Windows o mi antivirus avisan?', 'Why does Windows or my antivirus warn me?')}</button>
       ${repo ? `<button class="btn ghost" data-open="${repo}">${L('Ver el código', 'View the code')}</button>` : ''}
-      <button class="btn ghost" data-act="checkUpdate">${L('Buscar versión nueva', 'Check for a new version')}</button></div></div></div>`;
+      <button class="btn ghost" data-act="checkUpdate" ${S.checkingUpd ? 'disabled' : ''}>${S.checkingUpd ? L('Buscando...', 'Checking...') : L('Buscar actualizaciones', 'Check for updates')}</button></div>
+      <p class="meta" style="margin-top:12px">${updStatusText()}</p></div></div>`;
 }
 
 function loadingView(title, loader, msg) {
@@ -1026,8 +1041,23 @@ document.addEventListener('click', async (e) => {
       return render();
     }
     case 'remindNo': S.settings = await rl.setSettings({ recordatoriosPreguntado: true }); $('#modal').classList.add('hidden'); return;
-    case 'checkNow': toast(L('Revisando en segundo plano. Si hay algo que hacer, te llegará una notificación.', 'Checking in the background. You will get a notification if there is something to do.')); return rl.checkNow();
-    case 'checkUpdate': S.appUpdate = await rl.checkUpdate(); toast(S.appUpdate.disponible ? L('¡Hay versión nueva!', 'New version available!') : L('Tienes la última versión.', 'You have the latest version.')); return render();
+    case 'checkNow': {
+      toast(L('Revisando... tarda unos segundos.', 'Checking... takes a few seconds.'));
+      const res = await rl.checkNow();
+      S.settings = await rl.getSettings();
+      if (res) toast(L('Resultado: ', 'Result: ') + res);
+      return render();
+    }
+    case 'checkUpdate': {
+      S.checkingUpd = true; render();
+      const r = await rl.checkUpdate().catch(() => ({ disponible: false, error: 'x' }));
+      S.checkingUpd = false; S.appUpdate = r;
+      if (r.error) toast(L('No se pudo comprobar. ¿Hay conexión a internet?', 'Could not check. Are you online?'), 'err');
+      else if (!r.disponible) toast(L('Tienes la última versión. ✔', 'You have the latest version. ✔'));
+      else toast(r.modo === 'auto' ? L(`Versión ${r.version} encontrada: se está descargando sola.`, `Version ${r.version} found: downloading by itself.`) : L(`Hay una versión nueva: ${r.version}.`, `New version: ${r.version}.`));
+      return render();
+    }
+    case 'installUpdate': toast(L('Actualizando... RetroLimpia se volverá a abrir en unos segundos.', 'Updating... RetroLimpia will reopen in a few seconds.')); return rl.installUpdate();
   }
 });
 
@@ -1083,5 +1113,13 @@ setInterval(() => { if (S.busy) updateProgressOnly(); }, 1000);
   render();
   if (!S.settings.confianzaVista) showTrust();
   else if (!S.settings.recordatoriosPreguntado) showReminders();
-  rl.checkUpdate().then((u) => { S.appUpdate = u; if (u.disponible) render(); }).catch(() => {});
+  rl.onUpdate((st) => { S.upd = st; render(); });
+  rl.onSettings((st) => { S.settings = st; render(); });
+  rl.onResumen(async () => { S.settings = await rl.getSettings(); render(); });
+  rl.updateState().then((st) => {
+    S.upd = st;
+    // La versión portable no se actualiza sola: solo avisamos
+    if (!st.auto) rl.checkUpdate().then((u) => { S.appUpdate = u; if (u.disponible) render(); }).catch(() => {});
+    render();
+  }).catch(() => {});
 })();

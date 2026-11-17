@@ -29,6 +29,7 @@ Ve a **[Releases](../../releases/latest)** y elige una opción:
 | **Actualizaciones** | Windows, drivers y programas (con winget): marca los que quieras o actualiza **todo de una vez**. |
 | **Recordatorios** | Opcional: arranca en silencio con Windows y te avisa con una notificación cuando hay basura acumulada o actualizaciones pendientes. |
 | **Procesos (avanzado)** | Qué consume más CPU y RAM ahora mismo, con opción de cerrarlo. Los procesos vitales de Windows están protegidos. |
+| **Se actualiza solo** | Al abrirse busca versión nueva en GitHub, la descarga en segundo plano y se instala con un clic. También puedes buscar a mano en Ajustes. |
 | **Deshacer** | Punto de restauración antes de cada cambio y **cuarentena de 7 días** con botón de restaurar. |
 
 ![Programas](docs/capturas/programas.png)
@@ -66,7 +67,7 @@ npm run dist     # genera el instalador y la versión portable en dist/
 
 ## Apoya el proyecto
 
-RetroLimpia es gratis, sin anuncios y sin telemetría. Si te ha servido, puedes invitarme un café: https://streamelements.com/retropunk94/tip
+RetroLimpia es gratis, sin anuncios y sin telemetría. Detrás no hay una empresa, hay una persona. Si te ha servido, tu donación lo mantiene vivo: https://streamelements.com/retropunk94/tip
 
 ## Licencia
 

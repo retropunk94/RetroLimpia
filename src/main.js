@@ -213,21 +213,23 @@ if (!app.requestSingleInstanceLock()) {
     });
   });
   app.whenReady().then(() => {
-    engine.init({ demo: DEMO, scriptsDir: app.isPackaged ? path.join(process.resourcesPath, 'scripts') : path.join(__dirname, '..', 'scripts') });
-    if (process.platform === 'win32') app.setAppUserModelId(pkg.build.appId);
-    let s = loadSettings();
-    // Si se actualizó estando en la bandeja, vuelve a la bandeja (sin abrir ventana)
+    // Cada paso va protegido: si uno falla, la ventana y el actualizador arrancan igual.
+    // (Antes, un fallo aquí dejaba el programa abierto pero sin ventana y sin actualizarse.)
+    const paso = (nombre, fn) => { try { return fn(); } catch (e) { updLog('Arranque, fallo en ' + nombre + ': ' + (e && e.stack || e)); } };
+    paso('motor', () => engine.init({ demo: DEMO, scriptsDir: app.isPackaged ? path.join(process.resourcesPath, 'scripts') : path.join(__dirname, '..', 'scripts') }));
+    // OJO: el instalador quita la sección "build" de package.json, así que el id va escrito aquí
+    paso('appId', () => { if (process.platform === 'win32') app.setAppUserModelId('com.retropunk94.retrolimpia'); });
+    let s = paso('ajustes', () => loadSettings()) || { ...defaultSettings };
     // relanzarEnBandeja guarda la hora: solo vale justo después de una actualización
-    // (antes era true/false y, si se quedaba "pegado", el programa abría sin ventana)
     const recien = typeof s.relanzarEnBandeja === 'number' && Date.now() - s.relanzarEnBandeja < 10 * 60 * 1000;
     const enBandeja = BACKGROUND || recien;
-    if (s.relanzarEnBandeja) s = saveSettings({ ...s, relanzarEnBandeja: false });
-    if (s.inicioWindows || enBandeja) { createTray(); startTimers(); }
-    if (!enBandeja) createWindow();
-    initUpdater();
+    if (s.relanzarEnBandeja) s = paso('ajustes2', () => saveSettings({ ...s, relanzarEnBandeja: false })) || s;
+    if (s.inicioWindows || enBandeja) paso('bandeja', () => { createTray(); startTimers(); });
+    if (!enBandeja) paso('ventana', () => createWindow());
+    paso('actualizador', () => initUpdater());
     // Mantenimiento silencioso: vacía la cuarentena vieja al arrancar
-    engine.run('cuarentena', { accion: 'purgar', dias: s.diasCuarentena }).catch(() => {});
-  });
+    paso('cuarentena', () => engine.run('cuarentena', { accion: 'purgar', dias: s.diasCuarentena }).catch(() => {}));
+  }).catch((e) => { updLog('Arranque: ' + (e && e.stack || e)); try { if (!win) createWindow(); } catch {} });
   app.on('before-quit', () => { quitting = true; });
   app.on('window-all-closed', () => { if (!tray) app.quit(); });
 }
@@ -354,7 +356,7 @@ function initUpdater() {
   }
   autoUpdater.logger = { info: () => {}, debug: () => {}, warn: (m) => updLog('aviso: ' + m), error: (m) => updLog('error: ' + m) };
   autoUpdater.autoDownload = true;
-  autoUpdater.autoInstallOnAppQuit = true;
+  autoUpdater.autoInstallOnAppQuit = false;   // instalar al cerrar dejaba el programa "sin abrir" un rato: se instala con su ventana
   autoUpdater.on('checking-for-update', () => { if (updateState.estado !== 'lista') sendUpdate({ estado: 'buscando' }); });
   autoUpdater.on('update-not-available', () => sendUpdate({ estado: 'al-dia', revisado: Date.now() }));
   autoUpdater.on('update-available', (i) => sendUpdate({ estado: 'descargando', version: i.version, pct: 0 }));

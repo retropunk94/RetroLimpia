@@ -162,11 +162,24 @@ if ($plat) {
         $null = Start-Cmd $c.exe $c.args
     } catch { $result.mensaje = $_.Exception.Message }
 
-    # Espera: termina cuando desaparece su entrada. Si en 3 minutos no cambia nada, se da por cancelado.
+    # Espera hasta que la tienda termine. Se da por desinstalado si pasa cualquiera de estas cosas:
+    #  - desaparece su entrada del registro, o
+    #  - desaparece la ficha del juego (Steam: appmanifest), o
+    #  - desaparece su carpeta.
+    # (Steam a veces deja la entrada del registro: entonces se trata como resto y se limpia.)
+    # Si en 3 minutos no cambia nada, se da por cancelado. Tope total: 20 minutos.
+    $habiaManifest = [bool]($manifest -and (Test-Path -LiteralPath $manifest))
+    $habiaCarpeta = [bool]($loc0 -and (Test-Path -LiteralPath $loc0))
+    function Test-Terminado {
+        if (Test-Gone $key) { return $true }
+        if ($habiaManifest -and -not (Test-Path -LiteralPath $manifest)) { return $true }
+        if ($habiaCarpeta -and -not (Test-Path -LiteralPath $loc0)) { return $true }
+        return $false
+    }
     $sw = [Diagnostics.Stopwatch]::StartNew(); $quieto = [Diagnostics.Stopwatch]::StartNew()
-    $firma = Get-Firma $loc0 $manifest; $avisado = $false
-    while ($sw.Elapsed.TotalMinutes -lt 45) {
-        if (Test-Gone $key) { break }
+    $firma = Get-Firma $loc0 $manifest; $avisado = $false; $terminado = $false
+    while ($sw.Elapsed.TotalMinutes -lt 20) {
+        if (Test-Terminado) { $terminado = $true; break }
         Start-Sleep -Seconds 2
         $f2 = Get-Firma $loc0 $manifest
         if ($f2 -ne $firma) {
@@ -174,17 +187,21 @@ if ($plat) {
             if (-not $avisado) { $avisado = $true; Send-Log 'paso' ($plat.nombre + ' está borrando el juego...') ($plat.nombre + ' is deleting the game...') $loc0 }
         }
         $seg = [int]$sw.Elapsed.TotalSeconds
-        if ($avisado) { Send-Progress 60 ($plat.nombre + ' está borrando el juego... (' + $seg + ' s)') ($plat.nombre + ' is deleting the game... (' + $seg + ' s)') }
-        else { Send-Progress 30 ('Esperando que confirmes en la ventana de ' + $plat.nombre + '... (' + $seg + ' s)') ('Waiting for you to confirm in ' + $plat.nombre + '... (' + $seg + ' s)') }
+        $resta = [int](180 - $quieto.Elapsed.TotalSeconds)
+        if ($avisado) { Send-Progress ([Math]::Min(85, 40 + [int]($sw.Elapsed.TotalSeconds / 4))) ($plat.nombre + ' está borrando el juego... (' + $seg + ' s)') ($plat.nombre + ' is deleting the game... (' + $seg + ' s)') }
+        else { Send-Progress 20 ('Esperando que confirmes en la ventana de ' + $plat.nombre + '... (si no haces nada, se cancela en ' + $resta + ' s)') ('Waiting for you to confirm in ' + $plat.nombre + '... (auto-cancel in ' + $resta + ' s)') }
         if ($quieto.Elapsed.TotalMinutes -ge 3) { break }
     }
-    # La tienda borra la carpeta justo después de la entrada: margen de 1 minuto
-    if (Test-Gone $key) {
+    if ($terminado) {
+        Send-Progress 90 'Comprobando que no quede nada...' 'Checking nothing is left...'
+        # La tienda termina de borrar unos segundos después: margen de hasta 1 minuto
         for ($i = 0; $i -lt 30 -and $loc0 -and (Test-Path -LiteralPath $loc0); $i++) { Start-Sleep -Seconds 2 }
+        for ($i = 0; $i -lt 5 -and -not (Test-Gone $key); $i++) { Start-Sleep -Seconds 2 }
     }
     $result.metodo = 'plataforma'
-    $result.ok = Test-Gone $key
-    $result.registroLimpio = $result.ok
+    $result.ok = $terminado
+    $result.registroLimpio = Test-Gone $key
+    if ($terminado -and -not $result.registroLimpio) { Send-Log 'aviso' ($plat.nombre + ' dejó su entrada en el registro: se limpia como resto (con copia en la cuarentena)') ($plat.nombre + ' left its registry entry: cleaned as leftover') $key }
     $result.carpetaQueda = [bool]($loc0 -and (Test-Path -LiteralPath $loc0))
     if ($result.ok) {
         Send-Log 'ok' ($plat.nombre + ' desinstaló el juego') ($plat.nombre + ' uninstalled the game') $key

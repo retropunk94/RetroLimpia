@@ -361,6 +361,28 @@ function monSummary(it) {
     : `<div class="mon-sum good">✔ <b>${L('Disco limpio:', 'Disk clean:')}</b> ${L('no quedaron carpetas ni archivos.', 'no folders or files remain.')}</div>`;
   return regTxt + discoTxt + (r.cuarentena ? `<div class="mon-sum info">🛟 ${L('Lo quitado está en la cuarentena unos días, por si quieres restaurarlo:', 'Removed items are kept in quarantine for a few days in case you want to restore them:')} <code>${esc(r.cuarentena)}</code> <button class="link" data-reveal="${esc(r.cuarentena)}">${L('Abrir', 'Open')}</button></div>` : '');
 }
+function monPctVal() {
+  const m = S.mon; if (!m) return 0;
+  const total = m.items.length || 1;
+  const doneN = m.items.filter((x) => x.estado === 'ok' || x.estado === 'err' || x.estado === 'cancel').length;
+  const sub = m.done ? 0 : Math.min(99, m.subPct || 0) / 100;
+  return Math.min(100, Math.round(((doneN + (doneN < total ? sub : 0)) / total) * 100));
+}
+function monProgress(p) {
+  const m = S.mon; if (!m || m.done) return;
+  m.subPct = p.pct; m.subMsg = S.settings.idioma === 'en' ? p.en : p.msg; m.lastTick = Date.now();
+  const v = monPctVal();
+  const a = document.getElementById('monPct'); if (a) a.textContent = v + '%';
+  const b = document.getElementById('monBar'); if (b) b.style.width = v + '%';
+  const c = document.getElementById('monSub'); if (c) c.firstChild.textContent = m.subMsg + ' ';
+}
+// Reloj de "sigue trabajando": así se nota que no está colgado
+setInterval(() => {
+  const m = S.mon; if (!m || m.done || m.cur < 0) return;
+  const it = m.items[m.cur]; if (!it || !it.t0) return;
+  const el = document.getElementById('monTime');
+  if (el) el.textContent = '· ' + Math.round((Date.now() - it.t0) / 1000) + ' s';
+}, 1000);
 function renderMonitor() {
   const m = S.mon;
   if (!m) return;
@@ -372,8 +394,9 @@ function renderMonitor() {
   $('#monitor').innerHTML = `<div class="monitor">
     <div class="mon-head"><div><h2>${m.done ? L('Desinstalación terminada', 'Uninstall finished') : L('Desinstalando...', 'Uninstalling...')}</h2>
       <p class="meta">${m.done ? (anyRegLeft ? L('Algunas entradas del registro quedaron pendientes: revísalas abajo.', 'Some registry entries are waiting for review below.') : L('Todo revisado. Aquí tienes lo que se hizo y dónde.', 'All checked. Here is what was done and where.')) : L(`Programa ${Math.min(doneN + 1, total)} de ${total} · Aquí ves en vivo qué hace RetroLimpia y en qué carpeta.`, `Program ${Math.min(doneN + 1, total)} of ${total} · Watch live what RetroLimpia does and where.`)}</p></div>
-      <div class="mon-pct">${Math.round((doneN / total) * 100)}%</div></div>
-    <div class="pbar"><i style="width:${Math.round((doneN / total) * 100)}%"></i></div>
+      <div class="mon-pct" id="monPct">${monPctVal()}%</div></div>
+    <div class="pbar"><i id="monBar" style="width:${monPctVal()}%"></i></div>
+    ${m.done ? '' : `<div class="mon-sub" id="monSub">${esc(m.subMsg || L('Preparando...', 'Preparing...'))} <span class="meta" id="monTime"></span></div>`}
     <div class="mon-body">
       <div class="mon-list">${m.items.map((x, i) => `<button class="mon-item ${i === sel ? 'on' : ''} s-${x.estado}" data-monview="${i}"><span class="dot"></span><span class="n">${esc(x.nombre)}</span>${x.res && x.res.ok ? ((x.res.regRestos || []).some((r) => !r.movido) || !x.res.registroLimpio ? '<span class="tag warn">⚠</span>' : '<span class="tag ok">✔</span>') : ''}</button>`).join('')}</div>
       <div class="mon-detail"><h3>${esc(it.nombre)}</h3>
@@ -382,7 +405,9 @@ function renderMonitor() {
     </div>
     <div class="mon-foot">${m.done
       ? `<button class="btn ghost" data-act="monQuar">${L('Ver la cuarentena', 'Open quarantine')}</button><button class="btn primary" data-act="monClose">${L('Cerrar', 'Close')}</button>`
-      : `<span class="meta">${L('No cierres RetroLimpia mientras trabaja.', 'Do not close RetroLimpia while it works.')}</span><button class="btn ghost danger" data-act="cancel" ${S.cancelRequested ? 'disabled' : ''}>${S.cancelRequested ? L('Se detendrá tras este programa...', 'Will stop after this program...') : L('Detener después de este', 'Stop after this one')}</button>`}</div></div>`;
+      : `<span class="meta">${L('No cierres RetroLimpia mientras trabaja.', 'Do not close RetroLimpia while it works.')}</span>${S.cancelRequested
+        ? `<span class="meta">${L('Se detendrá tras este programa.', 'Will stop after this program.')}</span><button class="btn danger" data-act="monStopNow">${L('Detener ahora', 'Stop now')}</button>`
+        : `<button class="btn ghost danger" data-act="cancel">${L('Detener después de este', 'Stop after this one')}</button>`}`}</div></div>`;
   const box = document.getElementById('monLog') || document.getElementById('monLogStatic');
   if (box) box.scrollTop = box.scrollHeight;
 }
@@ -396,10 +421,13 @@ async function uninstallPrograms(list, motivo) {
   for (const p of list) {
     if (S.cancelRequested) { S.mon.items.slice(i).forEach((x) => { x.estado = 'cancel'; }); res.cancelado = true; break; }
     const it = S.mon.items[i];
-    S.mon.cur = i; S.mon.view = null; it.estado = 'run'; renderMonitor();
+    S.mon.cur = i; S.mon.view = null; S.mon.subPct = 0; S.mon.subMsg = ''; it.estado = 'run'; it.t0 = Date.now(); renderMonitor();
     i++;
     if (S.busy) { S.busy.label = L(`Desinstalando (${i}/${list.length})`, `Uninstalling (${i}/${list.length})`); S.busy.msg = p.cls.nombre; S.busy.pct = Math.round(((i - 1) / list.length) * 100); updateProgressOnly(); setStatus(S.busy.label + ' · ' + p.cls.nombre); }
-    const r = obj(await rl.run('desinstalar', { ...p, cls: undefined, imp: undefined, etiqueta: p.cls.nombre, permitirVentana: true }).catch((e) => ({ ok: false, mensaje: String(e.message || e) })));
+    const r = obj(await rl.run('desinstalar', { ...p, cls: undefined, imp: undefined, etiqueta: p.cls.nombre, permitirVentana: true })
+      .catch((e) => isCancel(e)
+        ? { ok: false, cancelado: true, mensaje: L('Detenido por ti. Si su tienda o su asistente seguía abierto, ciérralo; RetroLimpia no tocó nada más.', 'Stopped by you. If its store or wizard was still open, close it; RetroLimpia touched nothing else.') }
+        : { ok: false, mensaje: String(e.message || e) }));
     if (r.reinicio) res.reinicio = true;
     it.res = { ok: !!r.ok, metodo: r.metodo, plataforma: r.plataforma, cancelado: !!r.cancelado, registroLimpio: r.registroLimpio !== false, clave: p.clave, mensaje: r.mensaje, regRestos: [], archivos: [] };
     if (!r.ok && r.cancelado) { it.estado = 'cancel'; (res.saltados = res.saltados || []).push(p.cls.nombre); renderMonitor(); continue; }
@@ -421,6 +449,8 @@ async function uninstallPrograms(list, motivo) {
       } else dudosos.unshift(...altos);
       const mark = (x) => ({ ...x, movido: movidos.some((m) => m.ruta === x.ruta) });
       it.res.regRestos = restos.filter((x) => x.tipo === 'registro').map(mark);
+      // Si la entrada de desinstalación quedó (pasa con Steam) y se movió a la cuarentena, el registro quedó limpio
+      if (!it.res.registroLimpio && it.res.regRestos.some((x) => x.movido && x.ruta === p.clave)) it.res.registroLimpio = true;
       it.res.archivos = restos.filter((x) => x.tipo !== 'registro').map(mark);
       if (dudosos.length) res.dudosos.push({ programa: p.nombre, restos: dudosos.map((d) => ({ ...d, elegido: d.confianza === 'alta' })) });
     }
@@ -1287,6 +1317,7 @@ document.addEventListener('click', async (e) => {
     case 'report': { const f = await rl.saveReport(buildReport()); toast(L('Informe guardado en Documentos\\RetroLimpia', 'Report saved to Documents\\RetroLimpia')); return f; }
     case 'selVerde': allPrograms().filter((p) => p.cls.color === 'verde').forEach((p) => S.sel.add(p.id)); return render();
     case 'selNone': S.sel.clear(); return render();
+    case 'monStopNow': monLog({ tipo: 'aviso', msg: 'Deteniendo ahora...', en: 'Stopping now...' }); return rl.cancel();
     case 'refreshProgs': return task(L('Actualizando la lista de programas', 'Refreshing program list'), async () => {
       await loadPrograms();
       const ids = new Set(allPrograms().map((p) => p.id));
@@ -1411,6 +1442,7 @@ document.addEventListener('input', (e) => {
 
 rl.onProgress((p) => {
   if (p.log) { monLog(p.log); return; }
+  if (S.mon && !S.mon.done && p.script === 'desinstalar') monProgress(p);
   if (!S.busy) return;
   const msg = S.settings.idioma === 'en' ? p.en : p.msg;
   if (S.scan.state === 'running') {

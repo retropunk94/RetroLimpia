@@ -421,3 +421,5 @@ select { background: var(--panel-2); border: 1px solid var(--line-2); border-rad
 .upw-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
 .upw-btns:empty { display: none; }
 @keyframes upwPulse { 50% { opacity: .35; } }
+
+.mon-sub { margin: 10px 0 2px; font-size: 13.5px; color: var(--text); }

@@ -22,6 +22,10 @@ contextBridge.exposeInMainWorld('rl', {
   onResumen: (cb) => { const fn = (e, r) => cb(r); ipcRenderer.on('rl:resumen', fn); return () => ipcRenderer.removeListener('rl:resumen', fn); },
   onUpdate: (cb) => { const fn = (e, st) => cb(st); ipcRenderer.on('rl:update', fn); return () => ipcRenderer.removeListener('rl:update', fn); },
   win: (action) => ipcRenderer.send('rl:win', action),
+  reportPrepare: () => ipcRenderer.invoke('rl:report:prepare'),
+  reportCapture: () => ipcRenderer.invoke('rl:report:capture'),
+  reportPickImage: () => ipcRenderer.invoke('rl:report:pickImage'),
+  reportSend: (r) => ipcRenderer.invoke('rl:report:send', r),
   onProgress: (cb) => {
     const fn = (e, p) => cb(p);
     ipcRenderer.on('rl:progress', fn);

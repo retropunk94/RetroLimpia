@@ -2,7 +2,7 @@
 // Abre la ventana, conecta la interfaz con el motor (scripts de PowerShell)
 // y guarda los ajustes. No envía ningún dato a internet (sin telemetría).
 
-const { app, BrowserWindow, ipcMain, shell, net, Tray, Menu, Notification, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, net, Tray, Menu, Notification, nativeImage, dialog } = require('electron');
 const { execFile, spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -215,6 +215,8 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     // Cada paso va protegido: si uno falla, la ventana y el actualizador arrancan igual.
     // (Antes, un fallo aquí dejaba el programa abierto pero sin ventana y sin actualizarse.)
+    // Marca de sesión: si al arrancar sigue ahí, la vez anterior se cerró de golpe (fallo)
+    try { cierreRaro = fs.existsSync(sesionFlag()); fs.writeFileSync(sesionFlag(), String(Date.now())); } catch {}
     const paso = (nombre, fn) => { try { return fn(); } catch (e) { updLog('Arranque, fallo en ' + nombre + ': ' + (e && e.stack || e)); } };
     paso('motor', () => engine.init({ demo: DEMO, scriptsDir: app.isPackaged ? path.join(process.resourcesPath, 'scripts') : path.join(__dirname, '..', 'scripts') }));
     // OJO: el instalador quita la sección "build" de package.json, así que el id va escrito aquí
@@ -230,7 +232,7 @@ if (!app.requestSingleInstanceLock()) {
     // Mantenimiento silencioso: vacía la cuarentena vieja al arrancar
     paso('cuarentena', () => engine.run('cuarentena', { accion: 'purgar', dias: s.diasCuarentena }).catch(() => {}));
   }).catch((e) => { updLog('Arranque: ' + (e && e.stack || e)); try { if (!win) createWindow(); } catch {} });
-  app.on('before-quit', () => { quitting = true; });
+  app.on('before-quit', () => { quitting = true; try { fs.unlinkSync(sesionFlag()); } catch {} });
   app.on('window-all-closed', () => { if (!tray) app.quit(); });
 }
 
@@ -256,6 +258,9 @@ ipcMain.handle('rl:info', async () => ({
   version: pkg.version,
   repo: pkg.retrolimpia.repo,
   paypal: pkg.retrolimpia.paypal || '',
+  discord: pkg.retrolimpia.discord || '',
+  reportes: !!pkg.retrolimpia.reportes,
+  cierreRaro: cierreRaro,
   demo: DEMO,
   plataforma: process.platform,
   esAdmin: DEMO ? true : await engine.isAdmin(),
@@ -313,6 +318,7 @@ function installWhenIdle() {
   doInstall();
 }
 function doInstall() {
+  try { fs.unlinkSync(sesionFlag()); } catch {}
   // Plan B: instalador descargado por nosotros
   if (fallbackFile && fs.existsSync(fallbackFile)) {
     quitting = true; installing = true;
@@ -371,6 +377,95 @@ function initUpdater() {
   setTimeout(() => autoUpdater.checkForUpdates().catch(() => {}), 5000);
   setInterval(() => autoUpdater.checkForUpdates().catch(() => {}), 6 * 60 * 60 * 1000);
 }
+
+// ---------- Reportar un problema ----------
+// Nada se envía solo: la persona ve lo que se manda y pulsa Enviar.
+// El reporte va a un intermediario (Cloudflare) que lo pasa a un canal privado de Discord.
+let cierreRaro = false;
+function sesionFlag() { return path.join(app.getPath('userData'), 'sesion.abierta'); }
+function anonimizar(txt) {
+  let t = String(txt || '');
+  const reemplazos = [];
+  try { const u = os.userInfo().username; if (u && u.length > 1) reemplazos.push([u, '<usuario>']); } catch {}
+  try { const h = os.hostname(); if (h && h.length > 1) reemplazos.push([h, '<equipo>']); } catch {}
+  for (const [a, b] of reemplazos) t = t.split(a).join(b);
+  // correos y direcciones IP
+  t = t.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '<correo>').replace(/\b\d{1,3}(\.\d{1,3}){3}\b/g, '<ip>');
+  return t;
+}
+function cola(file, lineas) {
+  try { const l = fs.readFileSync(file, 'utf8').split(/\r?\n/); return l.slice(-lineas).join('\n'); } catch { return ''; }
+}
+function nombreWindows() {
+  const r = os.release(); const build = Number(r.split('.')[2] || 0);
+  return (build >= 22000 ? 'Windows 11' : 'Windows 10') + ' (' + r + ', ' + os.arch() + ')';
+}
+function datosEquipo() {
+  const c = os.cpus() || [];
+  return (c[0] ? c[0].model.trim() + ' · ' + c.length + ' hilos' : 'CPU ?') + ' · RAM ' + Math.round(os.totalmem() / 1073741824) + ' GB';
+}
+ipcMain.handle('rl:report:prepare', async () => {
+  const partes = [];
+  partes.push('RetroLimpia ' + pkg.version + (app.isPackaged ? '' : ' (desarrollo)') + ' · ' + nombreWindows());
+  partes.push('Equipo: ' + datosEquipo());
+  let admin = 'demo'; if (!DEMO) { try { admin = (await engine.isAdmin()) ? 'sí' : 'no'; } catch { admin = '?'; } }
+  partes.push('Administrador: ' + admin + ' · Cierre inesperado la vez anterior: ' + (cierreRaro ? 'SÍ' : 'no'));
+  partes.push('Actualizador: ' + JSON.stringify(updateState));
+  const upd = cola(path.join(app.getPath('userData'), 'actualizador.log'), 120);
+  if (upd) partes.push('\n===== actualizador.log (últimas líneas) =====\n' + upd);
+  try {
+    const dir = path.join(process.env.ProgramData || os.tmpdir(), 'RetroLimpia', 'logs');
+    const files = fs.readdirSync(dir).filter((f) => f.endsWith('.log')).sort().slice(-2);
+    for (const f of files) partes.push('\n===== logs/' + f + ' (últimas líneas) =====\n' + cola(path.join(dir, f), 250));
+  } catch {}
+  return { log: anonimizar(partes.join('\n')), version: pkg.version, windows: nombreWindows(), equipo: datosEquipo(), cierreRaro };
+});
+ipcMain.handle('rl:report:capture', async () => {
+  if (!win || win.isDestroyed()) return null;
+  try {
+    let img = await win.webContents.capturePage();
+    const sz = img.getSize();
+    if (sz.width > 1920) img = img.resize({ width: 1920 });
+    return img.toDataURL();
+  } catch { return null; }
+});
+ipcMain.handle('rl:report:pickImage', async () => {
+  const r = await dialog.showOpenDialog(win, {
+    title: 'Elige una captura de pantalla',
+    properties: ['openFile'],
+    filters: [{ name: 'Imágenes', extensions: ['png', 'jpg', 'jpeg', 'webp', 'gif'] }]
+  });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const f = r.filePaths[0];
+  const st = fs.statSync(f);
+  if (st.size > 7 * 1024 * 1024) return { error: 'La imagen pesa más de 7 MB. Elige una más pequeña.' };
+  const ext = path.extname(f).slice(1).toLowerCase().replace('jpg', 'jpeg');
+  return { dataUrl: 'data:image/' + ext + ';base64,' + fs.readFileSync(f).toString('base64'), nombre: path.basename(f) };
+});
+ipcMain.handle('rl:report:send', async (e, r) => {
+  const url = pkg.retrolimpia.reportes;
+  if (!url || DEMO) return { ok: false, error: DEMO ? 'En modo demostración no se envían reportes.' : 'Sin dirección de reportes.' };
+  try {
+    const fd = new FormData();
+    fd.append('datos', JSON.stringify({
+      version: pkg.version, windows: nombreWindows(), equipo: datosEquipo(),
+      seccion: String(r.seccion || '').slice(0, 60),
+      descripcion: anonimizar(String(r.descripcion || '').slice(0, 3500)),
+      contacto: String(r.contacto || '').slice(0, 100)
+    }));
+    if (r.log) fd.append('log', new Blob([anonimizar(String(r.log)).slice(0, 1900000)], { type: 'text/plain' }), 'log.txt');
+    if (r.imagen && /^data:image\/(png|jpeg|webp|gif);base64,/.test(r.imagen)) {
+      const tipo = r.imagen.slice(5, r.imagen.indexOf(';'));
+      const buf = Buffer.from(r.imagen.split(',')[1], 'base64');
+      if (buf.length > 7 * 1024 * 1024) return { ok: false, error: 'La captura pesa más de 7 MB.' };
+      fd.append('captura', new Blob([buf], { type: tipo }), 'captura.' + tipo.split('/')[1]);
+    }
+    // fetch de Node (undici): maneja FormData con archivos de forma nativa
+    const res = await globalThis.fetch(url, { method: 'POST', body: fd });
+    const j = await res.json().catch(() => ({ ok: false, error: 'Respuesta no válida (' + res.status + ')' }));
+    return j;
+  } catch (err) { return { ok: false, error: 'No se pudo enviar. ¿Hay conexión a internet? (' + (err && err.message || err) + ')' }; }
+});
 
 // ---------- Plan B: actualizar sin electron-updater ----------
 // Descarga el instalador de la última versión desde GitHub, comprueba su huella SHA-512

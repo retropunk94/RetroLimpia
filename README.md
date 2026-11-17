@@ -37,7 +37,7 @@ Ve a **[Releases](../../releases/latest)** y descarga **`RetroLimpia-Instalador-
 - **Lista de protegidos:** los drivers, Visual C++, .NET, la Store y otras piezas del sistema no se pueden quitar, salvo en modo experto.
 - **Rutas prohibidas:** RetroLimpia nunca toca carpetas como `Windows`, `System32` o tu carpeta de usuario, aunque una búsqueda de restos las señale.
 - **Sin webs de "drivers gratis":** los drivers vienen solo de Windows Update o del fabricante.
-- **Sin telemetría:** no envía datos de tu PC a ningún sitio.
+- **Sin telemetría:** no envía datos de tu PC a ningún sitio por su cuenta. Solo si tú pulsas **Reportar un problema** se manda un reporte, y antes ves exactamente qué contiene (tu usuario y el nombre del PC se anonimizan).
 - **Registro de cambios:** cada cambio queda anotado en `C:\ProgramData\RetroLimpia\logs`.
 
 ## Para desarrolladores
@@ -63,6 +63,14 @@ npm run dist     # genera el instalador en dist/
 **Publicar una versión:** cambia `version` en `package.json`, haz commit y crea una etiqueta `vX.Y.Z`. GitHub Actions compila el .exe y publica la Release con sus huellas SHA-256.
 
 ## Apoya el proyecto
+
+## Comunidad y reportes
+
+- **¿Algo falla?** Dentro del programa pulsa **🐞 Reportar problema**: escribe qué pasó, añade una captura (o pégala con Ctrl+V) y el registro técnico. Llega a un canal privado para preparar el parche.
+- **Comunidad en Discord:** https://discord.gg/55zDGujkgU
+- El intermediario que recibe los reportes está en [`worker/reportes.js`](worker/reportes.js) (Cloudflare Workers): guarda la dirección de Discord en secreto y limita el spam.
+
+## Donar
 
 RetroLimpia es gratis, sin anuncios y sin telemetría. Detrás no hay una empresa, hay una persona. Si te ha servido, tu donación lo mantiene vivo: https://streamelements.com/retropunk94/tip
 

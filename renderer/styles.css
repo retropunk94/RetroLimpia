@@ -423,3 +423,26 @@ select { background: var(--panel-2); border: 1px solid var(--line-2); border-rad
 @keyframes upwPulse { 50% { opacity: .35; } }
 
 .mon-sub { margin: 10px 0 2px; font-size: 13.5px; color: var(--text); }
+
+/* Reportar un problema */
+.side-row { display: flex; gap: 6px; margin-bottom: 8px; }
+.side-mini { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 6px; border-radius: 10px; border: 1px solid var(--line-2); background: var(--panel); color: var(--text); cursor: pointer; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.side-mini:hover { border-color: var(--violet); background: var(--panel-2); }
+.side-mini.discord { flex: 0 0 auto; padding: 8px 10px; }
+.side-mini.discord:hover { border-color: #5865f2; }
+.side-mini svg { width: 15px; height: 15px; }
+.modal.rep-modal { width: min(680px, 94vw); }
+.rep-label { display: block; font-weight: 600; margin: 14px 0 6px; font-size: 14px; }
+.rep-text, .rep-input { width: 100%; box-sizing: border-box; background: var(--bg); color: var(--text); border: 1px solid var(--line-2); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 14px; resize: vertical; }
+.rep-text:focus, .rep-input:focus { outline: none; border-color: var(--violet); }
+.rep-shot { display: flex; gap: 14px; align-items: center; margin-top: 14px; padding: 12px; border-radius: 12px; border: 1px solid var(--line-2); background: var(--panel); }
+.rep-shot.empty { border-style: dashed; border-color: rgba(255, 200, 69, .5); background: rgba(255, 200, 69, .06); }
+.rep-shot img { width: 170px; max-height: 110px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line-2); }
+.rep-shot .grow span { display: block; color: var(--muted); font-size: 13px; margin-top: 3px; }
+.rep-btns { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+.rep-check { display: flex; gap: 10px; align-items: flex-start; margin-top: 14px; font-size: 13px; color: var(--muted); cursor: pointer; }
+.rep-check b { color: var(--text); }
+.rep-check input { margin-top: 3px; accent-color: var(--violet); }
+.rep-log { max-height: 220px; overflow: auto; background: var(--bg); border: 1px solid var(--line-2); border-radius: 10px; padding: 10px; font-size: 11.5px; white-space: pre-wrap; word-break: break-all; margin: 8px 0 0; }
+.rep-ok { width: 56px; height: 56px; border-radius: 50%; display: grid; place-items: center; font-size: 28px; color: #fff; background: linear-gradient(135deg, var(--pink, #ff4fa3), var(--cyan, #2de2e6)); margin-bottom: 10px; }
+#modal:has(.rep-modal) { z-index: 80; }

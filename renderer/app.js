@@ -20,6 +20,7 @@ const S = {
 };
 
 const repoUrl = () => (S.info.repo && !S.info.repo.startsWith('TU_USUARIO') ? 'https://github.com/' + S.info.repo : null);
+const DISCORD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.3 4.4A19.6 19.6 0 0 0 15.4 3l-.6 1.3a18 18 0 0 0-5.6 0L8.6 3a19.6 19.6 0 0 0-4.9 1.4C.6 9 -.3 13.5.1 18a19.8 19.8 0 0 0 6 3l1.3-2a12.7 12.7 0 0 1-2-1l.5-.4a14 14 0 0 0 12.2 0l.5.4c-.6.4-1.3.7-2 1l1.3 2a19.7 19.7 0 0 0 6-3c.5-5.2-.8-9.7-3.6-13.6zM8.5 15.3c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4zm7 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4z"/></svg>';
 const GH_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.19c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>';
 const L = (es, en) => (S.settings.idioma === 'en' ? (en ?? es) : es);
 const $ = (s) => document.querySelector(s);
@@ -345,7 +346,7 @@ function monSummary(it) {
   const r = it.res;
   if (!r) return '';
   if (!r.ok && r.cancelado) return `<div class="mon-sum info">ℹ ${esc(r.mensaje || L('No se desinstaló. No se tocó nada.', 'Not uninstalled. Nothing was touched.'))}</div>`;
-  if (!r.ok) return `<div class="mon-sum bad">✖ ${L('No se pudo desinstalar', 'Could not uninstall')}${r.mensaje ? ': ' + esc(r.mensaje) : ''}</div>`;
+  if (!r.ok) return `<div class="mon-sum bad">✖ ${L('No se pudo desinstalar', 'Could not uninstall')}${r.mensaje ? ': ' + esc(r.mensaje) : ''}${S.info.reportes ? ` <button class="link" data-act="reportOpen" data-ctx="${esc(L('Desinstalar ', 'Uninstall ') + it.nombre)}">🐞 ${L('Reportar este problema', 'Report this problem')}</button>` : ''}</div>`;
   const reg = r.regRestos || [];
   const regAllMoved = reg.length && reg.every((x) => x.movido) && r.registroLimpio;
   const regTxt = !reg.length && r.registroLimpio
@@ -664,7 +665,7 @@ function renderNav() {
     return `<button class="nav-item ${S.view === id ? 'active' : ''}" data-nav="${id}"><svg viewBox="0 0 24 24">${ICONS[id]}</svg><span>${L(es, en)}</span>${c ? `<span class="count ${c[1]}">${esc(c[0])}</span>` : ''}</button>`;
   }).join('') + `<div class="nav-foot">${/^https:\/\//.test(S.info.paypal || '') ? `<div class="donate"><div class="d-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.8 4.5c2.1 0 3.6 1.1 5.2 3 1.6-1.9 3.1-3 5.2-3 3.8 0 5.9 3.9 4.4 7.3C19.5 16.4 12 21 12 21z"/></svg>${L('Tu donación lo mantiene vivo', 'Your donation keeps it alive')}</div>
     <p>${L('No hay empresa detrás: hay una persona que le dedica sus noches. Si te ayudó, donar, por poco que sea, lo mantiene vivo para todos.', 'No company behind it: one person giving it their nights. If it helped you, donating, however little, keeps it alive for everyone.')}</p>
-    <button class="donate-btn big-donate" data-act="donateAsk">${L('Donar con PayPal', 'Donate with PayPal')}</button><div class="d-note">${L('Cada donación cuenta 💜', 'Every donation counts 💜')}</div></div>` : ''}${repoUrl() ? `<button class="gh-btn" data-open="${repoUrl()}" title="${L('Revisar el código abierto en GitHub', 'Review the open source code on GitHub')}">${GH_ICON}<span>${L('Ver el código en GitHub', 'View code on GitHub')}</span></button>` : ''}<div class="trust">${L('Sin telemetría · Código abierto', 'No telemetry · Open source')}</div>${L('Todo lo que borra se puede deshacer.', 'Everything it removes can be undone.')}</div>`;
+    <button class="donate-btn big-donate" data-act="donateAsk">${L('Donar con PayPal', 'Donate with PayPal')}</button><div class="d-note">${L('Cada donación cuenta 💜', 'Every donation counts 💜')}</div></div>` : ''}<div class="side-row">${S.info.reportes ? `<button class="side-mini" data-act="reportOpen" title="${L('Envíanos lo que pasó, con captura y registro técnico', 'Send us what happened, with screenshot and technical log')}">🐞 ${L('Reportar problema', 'Report a problem')}</button>` : ''}${/^https:\/\//.test(S.info.discord || '') ? `<button class="side-mini discord" data-open="${S.info.discord}" title="${L('Únete a la comunidad en Discord', 'Join the community on Discord')}">${DISCORD_ICON}<span>Discord</span></button>` : ''}</div>${repoUrl() ? `<button class="gh-btn" data-open="${repoUrl()}" title="${L('Revisar el código abierto en GitHub', 'Review the open source code on GitHub')}">${GH_ICON}<span>${L('Ver el código en GitHub', 'View code on GitHub')}</span></button>` : ''}<div class="trust">${L('Sin telemetría · Código abierto', 'No telemetry · Open source')}</div>${L('Todo lo que borra se puede deshacer.', 'Everything it removes can be undone.')}</div>`;
 }
 
 function head(title, desc, right = '') {
@@ -675,6 +676,7 @@ function banners() {
   if (S.info.demo) h += `<div class="banner info"><div class="grow"><b>${L('Modo demostración', 'Demo mode')}</b> · ${L('Los datos son de ejemplo y no se cambia nada en este equipo.', 'Sample data; nothing on this computer is changed.')}</div></div>`;
   if (!S.info.esAdmin) h += `<div class="banner warn"><div class="grow"><b>${L('Abre RetroLimpia como administrador', 'Run RetroLimpia as administrator')}</b> · ${L('Sin permisos de administrador no puede desinstalar ni actualizar drivers. Ciérralo, haz clic derecho en su icono y elige "Ejecutar como administrador".', 'Without admin rights it cannot uninstall or update drivers. Close it, right-click its icon and choose "Run as administrator".')}</div></div>`;
   if (S.needsReboot) h += `<div class="banner warn"><div class="grow"><b>${L('Reinicia el PC cuando puedas', 'Restart your PC when you can')}</b> · ${L('Algunas actualizaciones o desinstalaciones terminan al reiniciar.', 'Some updates or uninstalls finish after a restart.')}</div></div>`;
+  if (S.info.cierreRaro && !S.crashSeen && S.info.reportes) h += `<div class="banner warn"><div class="grow"><b>${L('La última vez RetroLimpia se cerró de forma inesperada', 'Last time RetroLimpia closed unexpectedly')}</b> · ${L('¿Nos cuentas qué estabas haciendo? Nos ayuda a arreglarlo en la próxima versión.', 'Tell us what you were doing? It helps us fix it in the next version.')}</div><button class="btn small" data-act="reportOpen">🐞 ${L('Reportar', 'Report')}</button><button class="btn small ghost" data-act="crashSeen">${L('Ahora no', 'Not now')}</button></div>`;
   const up = S.upd || {};
   if (up.estado === 'lista') h += updBannerHTML();
   else if (up.estado === 'descargando') h += `<div class="banner info"><div class="grow"><b>${L('Descargando RetroLimpia ' + esc(up.version || ''), 'Downloading RetroLimpia ' + esc(up.version || ''))}</b> · ${up.pct || 0}% · ${L('puedes seguir usándolo mientras tanto', 'you can keep using it meanwhile')}</div></div>`;
@@ -1057,8 +1059,8 @@ function viewAjustes() {
       ${sw('modoExperto', L('Modo experto', 'Expert mode'), L('Muestra detalles técnicos y permite quitar elementos marcados en rojo. Solo si sabes lo que haces.', 'Shows technical details and allows removing red items. Only if you know what you are doing.'))}
     </div>
     <h2>${L('Acerca de RetroLimpia', 'About RetroLimpia')}</h2>
-    <div class="card"><div class="kv"><span>${L('Versión', 'Version')}</span><span>${esc(S.info.version)}</span><span>${L('Licencia', 'License')}</span><span>MIT (${L('código abierto', 'open source')})</span><span>${L('Privacidad', 'Privacy')}</span><span>${L('No envía ningún dato tuyo a internet.', 'Sends none of your data to the internet.')}</span></div>
-      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap"><button class="btn" data-act="tour">🧭 ${L('Ver el tour de bienvenida', 'Watch the welcome tour')}</button><button class="btn" data-act="trust">${L('¿Por qué Windows o mi antivirus avisan?', 'Why does Windows or my antivirus warn me?')}</button>
+    <div class="card"><div class="kv"><span>${L('Versión', 'Version')}</span><span>${esc(S.info.version)}</span><span>${L('Licencia', 'License')}</span><span>MIT (${L('código abierto', 'open source')})</span><span>${L('Privacidad', 'Privacy')}</span><span>${L('Sin telemetría. Solo envía un reporte si tú lo pides, después de ver qué se manda.', 'No telemetry. It only sends a report if you ask, after showing you what is sent.')}</span></div>
+      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap"><button class="btn" data-act="tour">🧭 ${L('Ver el tour de bienvenida', 'Watch the welcome tour')}</button><button class="btn" data-act="trust">${L('¿Por qué Windows o mi antivirus avisan?', 'Why does Windows or my antivirus warn me?')}</button>${S.info.reportes ? `<button class="btn" data-act="reportOpen">🐞 ${L('Reportar un problema', 'Report a problem')}</button>` : ''}${S.info.discord ? `<button class="btn ghost" data-open="${S.info.discord}">💬 ${L('Comunidad en Discord', 'Discord community')}</button>` : ''}
       ${repo ? `<button class="btn ghost" data-open="${repo}">${L('Ver el código', 'View the code')}</button>` : ''}
       <button class="btn ghost" data-act="checkUpdate" ${S.checkingUpd ? 'disabled' : ''}>${S.checkingUpd ? L('Buscando...', 'Checking...') : L('Buscar actualizaciones', 'Check for updates')}</button></div>
       <p class="meta" style="margin-top:12px">${updStatusText()}</p></div></div>`;
@@ -1118,6 +1120,103 @@ function showDonate() {
     <div class="banner good" style="margin-top:14px"><div class="grow">😊 <b>${L('Puedes estar tranquilo.', 'You can relax.')}</b> ${L('Se abrirá en tu navegador y puedes cerrarlo cuando quieras.', 'It opens in your browser and you can close it whenever you like.')}</div></div>
     <div class="foot"><button class="btn primary" data-act="donateGo">💜 ${L('Ir a donar', 'Go to donate')}</button><button class="btn ghost" data-act="modalClose">${L('Ahora no', 'Not now')}</button></div></div>`;
   $('#modal').classList.remove('hidden');
+}
+
+// ============================================================ Reportar un problema
+// Nada se envía solo: se muestra exactamente qué se manda y la persona pulsa Enviar.
+const VIEW_NAMES = { inicio: 'Revisar mi PC', programas: 'Programas y bloatware', limpieza: 'Limpieza', arranque: 'Arranque de Windows', hardware: 'Hardware y salud', drivers: 'Drivers', actualizaciones: 'Actualizaciones', procesos: 'Procesos', deshacer: 'Deshacer y cuarentena', ajustes: 'Ajustes' };
+function monitorLogText() {
+  if (!S.mon) return '';
+  return S.mon.items.map((it) => `--- ${it.nombre} [${it.estado}] ---\n` + it.log.map((l) => `${l.tipo}: ${l.msg}${l.ruta ? ' | ' + l.ruta : ''}`).join('\n') + (it.res ? `\nresultado: ${JSON.stringify({ ok: it.res.ok, metodo: it.res.metodo, plataforma: it.res.plataforma, registroLimpio: it.res.registroLimpio, mensaje: it.res.mensaje })}` : '')).join('\n');
+}
+async function openReport(ctx) {
+  // La captura se hace ANTES de abrir la ventana, para que muestre lo que la persona estaba viendo
+  const modalAbierto = !$('#modal').classList.contains('hidden');
+  let auto = null;
+  if (!modalAbierto) auto = await rl.reportCapture().catch(() => null);
+  const prep = await rl.reportPrepare().catch(() => ({ log: '' }));
+  const errores = S.scan && S.scan.errors ? '\n\n===== Errores del último análisis =====\n' + Object.entries(S.scan.errors).map(([k, v]) => k + ': ' + v).join('\n') : '';
+  const mon = monitorLogText();
+  S.rep = {
+    desc: ctx ? L('Problema al ', 'Problem with ') + ctx + ':\n' : '', contacto: '',
+    seccion: ctx || VIEW_NAMES[S.view] || S.view || '',
+    auto, img: auto, imgNombre: L('Captura de RetroLimpia (lo que estabas viendo)', 'RetroLimpia screenshot (what you were seeing)'), useImg: !!auto,
+    incluirLog: true, verLog: false,
+    log: (prep.log || '') + errores + (mon ? '\n\n===== Última desinstalación (ventana de seguimiento) =====\n' + mon : ''),
+    enviando: false, hecho: null
+  };
+  S.crashSeen = true;
+  renderReport();
+  $('#modal').classList.remove('hidden');
+  setTimeout(() => { const t = document.getElementById('repDesc'); if (t) { t.focus(); t.setSelectionRange(t.value.length, t.value.length); } }, 50);
+}
+function renderReport() {
+  const r = S.rep; if (!r) return;
+  if (r.hecho) {
+    $('#modal').innerHTML = `<div class="modal rep-modal" role="dialog" aria-modal="true">
+      <div class="rep-ok">✔</div>
+      <h2>${L('¡Reporte enviado! Gracias 💜', 'Report sent! Thank you 💜')}</h2>
+      <p class="lead">${L('Llegó a un canal privado que solo ve el creador de RetroLimpia. Con esto se puede preparar el parche.', 'It reached a private channel only the creator of RetroLimpia can see. This helps prepare the fix.')}</p>
+      <div class="card"><div class="kv"><span>${L('Número de reporte', 'Report number')}</span><span><b>${esc(r.hecho)}</b> <button class="link" data-copy="${esc(r.hecho)}">${L('Copiar', 'Copy')}</button></span></div></div>
+      ${S.info.discord ? `<p class="meta" style="margin-top:12px">${L('Si quieres seguir el arreglo o dar más detalles, entra a la comunidad y menciona este número en #ayuda.', 'To follow the fix or add details, join the community and mention this number in #help.')}</p>` : ''}
+      <div class="foot">${S.info.discord ? `<button class="btn primary" data-open="${S.info.discord}">💬 ${L('Ir al Discord', 'Open Discord')}</button>` : ''}<button class="btn ghost" data-act="modalClose">${L('Cerrar', 'Close')}</button></div></div>`;
+    return;
+  }
+  const img = r.useImg && r.img;
+  $('#modal').innerHTML = `<div class="modal rep-modal" role="dialog" aria-modal="true" aria-label="${L('Reportar un problema', 'Report a problem')}">
+    <h2>🐞 ${L('Reportar un problema', 'Report a problem')}</h2>
+    <p class="lead">${L('Cuéntanos qué pasó. El reporte llega a un canal privado del creador de RetroLimpia para preparar el arreglo.', 'Tell us what happened. The report goes to a private channel of the RetroLimpia creator to prepare a fix.')}</p>
+    <label class="rep-label" for="repDesc">${L('¿Qué pasó? ¿Qué estabas haciendo?', 'What happened? What were you doing?')} *</label>
+    <textarea id="repDesc" class="rep-text" rows="5" maxlength="3500" placeholder="${L('Ejemplo: le di a Desinstalar a un juego de Steam y la barra se quedó en 0%...', 'Example: I clicked Uninstall on a Steam game and the bar stayed at 0%...')}">${esc(r.desc)}</textarea>
+    <div class="rep-shot ${img ? '' : 'empty'}">
+      ${img ? `<img src="${img}" alt="${L('Vista previa de la captura', 'Screenshot preview')}"><div class="grow"><b>📸 ${esc(r.imgNombre || '')}</b><span>${L('Se enviará esta imagen.', 'This image will be sent.')}</span>
+        <div class="rep-btns"><button class="btn small ghost" data-act="repPick">${L('Elegir otra imagen…', 'Choose another image…')}</button><button class="btn small ghost" data-act="repNoImg">${L('No enviar imagen', 'Do not send image')}</button></div></div>`
+      : `<div class="grow"><b>📸 ${L('Te recomendamos añadir una captura de pantalla', 'We recommend adding a screenshot')}</b><span>${L('Una imagen del error ayuda muchísimo: muestra exactamente lo que ves. Puedes pegarla con Ctrl+V (tecla Impr Pant o Windows + Shift + S para capturar).', 'A picture of the error helps a lot: it shows exactly what you see. You can paste it with Ctrl+V (Print Screen key or Windows + Shift + S to capture).')}</span>
+        <div class="rep-btns"><button class="btn small primary" data-act="repPick">${L('Elegir imagen…', 'Choose image…')}</button>${r.auto ? `<button class="btn small ghost" data-act="repUseAuto">${L('Usar captura de RetroLimpia', 'Use RetroLimpia screenshot')}</button>` : ''}</div></div>`}
+    </div>
+    <label class="rep-check"><input type="checkbox" id="repLog" ${r.incluirLog ? 'checked' : ''}> <span><b>${L('Adjuntar registro técnico (recomendado)', 'Attach technical log (recommended)')}</b><br>${L('Versión, Windows, hardware básico y lo que hizo RetroLimpia. Tu nombre de usuario y el nombre del PC se cambian por &lt;usuario&gt; y &lt;equipo&gt;.', 'Version, Windows, basic hardware and what RetroLimpia did. Your username and PC name are replaced with &lt;user&gt; and &lt;pc&gt;.')}</span></label>
+    <button class="link" data-act="repToggleLog">${r.verLog ? L('Ocultar lo que se envía', 'Hide what is sent') : L('Ver exactamente lo que se envía', 'See exactly what is sent')}</button>
+    ${r.verLog ? `<pre class="rep-log">${esc(r.log || L('(vacío)', '(empty)'))}</pre>` : ''}
+    <label class="rep-label" for="repContacto">${L('Tu usuario de Discord (opcional, por si hace falta preguntarte algo)', 'Your Discord username (optional, in case we need to ask you)')}</label>
+    <input id="repContacto" class="rep-input" maxlength="100" value="${esc(r.contacto)}" placeholder="${L('ej. usuario123', 'e.g. user123')}">
+    <p class="meta">🔒 ${L('No se envía nada más: ni tus archivos, ni contraseñas, ni la lista completa de tus programas.', 'Nothing else is sent: no files, passwords or full list of your programs.')}</p>
+    <div class="foot"><button class="btn primary" data-act="repSend" ${r.enviando ? 'disabled' : ''}>${r.enviando ? L('Enviando…', 'Sending…') : L('Enviar reporte', 'Send report')}</button><button class="btn ghost" data-act="modalClose" ${r.enviando ? 'disabled' : ''}>${L('Cancelar', 'Cancel')}</button></div></div>`;
+}
+function repSyncFields() {
+  const r = S.rep; if (!r) return;
+  const d = document.getElementById('repDesc'); if (d) r.desc = d.value;
+  const c = document.getElementById('repContacto'); if (c) r.contacto = c.value;
+  const l = document.getElementById('repLog'); if (l) r.incluirLog = l.checked;
+}
+document.addEventListener('input', (e) => { if (S.rep && e.target && /^rep/.test(e.target.id || '')) repSyncFields(); }, true);
+document.addEventListener('change', (e) => { if (S.rep && e.target && e.target.id === 'repLog') repSyncFields(); }, true);
+// Pegar una captura con Ctrl+V dentro de la ventana de reporte
+document.addEventListener('paste', (e) => {
+  if (!S.rep || S.rep.hecho || $('#modal').classList.contains('hidden')) return;
+  const item = [...(e.clipboardData ? e.clipboardData.items : [])].find((i) => i.type && i.type.startsWith('image/'));
+  if (!item) return;
+  e.preventDefault();
+  const f = item.getAsFile();
+  if (f.size > 7 * 1024 * 1024) return toast(L('La imagen pesa más de 7 MB.', 'The image is larger than 7 MB.'), 'err');
+  const fr = new FileReader();
+  fr.onload = () => { repSyncFields(); S.rep.img = fr.result; S.rep.imgNombre = L('Imagen pegada', 'Pasted image'); S.rep.useImg = true; renderReport(); };
+  fr.readAsDataURL(f);
+});
+async function sendReport() {
+  repSyncFields();
+  const r = S.rep;
+  if ((r.desc || '').trim().length < 10) { toast(L('Cuéntanos un poco más qué pasó (mínimo 10 letras).', 'Tell us a bit more (at least 10 characters).'), 'err'); const d = document.getElementById('repDesc'); if (d) d.focus(); return; }
+  if (!(r.useImg && r.img) && !r.avisadoImg) {
+    r.avisadoImg = true;
+    toast(L('📸 Consejo: una captura ayuda mucho. Si aun así quieres enviarlo sin imagen, pulsa Enviar otra vez.', '📸 Tip: a screenshot helps a lot. To send without one, press Send again.'));
+    return;
+  }
+  r.enviando = true; renderReport();
+  const res = await rl.reportSend({ descripcion: r.desc.trim(), contacto: r.contacto.trim(), seccion: r.seccion, log: r.incluirLog ? r.log : '', imagen: r.useImg ? r.img : null }).catch((e) => ({ ok: false, error: String(e.message || e) }));
+  r.enviando = false;
+  if (res && res.ok) { r.hecho = res.id || 'OK'; renderReport(); return; }
+  renderReport();
+  toast(L('No se pudo enviar: ', 'Could not send: ') + ((res && res.error) || '?'), 'err');
 }
 
 // ============================================================ Tour de bienvenida
@@ -1305,7 +1404,18 @@ document.addEventListener('click', async (e) => {
     case 'monQuar': $('#monitor').classList.add('hidden'); S.mon = null; S.quarantine = null; S.view = 'deshacer'; return render();
     case 'donateAsk': return showDonate();
     case 'donateGo': $('#modal').classList.add('hidden'); return rl.open(S.info.paypal);
-    case 'modalClose': $('#modal').classList.add('hidden'); return;
+    case 'modalClose': $('#modal').classList.add('hidden'); S.rep = null; return;
+    case 'crashSeen': S.crashSeen = true; return render();
+    case 'reportOpen': return openReport(t.dataset.ctx || '');
+    case 'repPick': {
+      const r = await rl.reportPickImage(); if (!r) return;
+      if (r.error) return toast(r.error, 'err');
+      S.rep.img = r.dataUrl; S.rep.imgNombre = r.nombre; S.rep.useImg = true; return renderReport();
+    }
+    case 'repUseAuto': S.rep.img = S.rep.auto; S.rep.imgNombre = L('Captura de RetroLimpia', 'RetroLimpia screenshot'); S.rep.useImg = true; return renderReport();
+    case 'repNoImg': S.rep.useImg = false; return renderReport();
+    case 'repToggleLog': S.rep.verLog = !S.rep.verLog; return renderReport();
+    case 'repSend': return sendReport();
     case 'procWin': S.procShowWin = !S.procShowWin; return render();
     case 'procSmall': S.procShowSmall = !S.procShowSmall; return render();
     case 'procNo': S.procConfirm = null; return render();

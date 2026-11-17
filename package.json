@@ -1,7 +1,7 @@
 {
   "name": "retrolimpia",
   "productName": "RetroLimpia",
-  "version": "2.5.4",
+  "version": "2.6.0",
   "description": "Limpia, desinstala sin dejar restos, revisa tu hardware y mantiene tus drivers al día. Guiado paso a paso.",
   "main": "src/main.js",
   "author": "Retropunk94",
@@ -9,7 +9,9 @@
   "homepage": "https://github.com/retropunk94/RetroLimpia",
   "retrolimpia": {
     "repo": "retropunk94/RetroLimpia",
-    "paypal": "https://streamelements.com/retropunk94/tip"
+    "paypal": "https://streamelements.com/retropunk94/tip",
+    "reportes": "https://retrolimpia-reportes.arkanosouls.workers.dev/",
+    "discord": "https://discord.gg/55zDGujkgU"
   },
   "scripts": {
     "start": "electron .",

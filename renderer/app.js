@@ -181,6 +181,27 @@ async function refreshProgramsQuiet(motivo) {
   finally { refrescandoProgs = false; }
 }
 window.addEventListener('focus', () => refreshProgramsQuiet('foco'));
+// Después de cada acción que cambia el PC, se vuelven a leer las pestañas afectadas
+// (en segundo plano: no bloquea nada y la pantalla no se queda en blanco).
+const REFRESH = {
+  programas: ['programs', () => loadPrograms()], inicio: ['startup', () => loadStartup()],
+  actualizaciones: ['updates', () => loadUpdates()], drivers: ['drivers', () => loadDrivers()],
+  hardware: ['hardware', () => loadHardware()], limpieza: ['junk', () => loadJunk()], cuarentena: ['quarantine', () => loadQuarantine()]
+};
+const VIEW_REFRESH = { programas: 'programas', arranque: 'inicio', actualizaciones: 'actualizaciones', drivers: 'drivers', hardware: 'hardware', limpieza: 'limpieza', deshacer: 'cuarentena' };
+S.refreshing = new Set();
+function refreshAfter(...keys) {
+  setTimeout(async () => {
+    for (const k of keys) {
+      const def = REFRESH[k];
+      if (!def || S.refreshing.has(k)) continue;
+      if (!S[def[0]]) continue;            // aún no se había abierto: se cargará al entrar
+      S.refreshing.add(k); if (VIEW_REFRESH[S.view] === k) render();
+      try { await def[1](); } catch { /* se reintenta al volver a entrar */ }
+      finally { S.refreshing.delete(k); render(); }
+    }
+  }, 0);
+}
 document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshProgramsQuiet('visible'); });
 async function loadHardware() {
   const r = obj(await rl.run('hardware', {}));
@@ -515,6 +536,7 @@ async function updateSelected() {
       }
     }
     toast(L(`${ok} actualizado(s) correctamente.`, `${ok} updated successfully.`));
+    refreshAfter('actualizaciones', 'drivers', 'hardware', 'programas');
     if (bad.length) toast(L('No se pudieron actualizar (quizá estaban abiertos): ', 'Could not update (maybe they were open): ') + bad.join(', '), 'err');
   });
 }
@@ -566,6 +588,7 @@ async function fixAll() {
     // Re-escaneo rápido para actualizar la nota
     S.busy.label = L('Volviendo a medir', 'Measuring again'); S.busy.msg = ''; render();
     await Promise.allSettled([loadJunk(), loadPrograms(), loadStartup()]);
+    refreshAfter('actualizaciones', 'drivers', 'hardware', 'cuarentena');
     S.updates = S.updates ? { ...S.updates, windows: [], apps: [] } : S.updates;
     S.scan.findings = buildFindings(); S.scan.score = computeScore();
   });
@@ -699,6 +722,7 @@ function banners() {
   if (S.info.demo) h += `<div class="banner info"><div class="grow"><b>${L('Modo demostración', 'Demo mode')}</b> · ${L('Los datos son de ejemplo y no se cambia nada en este equipo.', 'Sample data; nothing on this computer is changed.')}</div></div>`;
   if (!S.info.esAdmin) h += `<div class="banner warn"><div class="grow"><b>${L('Abre RetroLimpia como administrador', 'Run RetroLimpia as administrator')}</b> · ${L('Sin permisos de administrador no puede desinstalar ni actualizar drivers. Ciérralo, haz clic derecho en su icono y elige "Ejecutar como administrador".', 'Without admin rights it cannot uninstall or update drivers. Close it, right-click its icon and choose "Run as administrator".')}</div></div>`;
   if (S.needsReboot) h += `<div class="banner warn"><div class="grow"><b>${L('Reinicia el PC cuando puedas', 'Restart your PC when you can')}</b> · ${L('Algunas actualizaciones o desinstalaciones terminan al reiniciar.', 'Some updates or uninstalls finish after a restart.')}</div></div>`;
+  if (S.refreshing && S.refreshing.has(VIEW_REFRESH[S.view])) h += `<div class="banner info"><div class="grow">🔄 <b>${L('Actualizando esta pestaña', 'Refreshing this tab')}</b> · ${L('Leyendo de nuevo lo que cambió tras la última acción...', 'Re-reading what changed after the last action...')}</div></div>`;
   if (S.info.cierreRaro && !S.crashSeen && S.info.reportes) h += `<div class="banner warn"><div class="grow"><b>${L('La última vez RetroLimpia se cerró de forma inesperada', 'Last time RetroLimpia closed unexpectedly')}</b> · ${L('¿Nos cuentas qué estabas haciendo? Nos ayuda a arreglarlo en la próxima versión.', 'Tell us what you were doing? It helps us fix it in the next version.')}</div><button class="btn small" data-act="reportOpen">🐞 ${L('Reportar', 'Report')}</button><button class="btn small ghost" data-act="crashSeen">${L('Ahora no', 'Not now')}</button></div>`;
   const up = S.upd || {};
   if (up.estado === 'lista') h += updBannerHTML();
@@ -1447,6 +1471,7 @@ document.addEventListener('click', async (e) => {
       const r = await rl.run('cuarentena', { accion: 'restaurar', id: t.dataset.restore });
       toast(r.ok ? L('Restaurado. Todo volvió a su sitio.', 'Restored. Everything is back in place.') : L('Se restauró una parte; algunos archivos estaban en uso.', 'Partly restored; some files were in use.'), r.ok ? 'ok' : 'err');
       await loadQuarantine();
+      refreshAfter('programas', 'inicio', 'limpieza');
     });
   }
   if (t.dataset.wu) {
@@ -1457,6 +1482,7 @@ document.addEventListener('click', async (e) => {
       if (r.reinicio) S.needsReboot = true;
       toast(ok ? L('Actualización instalada.', 'Update installed.') : L('No se pudo instalar.', 'Could not install.'), ok ? 'ok' : 'err');
       S.updates.windows = S.updates.windows.filter((u) => !(ok && u.id === t.dataset.wu));
+      refreshAfter('actualizaciones', 'drivers', 'hardware');
     });
   }
   if (t.dataset.wg) {
@@ -1465,6 +1491,7 @@ document.addEventListener('click', async (e) => {
       const ok = r.resultados.every((x) => x.ok);
       toast(ok ? L('Programa actualizado.', 'Program updated.') : L('No se pudo actualizar (quizá está abierto).', 'Could not update (it may be open).'), ok ? 'ok' : 'err');
       if (ok) S.updates.apps = S.updates.apps.filter((a) => a.id !== t.dataset.wg);
+      refreshAfter('actualizaciones', 'programas');
     });
   }
   switch (t.dataset.act) {
@@ -1518,6 +1545,7 @@ document.addEventListener('click', async (e) => {
         if (r.fail.length) toast(L('No se pudieron quitar: ', 'Could not remove: ') + r.fail.join(', '), 'err');
         if (r.saltados && r.saltados.length) toast(L('No se desinstalaron (cancelado en su tienda): ', 'Not uninstalled (cancelled in its store): ') + r.saltados.join(', '));
         await loadPrograms(); S.quarantine = null;
+        refreshAfter('inicio', 'actualizaciones', 'limpieza');
       });
     }
     case 'moveResidues': {
@@ -1527,6 +1555,7 @@ document.addEventListener('click', async (e) => {
         const q = await rl.run('cuarentena', { accion: 'mover', items, motivo: L('Restos revisados', 'Reviewed leftovers') });
         toast(L(`${q.guardados} resto(s) en la cuarentena.`, `${q.guardados} leftover(s) quarantined.`));
         S.pendingResidues = null; S.quarantine = null;
+        refreshAfter('programas');
       });
     }
     case 'skipResidues': S.pendingResidues = null; return render();
@@ -1555,12 +1584,14 @@ document.addEventListener('click', async (e) => {
         if (S.updates.apps.length) { S.busy.label = L('Programas', 'Programs'); await rl.run('actualizaciones', { accion: 'winget', todos: true }); }
         toast(L('Todo actualizado.', 'Everything updated.'));
         await loadUpdates();
+        refreshAfter('drivers', 'hardware', 'programas');
       });
     case 'backupDrivers':
       return taskC(L('Copia de drivers', 'Driver backup'), async () => {
         const r = await rl.run('drivers', { accion: 'respaldar' });
         toast(r.ok ? L('Copia guardada (', 'Backup saved (') + fmtBytes(r.tamano) + ').' : L('No se pudo hacer la copia.', 'Backup failed.'), r.ok ? 'ok' : 'err');
         await loadDrivers();
+        refreshAfter('cuarentena');
       });
     case 'openRestore': return rl.run('restauracion', { accion: 'abrir' });
     case 'trust': return showTrust();
@@ -1604,7 +1635,7 @@ document.addEventListener('change', async (e) => {
   if (t.dataset.res) { const [g, r] = t.dataset.res.split(':').map(Number); S.pendingResidues[g].restos[r].elegido = t.checked; return; }
   if (t.dataset.startup) {
     const id = t.dataset.startup, on = t.checked;
-    return taskC(on ? L('Activando', 'Enabling') : L('Desactivando', 'Disabling'), async () => { await rl.run('inicio', { accion: 'cambiar', id, activar: on }); await loadStartup(); });
+    return taskC(on ? L('Activando', 'Enabling') : L('Desactivando', 'Disabling'), async () => { await rl.run('inicio', { accion: 'cambiar', id, activar: on }); await loadStartup(); refreshAfter('programas'); });
   }
   if (t.dataset.autostart !== undefined) {
     const r = await rl.autostart(t.checked, S.settings.frecuenciaDias); S.settings = r.settings;

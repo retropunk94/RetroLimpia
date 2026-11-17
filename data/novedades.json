@@ -5,12 +5,14 @@
       "version": "2.7.1",
       "fecha": "2026-11-17",
       "es": [
-        "La lista de programas se pone al día sola: si instalas o desinstalas algo fuera de RetroLimpia (desde Steam, Ajustes de Windows o su propio desinstalador), al volver a RetroLimpia ya no aparece.",
-        "Te avisa con un mensaje cuando la lista cambia (programas quitados o nuevos)."
+        "Después de cada acción (desinstalar, actualizar drivers o Windows, actualizar programas, limpiar, restaurar...) las pestañas afectadas se actualizan solas. Verás un aviso \"Actualizando esta pestaña\" mientras se leen de nuevo.",
+        "La lista de programas se pone al día sola si instalas o desinstalas algo fuera de RetroLimpia (desde Steam, Ajustes de Windows o su propio desinstalador): al volver a RetroLimpia ya no aparece.",
+        "Te avisa con un mensaje cuando la lista de programas cambia."
       ],
       "en": [
-        "The program list updates itself: if you install or uninstall something outside RetroLimpia (from Steam, Windows Settings or its own uninstaller), it is gone when you come back to RetroLimpia.",
-        "A message tells you when the list changes (removed or new programs)."
+        "After every action (uninstalling, updating drivers or Windows, updating programs, cleaning, restoring...) the affected tabs refresh by themselves. A \"Refreshing this tab\" notice shows while they are re-read.",
+        "The program list updates itself if you install or uninstall something outside RetroLimpia (Steam, Windows Settings or its own uninstaller).",
+        "A message tells you when the program list changes."
       ]
     },
     {

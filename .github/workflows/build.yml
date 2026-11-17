@@ -72,4 +72,4 @@ jobs:
 
             ### ¿Windows dice "Windows protegió su PC"?
             Es normal: el programa no tiene firma digital de pago. Pulsa **Más información → Ejecutar de todas formas**.
-            Lee [por qué pasa](docs/POR-QUE-AVISA-WINDOWS.md). Puedes comprobar el archivo en [VirusTotal](https://www.virustotal.com) y comparar su huella con `SHA256.txt`.
+            Lee [por qué pasa](https://github.com/${{ github.repository }}/blob/main/docs/POR-QUE-AVISA-WINDOWS.md). Puedes comprobar el archivo en [VirusTotal](https://www.virustotal.com) y comparar su huella con `SHA256.txt`.

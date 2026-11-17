@@ -1,3 +1,5 @@
+<p align="center"><img src="docs/logo-animado.gif" alt="RetroLimpia — Deja tu PC como nuevo" width="420"></p>
+
 # RetroLimpia
 
 **Limpia tu PC, quita el bloatware sin dejar restos, revisa tu hardware y mantén tus drivers al día. Todo guiado paso a paso, pensado para quien no sabe nada de informática.**

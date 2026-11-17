@@ -349,6 +349,40 @@ async function uninstallPrograms(list, motivo) {
   return res;
 }
 
+async function updateSelected() {
+  const wuIds = [...S.updSel].filter((k) => k.startsWith('wu:')).map((k) => k.slice(3));
+  const wgIds = [...S.updSel].filter((k) => k.startsWith('wg:')).map((k) => k.slice(3));
+  if (!wuIds.length && !wgIds.length) return;
+  await taskC(L('Actualizando lo seleccionado', 'Updating selection'), async () => {
+    await restorePoint(L('Antes de actualizar', 'Before updating'));
+    let ok = 0, bad = [];
+    if (wuIds.length) {
+      S.busy.label = 'Windows Update'; render();
+      const r = await rl.run('actualizaciones', { accion: 'instalarWU', ids: wuIds });
+      for (const x of arr(r.resultados)) { if (x.ok) { ok++; S.updSel.delete('wu:' + x.id); } else bad.push(x.titulo || x.id); }
+      if (r.reinicio) S.needsReboot = true;
+      S.updates.windows = S.updates.windows.filter((u) => !arr(r.resultados).some((x) => x.ok && x.id === u.id));
+    }
+    checkCancel();
+    if (wgIds.length) {
+      // Uno por uno: así Cancelar puede parar entre programa y programa
+      let i = 0;
+      for (const id of wgIds) {
+        if (S.cancelRequested) break;
+        const app = S.updates.apps.find((a) => a.id === id);
+        S.busy.label = L(`Actualizando programas (${++i}/${wgIds.length})`, `Updating programs (${i}/${wgIds.length})`);
+        S.busy.msg = app ? app.nombre : id; S.busy.pct = Math.round(((i - 1) / wgIds.length) * 100); render();
+        const r = await rl.run('actualizaciones', { accion: 'winget', ids: [id] });
+        const x = arr(r.resultados)[0];
+        if (x && x.ok) { ok++; S.updSel.delete('wg:' + id); S.updates.apps = S.updates.apps.filter((a) => a.id !== id); }
+        else bad.push(app ? app.nombre : id);
+      }
+    }
+    toast(L(`${ok} actualizado(s) correctamente.`, `${ok} updated successfully.`));
+    if (bad.length) toast(L('No se pudieron actualizar (quizá estaban abiertos): ', 'Could not update (maybe they were open): ') + bad.join(', '), 'err');
+  });
+}
+
 async function fixAll() {
   const chosen = S.scan.findings.filter((f) => f.elegido && f.accion);
   if (!chosen.length) { toast(L('No hay nada seleccionado para arreglar.', 'Nothing selected to fix.'), 'err'); return; }
@@ -412,6 +446,7 @@ const ICONS = {
   drivers: '<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/>',
   actualizaciones: '<path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/>',
   deshacer: '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+  procesos: '<path d="M3 12h4l3-8 4 16 3-8h4"/>',
   ajustes: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>'
 };
 const NAV = [
@@ -423,6 +458,7 @@ const NAV = [
   ['hardware', 'Hardware y salud', 'Hardware & health'],
   ['drivers', 'Drivers', 'Drivers'],
   ['actualizaciones', 'Actualizaciones', 'Updates'],
+  ['procesos', 'Procesos (avanzado)', 'Processes (advanced)'],
   'sep',
   ['deshacer', 'Deshacer y cuarentena', 'Undo & quarantine'],
   ['ajustes', 'Ajustes', 'Settings']
@@ -441,7 +477,9 @@ function renderNav() {
     if (n === 'sep') return '<div class="nav-sep"></div>';
     const [id, es, en] = n; const c = navCount(id);
     return `<button class="nav-item ${S.view === id ? 'active' : ''}" data-nav="${id}"><svg viewBox="0 0 24 24">${ICONS[id]}</svg><span>${L(es, en)}</span>${c ? `<span class="count ${c[1]}">${esc(c[0])}</span>` : ''}</button>`;
-  }).join('') + `<div class="nav-foot">${repoUrl() ? `<button class="gh-btn" data-open="${repoUrl()}" title="${L('Revisar el código abierto en GitHub', 'Review the open source code on GitHub')}">${GH_ICON}<span>${L('Ver el código en GitHub', 'View code on GitHub')}</span></button>` : ''}<div class="trust">${L('Sin telemetría · Código abierto', 'No telemetry · Open source')}</div>${L('Todo lo que borra se puede deshacer.', 'Everything it removes can be undone.')}</div>`;
+  }).join('') + `<div class="nav-foot">${/^https:\/\//.test(S.info.paypal || '') ? `<div class="donate"><div class="d-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.8 4.5c2.1 0 3.6 1.1 5.2 3 1.6-1.9 3.1-3 5.2-3 3.8 0 5.9 3.9 4.4 7.3C19.5 16.4 12 21 12 21z"/></svg>${L('¿Te ha servido?', 'Did it help you?')}</div>
+    <p>${L('RetroLimpia es gratis, sin anuncios y no vende tus datos. Lo hace una sola persona: tu café hace que siga mejorando.', "RetroLimpia is free, ad-free and never sells your data. One person builds it: your coffee keeps it improving.")}</p>
+    <button class="donate-btn" data-open="${esc(S.info.paypal)}">☕ ${L('Invítame un café', 'Buy me a coffee')}</button><div class="d-note">${L('Acepta PayPal · cualquier cantidad ayuda', 'PayPal accepted · any amount helps')}</div></div>` : ''}${repoUrl() ? `<button class="gh-btn" data-open="${repoUrl()}" title="${L('Revisar el código abierto en GitHub', 'Review the open source code on GitHub')}">${GH_ICON}<span>${L('Ver el código en GitHub', 'View code on GitHub')}</span></button>` : ''}<div class="trust">${L('Sin telemetría · Código abierto', 'No telemetry · Open source')}</div>${L('Todo lo que borra se puede deshacer.', 'Everything it removes can be undone.')}</div>`;
 }
 
 function head(title, desc, right = '') {
@@ -513,9 +551,25 @@ function residuesReviewHTML() {
     <div style="margin-top:14px;display:flex;gap:10px"><button class="btn primary" data-act="moveResidues">${L('Mover lo marcado a la cuarentena', 'Move ticked items to quarantine')}</button><button class="btn ghost" data-act="skipResidues">${L('Dejarlo como está', 'Leave it')}</button></div></div>`;
 }
 
+// Impacto en el sistema: lo que un programa hace aunque no lo estés usando
+function programImpact(p) {
+  const why = [];
+  let pts = 0;
+  const loc = String(p.carpeta || '').replace(/"/g, '').toLowerCase().replace(/\\$/, '');
+  const arranca = (S.startup?.elementos || []).some((i) => i.activo && ((loc.length > 6 && String(i.comando).toLowerCase().includes(loc)) || (p.tipo === 'win32' && i.nombre.length > 3 && p.nombre.toLowerCase().startsWith(i.nombre.toLowerCase()))));
+  if (arranca) { pts += 2; why.push(L('arranca con Windows', 'starts with Windows')); }
+  if (p.serviciosAuto > 0) { pts += 2; why.push(L(`${p.serviciosAuto} servicio(s) siempre activos`, `${p.serviciosAuto} always-on service(s)`)); }
+  else if (p.servicios > 0) { pts += 1; why.push(L(`${p.servicios} servicio(s)`, `${p.servicios} service(s)`)); }
+  if (p.ram > 300 * 1024 ** 2) { pts += 2; why.push(L(`usa ${fmtBytes(p.ram)} de RAM ahora`, `using ${fmtBytes(p.ram)} RAM now`)); }
+  else if (p.ram > 60 * 1024 ** 2) { pts += 1; why.push(L(`usa ${fmtBytes(p.ram)} de RAM ahora`, `using ${fmtBytes(p.ram)} RAM now`)); }
+  const nivel = pts >= 4 ? 'alto' : pts >= 2 ? 'medio' : 'bajo';
+  return { nivel, pts, why };
+}
+const IMPACT = { alto: ['rojo', 'Impacto alto', 'High impact'], medio: ['amarillo', 'Impacto medio', 'Medium impact'], bajo: ['verde', 'Impacto bajo', 'Low impact'] };
+
 function viewProgramas() {
-  if (!S.programs) return loadingView(L('Programas y bloatware', 'Programs & bloatware'), loadPrograms);
-  const all = allPrograms();
+  if (!S.programs) return loadingView(L('Programas y bloatware', 'Programs & bloatware'), async () => { await loadPrograms(); if (!S.startup) await loadStartup().catch(() => {}); });
+  const all = allPrograms().map((p) => ({ ...p, imp: programImpact(p) }));
   const q = S.search.toLowerCase();
   const filt = all.filter((p) => {
     if (q && !(p.cls.nombre + ' ' + p.editor + ' ' + p.nombre).toLowerCase().includes(q)) return false;
@@ -524,29 +578,44 @@ function viewProgramas() {
       case 'amarillo': return p.cls.color === 'amarillo';
       case 'store': return p.tipo === 'appx';
       case 'clasicos': return p.tipo === 'win32';
+      case 'impacto': return p.imp.nivel !== 'bajo';
       default: return S.settings.modoExperto || p.tipo === 'win32' || p.cls.color;
     }
   });
   const rank = { verde: 0, amarillo: 1, null: 2, rojo: 3 };
-  filt.sort((a, b) => (rank[a.cls.color] - rank[b.cls.color]) || a.cls.nombre.localeCompare(b.cls.nombre));
+  const sorts = {
+    rec: (a, b) => (rank[a.cls.color] - rank[b.cls.color]) || a.cls.nombre.localeCompare(b.cls.nombre),
+    peso: (a, b) => (b.tamano || 0) - (a.tamano || 0),
+    impacto: (a, b) => (b.imp.pts - a.imp.pts) || (b.ram || 0) - (a.ram || 0),
+    nombre: (a, b) => a.cls.nombre.localeCompare(b.cls.nombre)
+  };
+  S.progSort = S.progSort || 'rec';
+  filt.sort(sorts[S.progSort]);
+  const maxSize = Math.max(1, ...filt.map((p) => p.tamano || 0));
+  const totalSize = all.reduce((a, p) => a + (p.tamano || 0), 0);
+  const nAlto = all.filter((p) => p.imp.nivel === 'alto').length;
   const selList = all.filter((p) => S.sel.has(p.id));
   const selSize = selList.reduce((a, p) => a + (p.tamano || 0), 0);
-  const chips = [['todos', 'Todos', 'All'], ['verde', 'Seguro quitar', 'Safe to remove'], ['amarillo', 'Opcionales', 'Optional'], ['clasicos', 'Programas', 'Programs'], ['store', 'Apps de la Store', 'Store apps']];
+  const chips = [['todos', 'Todos', 'All'], ['verde', 'Seguro quitar', 'Safe to remove'], ['amarillo', 'Opcionales', 'Optional'], ['impacto', 'Con impacto', 'With impact'], ['clasicos', 'Programas', 'Programs'], ['store', 'Store', 'Store']];
+  const sortOpts = [['rec', 'Recomendado', 'Recommended'], ['peso', 'Más pesados', 'Largest'], ['impacto', 'Mayor impacto', 'Highest impact'], ['nombre', 'Nombre (A-Z)', 'Name (A-Z)']];
   const nVerde = all.filter((p) => p.cls.color === 'verde').length;
-  return `<div class="view">${banners()}${head(L('Programas y bloatware', 'Programs & bloatware'), L('Desinstala sin ventanas y sin dejar restos. Los colores te dicen qué es seguro quitar.', 'Uninstall without pop-ups and without leftovers. Colours tell you what is safe to remove.'), nVerde ? `<button class="btn" data-act="selVerde">${L(`Marcar los ${nVerde} recomendados`, `Tick the ${nVerde} recommended`)}</button>` : '')}
+  return `<div class="view">${banners()}${head(L('Programas y bloatware', 'Programs & bloatware'), L(`${all.length} programas ocupan <b>${fmtBytes(totalSize)}</b>${nAlto ? ` · <b>${nAlto}</b> con impacto alto en el sistema` : ''}. Desinstala sin ventanas y sin dejar restos.`, `${all.length} programs take up <b>${fmtBytes(totalSize)}</b>${nAlto ? ` · <b>${nAlto}</b> with high system impact` : ''}. Uninstall without pop-ups or leftovers.`), nVerde ? `<button class="btn" data-act="selVerde">${L(`Marcar los ${nVerde} recomendados`, `Tick the ${nVerde} recommended`)}</button>` : '')}
     ${progressHTML()}${residuesReviewHTML()}
     <div class="toolbar"><input class="search" id="search" placeholder="${L('Buscar un programa...', 'Search a program...')}" value="${esc(S.search)}">
-      ${chips.map(([id, es, en]) => `<button class="chip ${S.progFilter === id ? 'on' : ''}" data-filter="${id}">${L(es, en)}</button>`).join('')}</div>
+      <label class="sortsel">${L('Ordenar:', 'Sort:')} <select data-sort>${sortOpts.map(([id, es, en]) => `<option value="${id}" ${S.progSort === id ? 'selected' : ''}>${L(es, en)}</option>`).join('')}</select></label></div>
+    <div class="toolbar">${chips.map(([id, es, en]) => `<button class="chip ${S.progFilter === id ? 'on' : ''}" data-filter="${id}">${L(es, en)}</button>`).join('')}</div>
     <div class="list">${filt.length ? filt.map((p) => {
       const blocked = p.cls.color === 'rojo' && !S.settings.modoExperto;
+      const [ic, ies, ien] = IMPACT[p.imp.nivel];
       return `<label class="row ${blocked ? 'disabled' : ''}"><input type="checkbox" class="check" data-sel="${esc(p.id)}" ${S.sel.has(p.id) ? 'checked' : ''} ${blocked ? 'disabled' : ''}>
-        <div class="grow"><div class="name">${esc(p.cls.nombre)}</div><div class="sub">${esc(p.cls.nota || [p.editor, p.version].filter(Boolean).join(' · '))}</div>
+        <div class="grow"><div class="name">${esc(p.cls.nombre)}${p.tipo === 'appx' ? ' <span class="badge gris">Store</span>' : ''}</div><div class="sub">${esc(p.cls.nota || [p.editor, p.version].filter(Boolean).join(' · '))}</div>
+        ${p.imp.why.length ? `<div class="why-line">${esc(p.imp.why.join(' · '))}</div>` : ''}
         ${S.settings.modoExperto ? `<div class="tech">${esc(p.tipo === 'appx' ? p.paquete : (p.desinstalarSilencioso || p.desinstalar))}</div>` : ''}</div>
         ${p.cls.color ? `<span class="badge ${p.cls.color}">${L(...COLOR_TXT[p.cls.color])}</span>` : ''}
-        ${p.tipo === 'appx' ? `<span class="badge gris">Store</span>` : ''}
-        <div class="size">${p.tamano ? fmtBytes(p.tamano) : ''}</div></label>`;
+        <span class="badge ${ic}" title="${esc(p.imp.why.join(', ') || L('No hace nada mientras no lo usas', 'Does nothing while not in use'))}">${L(ies, ien)}</span>
+        <div class="weight"><b>${p.tamano ? fmtBytes(p.tamano) : '—'}</b><i style="width:${p.tamano ? Math.max(3, Math.round(100 * p.tamano / maxSize)) : 0}%"></i></div></label>`;
     }).join('') : `<div class="empty">${L('No hay programas que coincidan.', 'No matching programs.')}</div>`}</div>
-    ${S.sel.size ? `<div class="actionbar"><div class="info">${L(`<b>${S.sel.size}</b> seleccionado(s)`, `<b>${S.sel.size}</b> selected`)}${selSize ? ' · ' + fmtBytes(selSize) : ''}. ${L('Se buscarán sus restos al terminar.', 'Leftovers will be searched afterwards.')}</div>
+    ${S.sel.size ? `<div class="actionbar"><div class="info">${L(`<b>${S.sel.size}</b> seleccionado(s)`, `<b>${S.sel.size}</b> selected`)}${selSize ? ' · ' + L('liberarás ', 'frees ') + '<b>' + fmtBytes(selSize) + '</b>' : ''}. ${L('Se buscarán sus restos al terminar.', 'Leftovers will be searched afterwards.')}</div>
       <button class="btn ghost" data-act="selNone">${L('Quitar selección', 'Clear')}</button>
       <button class="btn primary" data-act="uninstallSel" ${S.busy ? 'disabled' : ''}>${L('Desinstalar', 'Uninstall')} (${S.sel.size})</button></div>` : ''}</div>`;
 }
@@ -633,23 +702,92 @@ function viewDrivers() {
 function viewActualizaciones() {
   if (!S.updates) return loadingView(L('Actualizaciones', 'Updates'), loadUpdates, L('Preguntando a Windows Update. Puede tardar unos minutos...', 'Asking Windows Update. May take a few minutes...'));
   const u = S.updates;
+  S.updSel = S.updSel || new Set();
   const wu = u.windows;
   const big = wu.filter((x) => x.grande);
   const normal = wu.filter((x) => !x.grande);
   const tipoTxt = { seguridad: L('Seguridad', 'Security'), driver: 'Driver', windows: 'Windows' };
-  return `<div class="view">${banners()}${head(L('Actualizaciones', 'Updates'), L('Actualiza cada cosa por separado o todo de una vez. Solo fuentes oficiales: Windows Update y winget (el gestor de apps de Microsoft).', 'Update items one by one or all at once. Official sources only: Windows Update and winget (Microsoft\'s app manager).'), `<button class="btn ghost" data-act="loadUpdates" ${S.busy ? 'disabled' : ''}>${L('Buscar de nuevo', 'Search again')}</button>`)}
+  const keysWu = normal.map((x) => 'wu:' + x.id), keysWg = u.apps.map((a) => 'wg:' + a.id);
+  const allOn = (keys) => keys.length && keys.every((k) => S.updSel.has(k));
+  const selAll = (grp, keys) => keys.length ? `<button class="link sel-all" data-updall="${grp}">${allOn(keys) ? L('Quitar todos', 'Untick all') : L('Marcar todos', 'Tick all')}</button>` : '';
+  const nSel = [...S.updSel].filter((k) => keysWu.includes(k) || keysWg.includes(k)).length;
+  const chk = (key) => `<input type="checkbox" class="check" data-upd="${esc(key)}" ${S.updSel.has(key) ? 'checked' : ''} ${S.busy ? 'disabled' : ''}>`;
+  return `<div class="view">${banners()}${head(L('Actualizaciones', 'Updates'), L('Marca lo que quieras actualizar y hazlo de una vez, o actualízalo todo. Solo fuentes oficiales: Windows Update y winget (el gestor de apps de Microsoft).', 'Tick what you want to update and do it in one go, or update everything. Official sources only: Windows Update and winget (Microsoft\'s app manager).'), `<button class="btn ghost" data-act="loadUpdates" ${S.busy ? 'disabled' : ''}>${L('Buscar de nuevo', 'Search again')}</button>`)}
     ${progressHTML()}
     ${u.error ? `<div class="banner warn"><div class="grow">${L('Windows Update no respondió', 'Windows Update did not respond')}: ${esc(u.error)}</div></div>` : ''}
-    <h2>${L('Windows y drivers', 'Windows & drivers')}<span class="sub">${normal.length} ${L('disponibles', 'available')}</span></h2>
-    ${normal.length ? `<div class="list">${normal.map((x) => `<div class="row"><div class="grow"><div class="name">${esc(x.titulo)}</div><div class="sub">${tipoTxt[x.tipo]} · ${fmtBytes(x.tamano)}${x.reinicio ? ' · ' + L('pide reiniciar', 'needs restart') : ''}${x.opcional ? ' · ' + L('opcional', 'optional') : ''}</div></div>
+    <h2>${L('Windows y drivers', 'Windows & drivers')}<span class="sub">${normal.length} ${L('disponibles', 'available')}</span>${selAll('wu', keysWu)}</h2>
+    ${normal.length ? `<div class="list">${normal.map((x) => `<label class="row">${chk('wu:' + x.id)}<div class="grow"><div class="name">${esc(x.titulo)}</div><div class="sub">${tipoTxt[x.tipo]} · ${fmtBytes(x.tamano)}${x.reinicio ? ' · ' + L('pide reiniciar', 'needs restart') : ''}${x.opcional ? ' · ' + L('opcional', 'optional') : ''}</div></div>
       <span class="badge ${x.tipo === 'seguridad' ? 'rojo' : x.opcional ? 'gris' : 'amarillo'}">${x.tipo === 'seguridad' ? L('Importante', 'Important') : x.opcional ? L('Opcional', 'Optional') : L('Recomendado', 'Recommended')}</span>
-      <button class="btn small" data-wu="${esc(x.id)}" ${S.busy ? 'disabled' : ''}>${L('Instalar', 'Install')}</button></div>`).join('')}</div>` : `<div class="banner good"><div class="grow"><b>${L('Windows está al día', 'Windows is up to date')}</b></div></div>`}
+      <button class="btn small" data-wu="${esc(x.id)}" ${S.busy ? 'disabled' : ''}>${L('Instalar', 'Install')}</button></label>`).join('')}</div>` : `<div class="banner good"><div class="grow"><b>${L('Windows está al día', 'Windows is up to date')}</b></div></div>`}
     ${big.length ? `<div class="banner info" style="margin-top:12px"><div class="grow"><b>${L('Hay una versión nueva de Windows disponible', 'A new Windows version is available')}</b> · ${esc(big[0].titulo)}. ${L('Por seguridad, RetroLimpia no la instala automáticamente: hazlo desde Configuración > Windows Update cuando tengas tiempo.', 'For safety RetroLimpia does not install it automatically: do it from Settings > Windows Update when you have time.')}</div></div>` : ''}
-    <h2>${L('Tus programas', 'Your programs')}<span class="sub">${u.apps.length} ${L('con versión nueva', 'with a new version')}</span></h2>
+    <h2>${L('Tus programas', 'Your programs')}<span class="sub">${u.apps.length} ${L('con versión nueva', 'with a new version')}</span>${selAll('wg', keysWg)}</h2>
     ${!u.wingetDisponible ? `<div class="banner warn"><div class="grow">${L('Falta "Instalador de aplicaciones" (winget). Instálalo gratis desde Microsoft Store para poder actualizar tus programas.', 'App Installer (winget) is missing. Install it free from the Microsoft Store to update your programs.')}</div><button class="btn small" data-open="https://apps.microsoft.com/detail/9NBLGGH4NNS1">${L('Abrir Store', 'Open Store')}</button></div>`
-      : u.apps.length ? `<div class="list">${u.apps.map((a) => `<div class="row"><div class="grow"><div class="name">${esc(a.nombre)}</div><div class="sub">${esc(a.actual)} → <b style="color:var(--verde)">${esc(a.nueva)}</b></div>${S.settings.modoExperto ? `<div class="tech">${esc(a.id)}</div>` : ''}</div><button class="btn small" data-wg="${esc(a.id)}" ${S.busy ? 'disabled' : ''}>${L('Actualizar', 'Update')}</button></div>`).join('')}</div>`
+      : u.apps.length ? `<div class="list">${u.apps.map((a) => `<label class="row">${chk('wg:' + a.id)}<div class="grow"><div class="name">${esc(a.nombre)}</div><div class="sub">${esc(a.actual)} → <b style="color:var(--verde)">${esc(a.nueva)}</b></div>${S.settings.modoExperto ? `<div class="tech">${esc(a.id)}</div>` : ''}</div><button class="btn small" data-wg="${esc(a.id)}" ${S.busy ? 'disabled' : ''}>${L('Actualizar', 'Update')}</button></label>`).join('')}</div>`
       : `<div class="banner good"><div class="grow"><b>${L('Tus programas están al día', 'Your programs are up to date')}</b></div></div>`}
-    ${(normal.length || u.apps.length) ? `<div class="actionbar"><div class="info">${L('Las actualizaciones opcionales de Windows y los cambios de versión no se incluyen en "todo".', 'Optional Windows updates and version upgrades are not included in "all".')}</div><button class="btn primary" data-act="updateAll" ${S.busy ? 'disabled' : ''}>${L('Actualizar todo', 'Update all')}</button></div>` : ''}</div>`;
+    ${(normal.length || u.apps.length) ? `<div class="actionbar">
+      ${nSel ? `<div class="info">${L(`<b>${nSel}</b> seleccionado(s). Se instalan uno detrás de otro, sin ventanas.`, `<b>${nSel}</b> selected. Installed one after another, no pop-ups.`)}</div>
+        <button class="btn ghost" data-act="updNone">${L('Quitar selección', 'Clear')}</button>
+        <button class="btn primary" data-act="updateSel" ${S.busy ? 'disabled' : ''}>${L('Actualizar seleccionados', 'Update selected')} (${nSel})</button>`
+      : `<div class="info">${L('Marca las casillas para elegir qué actualizar. "Todo" no incluye opcionales de Windows ni cambios de versión.', 'Tick boxes to choose what to update. "All" excludes optional Windows updates and version upgrades.')}</div>
+        <button class="btn primary" data-act="updateAll" ${S.busy ? 'disabled' : ''}>${L('Actualizar todo', 'Update all')}</button>`}</div>` : ''}</div>`;
+}
+
+// ============================================================ Procesos (avanzado)
+async function loadProcs() {
+  if (S.procLoading) return;
+  S.procLoading = true;
+  try {
+    const r = obj(await rl.run('procesos', { accion: 'listar' }));
+    S.procs = { procesos: arr(r.procesos).map((x) => ({ ...x, pids: arr(x.pids) })), ramTotal: r.ramTotal || 0, ramLibre: r.ramLibre || 0, cpuTotal: r.cpuTotal || 0, at: Date.now() };
+  } catch (e) { if (!isCancel(e)) S.procError = String(e.message || e).slice(0, 200); }
+  finally { S.procLoading = false; if (S.view === 'procesos') render(); }
+}
+setInterval(() => { if (S.view === 'procesos' && S.settings.procesosAviso && !S.procPaused && !S.procConfirm) loadProcs(); }, 3000);
+
+function showProcWarning() {
+  $('#modal').innerHTML = `<div class="modal warn-modal" role="dialog" aria-modal="true">
+    <h2>⚠ ${L('Zona para usuarios avanzados', 'Advanced users only')}</h2>
+    <p class="lead">${L('Aquí ves todo lo que está funcionando ahora en tu PC y puedes cerrarlo a la fuerza. <b>Úsalo solo si sabes lo que estás haciendo.</b>', 'Here you see everything running on your PC right now and can force it to close. <b>Only use it if you know what you are doing.</b>')}</p>
+    <div class="why"><span class="n">1</span><div><b>${L('Puedes perder trabajo', 'You can lose work')}</b><p>${L('Cerrar un programa a la fuerza no guarda nada: si tenías un documento o una partida sin guardar, se pierde.', 'Force-closing a program saves nothing: unsaved documents or games are lost.')}</p></div></div>
+    <div class="why"><span class="n">2</span><div><b>${L('Algunas cosas dejan de funcionar', 'Some things stop working')}</b><p>${L('El sonido, la red, el antivirus o la barra de tareas dependen de procesos que no reconocerías por el nombre.', 'Sound, network, antivirus or the taskbar depend on processes you would not recognise by name.')}</p></div></div>
+    <div class="why"><span class="n">3</span><div><b>${L('Lo vital está protegido', 'Vital parts are protected')}</b><p>${L('Los procesos imprescindibles de Windows aparecen bloqueados y no se pueden cerrar desde aquí. Si no reconoces algo, déjalo como está.', 'Essential Windows processes are locked and cannot be closed here. If you do not recognise something, leave it alone.')}</p></div></div>
+    <div class="foot"><button class="btn primary" data-act="procOk">${L('Entiendo, continuar', 'I understand, continue')}</button><button class="btn ghost" data-act="procBack">${L('Mejor no', 'Better not')}</button></div></div>`;
+  $('#modal').classList.remove('hidden');
+}
+
+function viewProcesos() {
+  const intro = head(L('Procesos (avanzado)', 'Processes (advanced)'), L('Lo que más está consumiendo tu PC ahora mismo. Se actualiza cada 3 segundos.', 'What is using your PC the most right now. Refreshes every 3 seconds.'),
+    `<button class="btn ghost" data-act="procPause">${S.procPaused ? L('Reanudar', 'Resume') : L('Pausar', 'Pause')}</button>`);
+  if (!S.settings.procesosAviso) {
+    if ($('#modal').classList.contains('hidden')) setTimeout(showProcWarning, 0);
+    return `<div class="view">${banners()}${intro}</div>`;
+  }
+  if (!S.procs) { loadProcs(); return `<div class="view">${banners()}${intro}<div class="progress-card"><div class="msg"><span><b>${L('Midiendo procesos...', 'Measuring processes...')}</b></span></div><div class="pbar indet"><i></i></div></div></div>`; }
+  const pr = S.procs;
+  S.procSort = S.procSort || 'ram';
+  const list = [...pr.procesos].sort((a, b) => (S.procSort === 'cpu' ? b.cpu - a.cpu : b.ram - a.ram)).slice(0, 60);
+  const maxRam = Math.max(1, ...list.map((x) => x.ram));
+  const ramUsada = pr.ramTotal - pr.ramLibre;
+  const ramPct = pr.ramTotal ? Math.round(100 * ramUsada / pr.ramTotal) : 0;
+  const lvl = (v, a, b) => (v >= b ? 'rojo' : v >= a ? 'amarillo' : '');
+  return `<div class="view">${banners()}${intro}
+    <div class="grid c2" style="margin-bottom:14px">
+      <div class="card"><h3>${L('Procesador', 'CPU')}</h3><div class="big">${pr.cpuTotal}%</div><div class="meter"><i class="${lvl(pr.cpuTotal, 60, 90)}" style="width:${Math.max(1, pr.cpuTotal)}%"></i></div></div>
+      <div class="card"><h3>${L('Memoria RAM', 'RAM')}</h3><div class="big">${fmtBytes(ramUsada)} <span class="meta">/ ${fmtBytes(pr.ramTotal)}</span></div><div class="meter"><i class="${lvl(ramPct, 75, 90)}" style="width:${ramPct}%"></i></div></div>
+    </div>
+    <div class="toolbar"><button class="chip ${S.procSort === 'ram' ? 'on' : ''}" data-psort="ram">${L('Más memoria', 'Most memory')}</button><button class="chip ${S.procSort === 'cpu' ? 'on' : ''}" data-psort="cpu">${L('Más procesador', 'Most CPU')}</button>
+      <span class="meta" style="margin-left:auto">${pr.procesos.length} ${L('programas en marcha', 'programs running')}${S.procPaused ? ' · ' + L('en pausa', 'paused') : ''}</span></div>
+    <div class="list">${list.map((x) => {
+      const name = x.descripcion && x.descripcion.length < 60 ? x.descripcion : x.nombre;
+      const confirming = S.procConfirm === x.nombre;
+      return `<div class="row ${confirming ? 'confirming' : ''}"><div class="grow"><div class="name">${esc(name)}${x.cantidad > 1 ? ` <span class="meta">×${x.cantidad}</span>` : ''}</div>
+        <div class="sub">${esc(x.nombre + '.exe')}${x.empresa ? ' · ' + esc(x.empresa) : ''}</div>${S.settings.modoExperto && x.ruta ? `<div class="tech">${esc(x.ruta)}</div>` : ''}</div>
+        <div class="pstat"><span>${x.cpu.toFixed(1)}%</span><small>CPU</small></div>
+        <div class="weight"><b>${fmtBytes(x.ram)}</b><i style="width:${Math.max(3, Math.round(100 * x.ram / maxRam))}%"></i></div>
+        <div class="pact">${x.critico ? `<span class="badge gris" title="${L('Windows lo necesita para funcionar', 'Windows needs it to work')}">🔒 ${L('Protegido', 'Protected')}</span>`
+          : confirming ? `<button class="btn small danger" data-pkill="${esc(x.nombre)}">${L('Sí, cerrar', 'Yes, close')}</button><button class="btn small ghost" data-act="procNo">${L('No', 'No')}</button>`
+          : `<button class="btn small ghost" data-pask="${esc(x.nombre)}">${L('Terminar', 'End')}</button>`}</div></div>`;
+    }).join('')}</div></div>`;
 }
 
 function viewDeshacer() {
@@ -674,6 +812,8 @@ function viewAjustes() {
   return `<div class="view">${banners()}${head(L('Ajustes', 'Settings'), L('Casi nadie necesita cambiar nada aquí.', 'Most people never need to change anything here.'))}
     <div class="card">
       <div class="setting"><div class="grow"><b>${L('Idioma', 'Language')}</b></div><select data-setting="idioma"><option value="es" ${s.idioma === 'es' ? 'selected' : ''}>Español</option><option value="en" ${s.idioma === 'en' ? 'selected' : ''}>English</option></select></div>
+      <div class="setting"><div class="grow"><b>${L('Iniciar con Windows y avisarme', 'Start with Windows and remind me')}</b><span>${L('Revisa en silencio cada cierto tiempo y te manda una notificación si hay basura o actualizaciones. Recomendado.', 'Quietly checks every so often and notifies you about junk or updates. Recommended.')}</span></div><label class="switch"><input type="checkbox" data-autostart ${s.inicioWindows ? 'checked' : ''}><span></span></label></div>
+      ${s.inicioWindows ? `<div class="setting"><div class="grow"><b>${L('Frecuencia de revisión', 'Check frequency')}</b><span>${s.ultimaRevision ? L('Última revisión: ', 'Last check: ') + new Date(s.ultimaRevision).toLocaleString() : L('Todavía no ha revisado.', 'No check yet.')}</span></div>${freqSelect('data-setting="frecuenciaDias"')} <button class="btn small ghost" data-act="checkNow">${L('Revisar ahora', 'Check now')}</button></div>` : ''}
       ${sw('restosAutomaticos', L('Borrar restos seguros automáticamente', 'Remove safe leftovers automatically'), L('Al desinstalar, mueve a la cuarentena los restos que seguro son del programa, sin preguntar.', 'After uninstalling, quarantine leftovers that surely belong to the program without asking.'))}
       ${sw('puntoRestauracion', L('Crear punto de restauración antes de cambios', 'Create a restore point before changes'), L('Muy recomendado. Tarda unos segundos.', 'Highly recommended. Takes a few seconds.'))}
       <div class="setting"><div class="grow"><b>${L('Días en cuarentena', 'Days in quarantine')}</b><span>${L('Cuánto tiempo se guardan las cosas quitadas antes de borrarlas.', 'How long removed items are kept before deletion.')}</span></div><select data-setting="diasCuarentena">${[3, 7, 14, 30].map((d) => `<option value="${d}" ${s.diasCuarentena == d ? 'selected' : ''}>${d}</option>`).join('')}</select></div>
@@ -713,6 +853,23 @@ function showTrust() {
   $('#modal').classList.remove('hidden');
 }
 
+function freqSelect(attr) {
+  return `<select ${attr}>${[[1, 'Cada día', 'Every day'], [3, 'Cada 3 días', 'Every 3 days'], [7, 'Cada semana', 'Every week'], [14, 'Cada 2 semanas', 'Every 2 weeks']].map(([d, es, en]) => `<option value="${d}" ${Number(S.settings.frecuenciaDias) === d ? 'selected' : ''}>${L(es, en)}</option>`).join('')}</select>`;
+}
+function showReminders() {
+  $('#modal').innerHTML = `<div class="modal" role="dialog" aria-modal="true">
+    <h2>${L('¿Te aviso cuando tu PC lo necesite?', 'Shall I remind you when your PC needs it?')}</h2>
+    <p class="lead">${L('RetroLimpia puede arrancar en silencio con Windows y revisar cada pocos días si hay basura acumulada o actualizaciones pendientes. <b>Solo te avisa cuando de verdad hay algo que hacer</b>, y nunca cambia nada sin que tú lo confirmes.', 'RetroLimpia can start quietly with Windows and check every few days for piled-up junk or pending updates. <b>It only notifies you when there is actually something to do</b>, and never changes anything without your OK.')}</p>
+    <div class="why"><span class="n">🛡</span><div><b>${L('Más seguro', 'Safer')}</b><p>${L('Las actualizaciones de seguridad cierran los agujeros que usan los virus. Cuanto antes se instalen, mejor.', 'Security updates close the holes viruses use. The sooner they are installed, the better.')}</p></div></div>
+    <div class="why"><span class="n">⚡</span><div><b>${L('Más rápido', 'Faster')}</b><p>${L('La basura se acumula sola, varios GB al mes. Un repaso de vez en cuando mantiene el PC ágil.', 'Junk piles up by itself, several GB a month. A regular tune-up keeps the PC snappy.')}</p></div></div>
+    <div class="why"><span class="n">🧠</span><div><b>${L('Sin tener que acordarte', 'Without remembering')}</b><p>${L('Casi nadie se acuerda de revisar su PC. RetroLimpia se acuerda por ti y apenas usa recursos mientras espera.', 'Hardly anyone remembers to check their PC. RetroLimpia remembers for you and barely uses resources while waiting.')}</p></div></div>
+    <div class="setting" style="border:0;padding-bottom:0"><div class="grow"><b>${L('¿Cada cuánto reviso?', 'How often should I check?')}</b></div>${freqSelect('id="remFreq"')}</div>
+    <div class="foot"><button class="btn primary" data-act="remindYes">${L('Sí, avísame (recomendado)', 'Yes, remind me (recommended)')}</button>
+      <button class="btn ghost" data-act="remindNo">${L('Ahora no', 'Not now')}</button>
+      <span class="meta">${L('Puedes cambiarlo cuando quieras en Ajustes.', 'You can change it any time in Settings.')}</span></div></div>`;
+  $('#modal').classList.remove('hidden');
+}
+
 // ============================================================ Informe
 function buildReport() {
   const h = S.hardware;
@@ -734,7 +891,7 @@ function buildReport() {
 // ============================================================ Render y eventos
 function render() {
   renderNav();
-  const views = { inicio: viewInicio, programas: viewProgramas, limpieza: viewLimpieza, arranque: viewArranque, hardware: viewHardware, drivers: viewDrivers, actualizaciones: viewActualizaciones, deshacer: viewDeshacer, ajustes: viewAjustes };
+  const views = { inicio: viewInicio, programas: viewProgramas, limpieza: viewLimpieza, arranque: viewArranque, hardware: viewHardware, drivers: viewDrivers, actualizaciones: viewActualizaciones, procesos: viewProcesos, deshacer: viewDeshacer, ajustes: viewAjustes };
   const focusSearch = document.activeElement && document.activeElement.id === 'search';
   const caret = focusSearch ? document.activeElement.selectionStart : 0;
   let html;
@@ -748,8 +905,19 @@ function render() {
 }
 
 document.addEventListener('click', async (e) => {
-  const t = e.target.closest('[data-retry],[data-nav],[data-act],[data-win],[data-open],[data-filter],[data-folder],[data-restore],[data-wu],[data-wg]');
+  const t = e.target.closest('[data-psort],[data-pask],[data-pkill],[data-updall],[data-retry],[data-nav],[data-act],[data-win],[data-open],[data-filter],[data-folder],[data-restore],[data-wu],[data-wg]');
   if (!t) return;
+  if (t.dataset.psort) { S.procSort = t.dataset.psort; return render(); }
+  if (t.dataset.pask) { S.procConfirm = t.dataset.pask; return render(); }
+  if (t.dataset.pkill) {
+    const g = S.procs.procesos.find((x) => x.nombre === t.dataset.pkill);
+    S.procConfirm = null;
+    if (!g) return render();
+    const r = obj(await rl.run('procesos', { accion: 'terminar', nombre: g.nombre, pids: g.pids }));
+    toast(r.ok ? L(`${g.nombre} cerrado.`, `${g.nombre} closed.`) : L(`No se pudo cerrar ${g.nombre} (puede necesitar más permisos o ser protegido).`, `Could not close ${g.nombre}.`), r.ok ? 'ok' : 'err');
+    return loadProcs();
+  }
+  if (t.dataset.updall) { const keys = t.dataset.updall === 'wu' ? S.updates.windows.filter((x) => !x.grande).map((x) => 'wu:' + x.id) : S.updates.apps.map((a) => 'wg:' + a.id); const on = !keys.every((k) => S.updSel.has(k)); keys.forEach((k) => (on ? S.updSel.add(k) : S.updSel.delete(k))); return render(); }
   if (t.dataset.retry) { delete S.failed[t.dataset.retry]; return render(); }
   if (t.dataset.win) return rl.win(t.dataset.win);
   if (t.dataset.open) return rl.open(t.dataset.open);
@@ -783,6 +951,12 @@ document.addEventListener('click', async (e) => {
   }
   switch (t.dataset.act) {
     case 'cancel': return cancelTask();
+    case 'procOk': S.settings = await rl.setSettings({ procesosAviso: true }); $('#modal').classList.add('hidden'); return render();
+    case 'procBack': $('#modal').classList.add('hidden'); S.view = 'inicio'; return render();
+    case 'procPause': S.procPaused = !S.procPaused; return render();
+    case 'procNo': S.procConfirm = null; return render();
+    case 'updNone': S.updSel.clear(); return render();
+    case 'updateSel': return updateSelected();
     case 'scan': return scanAll();
     case 'fixAll': return fixAll();
     case 'closeFix': S.fix = null; return render();
@@ -844,13 +1018,23 @@ document.addEventListener('click', async (e) => {
       });
     case 'openRestore': return rl.run('restauracion', { accion: 'abrir' });
     case 'trust': return showTrust();
-    case 'trustOk': $('#modal').classList.add('hidden'); S.settings = await rl.setSettings({ confianzaVista: true }); return;
+    case 'trustOk': $('#modal').classList.add('hidden'); S.settings = await rl.setSettings({ confianzaVista: true }); if (!S.settings.recordatoriosPreguntado) showReminders(); return;
+    case 'remindYes': {
+      const dias = Number(($('#remFreq') || {}).value) || 3;
+      const r = await rl.autostart(true, dias); S.settings = r.settings; $('#modal').classList.add('hidden');
+      toast(r.ok ? L('¡Hecho! Te avisaré cuando tu PC necesite un repaso.', "Done! I'll let you know when your PC needs a tune-up.") : L('No se pudo activar el inicio con Windows.', 'Could not enable start with Windows.'), r.ok ? 'ok' : 'err');
+      return render();
+    }
+    case 'remindNo': S.settings = await rl.setSettings({ recordatoriosPreguntado: true }); $('#modal').classList.add('hidden'); return;
+    case 'checkNow': toast(L('Revisando en segundo plano. Si hay algo que hacer, te llegará una notificación.', 'Checking in the background. You will get a notification if there is something to do.')); return rl.checkNow();
     case 'checkUpdate': S.appUpdate = await rl.checkUpdate(); toast(S.appUpdate.disponible ? L('¡Hay versión nueva!', 'New version available!') : L('Tienes la última versión.', 'You have the latest version.')); return render();
   }
 });
 
 document.addEventListener('change', async (e) => {
   const t = e.target;
+  if (t.dataset.sort !== undefined) { S.progSort = t.value; return render(); }
+  if (t.dataset.upd) { t.checked ? S.updSel.add(t.dataset.upd) : S.updSel.delete(t.dataset.upd); return render(); }
   if (t.dataset.sel) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); return render(); }
   if (t.dataset.junk) { t.checked ? S.junkSel.add(t.dataset.junk) : S.junkSel.delete(t.dataset.junk); return render(); }
   if (t.dataset.finding) { const f = S.scan.findings.find((x) => x.id === t.dataset.finding); if (f) f.elegido = t.checked; return render(); }
@@ -859,9 +1043,14 @@ document.addEventListener('change', async (e) => {
     const id = t.dataset.startup, on = t.checked;
     return taskC(on ? L('Activando', 'Enabling') : L('Desactivando', 'Disabling'), async () => { await rl.run('inicio', { accion: 'cambiar', id, activar: on }); await loadStartup(); });
   }
+  if (t.dataset.autostart !== undefined) {
+    const r = await rl.autostart(t.checked, S.settings.frecuenciaDias); S.settings = r.settings;
+    toast(t.checked ? (r.ok ? L('RetroLimpia arrancará con Windows y te avisará.', 'RetroLimpia will start with Windows and remind you.') : L('No se pudo activar.', 'Could not enable.')) : L('Ya no arrancará con Windows.', 'It will no longer start with Windows.'), r.ok ? 'ok' : 'err');
+    return render();
+  }
   if (t.dataset.setting) {
     const k = t.dataset.setting;
-    const v = t.type === 'checkbox' ? t.checked : (k === 'diasCuarentena' ? Number(t.value) : t.value);
+    const v = t.type === 'checkbox' ? t.checked : (['diasCuarentena', 'frecuenciaDias'].includes(k) ? Number(t.value) : t.value);
     S.settings = await rl.setSettings({ [k]: v });
     if (k === 'idioma') document.documentElement.lang = v;
     render();
@@ -893,5 +1082,6 @@ setInterval(() => { if (S.busy) updateProgressOnly(); }, 1000);
   $('#ver').textContent = 'v' + S.info.version;
   render();
   if (!S.settings.confianzaVista) showTrust();
+  else if (!S.settings.recordatoriosPreguntado) showReminders();
   rl.checkUpdate().then((u) => { S.appUpdate = u; if (u.disponible) render(); }).catch(() => {});
 })();

@@ -57,6 +57,30 @@ foreach ($r in $roots) {
     }
 }
 
+Send-Progress 40 'Midiendo el impacto de cada programa...' 'Measuring each program''s impact...'
+
+# Impacto en el sistema: servicios que deja funcionando y memoria que usa ahora mismo
+$services = @(Get-CimInstance Win32_Service -ErrorAction SilentlyContinue | Where-Object { $_.PathName } | ForEach-Object {
+    @{ ruta = ([string]$_.PathName).Trim('"').ToLowerInvariant(); auto = ($_.StartMode -eq 'Auto'); activo = ($_.State -eq 'Running') }
+})
+$running = @(Get-Process -ErrorAction SilentlyContinue | ForEach-Object {
+    $pp = $null; try { $pp = $_.Path } catch {}
+    if ($pp) { @{ ruta = $pp.ToLowerInvariant(); ram = [int64]$_.WorkingSet64 } }
+})
+foreach ($prog in $programs) {
+    $svc = 0; $svcAuto = 0; $ram = [int64]0; $nproc = 0
+    $loc = ([string]$prog.carpeta).Trim('"').TrimEnd('\')
+    if ($loc -and $loc.Length -gt 6 -and -not (Test-ProtectedPath $loc)) {
+        $pre = $loc.ToLowerInvariant() + '\'
+        foreach ($s in $services) { if ($s.ruta.StartsWith($pre)) { $svc++; if ($s.auto) { $svcAuto++ } } }
+        foreach ($r in $running) { if ($r.ruta.StartsWith($pre)) { $ram += $r.ram; $nproc++ } }
+    }
+    $prog | Add-Member -NotePropertyName servicios -NotePropertyValue $svc
+    $prog | Add-Member -NotePropertyName serviciosAuto -NotePropertyValue $svcAuto
+    $prog | Add-Member -NotePropertyName ram -NotePropertyValue $ram
+    $prog | Add-Member -NotePropertyName procesos -NotePropertyValue $nproc
+}
+
 Send-Progress 55 'Revisando apps de Microsoft Store...' 'Checking Microsoft Store apps...'
 
 $apps = New-Object System.Collections.Generic.List[object]
@@ -65,7 +89,10 @@ try {
         Where-Object { -not $_.IsFramework -and $_.SignatureKind -ne 'System' -and -not $_.NonRemovable }
     foreach ($a in $pk) {
         $size = [int64]0
-        if ($params.tamanos -and $a.InstallLocation) { $size = Get-PathSize $a.InstallLocation }
+        $loc = ([string]$a.InstallLocation).ToLowerInvariant()
+        if ($a.InstallLocation) { $size = Get-PathSize $a.InstallLocation }
+        $ram = [int64]0; $nproc = 0
+        if ($loc) { foreach ($r in $running) { if ($r.ruta.StartsWith($loc + '\')) { $ram += $r.ram; $nproc++ } } }
         $apps.Add([pscustomobject]@{
             id       = 'a:' + $a.PackageFullName
             tipo     = 'appx'
@@ -76,6 +103,9 @@ try {
             paquete  = $a.PackageFullName
             familia  = $a.PackageFamilyName
             carpeta  = [string]$a.InstallLocation
+            ram      = $ram
+            procesos = $nproc
+            servicios = 0
         })
     }
 } catch {

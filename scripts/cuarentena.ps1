@@ -56,7 +56,8 @@ switch ($p.accion) {
         $manifest = @{ id = $id; fecha = (Get-Date).ToString('o'); motivo = [string]$p.motivo; items = $saved.ToArray() }
         $manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $dir 'manifest.json') -Encoding UTF8
         Write-RLLog ('Cuarentena ' + $id + ': ' + $saved.Count + ' guardados, ' + $failed.Count + ' fallidos')
-        Send-Result @{ id = $id; guardados = $saved.Count; fallidos = $failed.ToArray(); bytes = ($saved | Measure-Object -Property tamano -Sum).Sum }
+        $bytes = [int64]0; foreach ($x in $saved) { $bytes += [int64]$x.tamano }
+        Send-Result @{ id = $id; guardados = $saved.Count; fallidos = $failed.ToArray(); bytes = $bytes }
     }
     'listar' {
         $list = New-Object System.Collections.Generic.List[object]

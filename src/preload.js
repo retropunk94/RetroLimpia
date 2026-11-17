@@ -12,6 +12,8 @@ contextBridge.exposeInMainWorld('rl', {
   openFolder: (which) => ipcRenderer.invoke('rl:openFolder', which),
   saveReport: (html) => ipcRenderer.invoke('rl:saveReport', html),
   checkUpdate: () => ipcRenderer.invoke('rl:checkUpdate'),
+  autostart: (on, dias) => ipcRenderer.invoke('rl:autostart', on, dias),
+  checkNow: () => ipcRenderer.invoke('rl:checkNow'),
   win: (action) => ipcRenderer.send('rl:win', action),
   onProgress: (cb) => {
     const fn = (e, p) => cb(p);

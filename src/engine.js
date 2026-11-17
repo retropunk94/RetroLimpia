@@ -11,7 +11,7 @@ const demo = require('./demo');
 
 const SCRIPTS = new Set([
   'programas', 'desinstalar', 'residuos', 'cuarentena', 'restauracion',
-  'hardware', 'drivers', 'actualizaciones', 'limpieza', 'inicio'
+  'hardware', 'drivers', 'actualizaciones', 'limpieza', 'inicio', 'procesos'
 ]);
 
 let cfg = { demo: false, scriptsDir: '' };

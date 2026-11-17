@@ -18,13 +18,13 @@ async function steps(onProgress, msgs, total = 1200) {
 }
 
 const programas = [
-  { id: 'w:1', tipo: 'win32', nombre: 'McAfee LiveSafe', editor: 'McAfee, LLC', version: '16.0', fecha: '2024-02-11', tamano: 812 * MB, carpeta: 'C:\\Program Files\\McAfee', clave: 'HKEY_LOCAL_MACHINE\\...\\McAfee', desinstalar: '"C:\\Program Files\\McAfee\\uninstall.exe"' },
+  { id: 'w:1', tipo: 'win32', nombre: 'McAfee LiveSafe', editor: 'McAfee, LLC', version: '16.0', fecha: '2024-02-11', tamano: 812 * MB, servicios: 4, serviciosAuto: 3, ram: 420 * MB, procesos: 5, carpeta: 'C:\\Program Files\\McAfee', clave: 'HKEY_LOCAL_MACHINE\\...\\McAfee', desinstalar: '"C:\\Program Files\\McAfee\\uninstall.exe"' },
   { id: 'w:2', tipo: 'win32', nombre: 'WildTangent Games', editor: 'WildTangent', version: '1.1.1', fecha: '2024-02-11', tamano: 120 * MB, carpeta: '', clave: '', desinstalar: 'x' },
   { id: 'w:3', tipo: 'win32', nombre: 'Google Chrome', editor: 'Google LLC', version: '142.0', fecha: '2025-10-02', tamano: 610 * MB, carpeta: 'C:\\Program Files\\Google\\Chrome', clave: '', desinstalar: 'x' },
   { id: 'w:4', tipo: 'win32', nombre: 'Microsoft Visual C++ 2015-2022 Redistributable (x64)', editor: 'Microsoft Corporation', version: '14.44', fecha: '2025-06-01', tamano: 25 * MB, carpeta: '', clave: '', desinstalar: 'x' },
   { id: 'w:5', tipo: 'win32', nombre: 'VLC media player', editor: 'VideoLAN', version: '3.0.21', fecha: '2025-01-15', tamano: 168 * MB, carpeta: 'C:\\Program Files\\VideoLAN\\VLC', clave: '', desinstalar: 'x' },
-  { id: 'w:6', tipo: 'win32', nombre: 'OBS Studio', editor: 'OBS Project', version: '31.1', fecha: '2025-08-20', tamano: 410 * MB, carpeta: '', clave: '', desinstalar: 'x' },
-  { id: 'w:7', tipo: 'win32', nombre: 'Steam', editor: 'Valve Corporation', version: '2.10', fecha: '2023-11-03', tamano: 1.1 * GB, carpeta: '', clave: '', desinstalar: 'x' },
+  { id: 'w:6', tipo: 'win32', nombre: 'OBS Studio', editor: 'OBS Project', version: '31.1', fecha: '2025-08-20', tamano: 410 * MB, ram: 1.2 * GB, procesos: 1, carpeta: '', clave: '', desinstalar: 'x' },
+  { id: 'w:7', tipo: 'win32', nombre: 'Steam', editor: 'Valve Corporation', version: '2.10', fecha: '2023-11-03', tamano: 1.1 * GB, servicios: 1, serviciosAuto: 0, ram: 610 * MB, procesos: 9, carpeta: '', clave: '', desinstalar: 'x' },
   { id: 'w:8', tipo: 'win32', nombre: 'NVIDIA Graphics Driver 581.57', editor: 'NVIDIA Corporation', version: '581.57', fecha: '2025-10-14', tamano: 1.4 * GB, carpeta: '', clave: '', desinstalar: 'x' },
   { id: 'w:9', tipo: 'win32', nombre: 'CyberLink PowerDVD 14', editor: 'CyberLink Corp.', version: '14.0', fecha: '2024-02-11', tamano: 350 * MB, carpeta: '', clave: '', desinstalar: 'x' },
   { id: 'w:10', tipo: 'win32', nombre: '7-Zip 24.08 (x64)', editor: 'Igor Pavlov', version: '24.08', fecha: '2025-03-09', tamano: 6 * MB, carpeta: '', clave: '', desinstalar: 'x' }
@@ -122,6 +122,19 @@ async function run(script, p, onProgress) {
       if (p.accion === 'crear') { await steps(onProgress, ['Creando punto de restauración...'], 1200); return { ok: true }; }
       if (p.accion === 'listar') return { puntos: [{ numero: 41, descripcion: 'RetroLimpia - Antes de limpiar', fecha: '2026-11-10' }] };
       return { ok: true };
+    case 'procesos': {
+      if (p.accion === 'terminar') { await wait(300); return { ok: true, terminados: (p.pids || []).length }; }
+      await wait(500);
+      const j = () => Math.random();
+      const mk = (nombre, descripcion, empresa, ram, cpu, cantidad = 1, critico = false) => ({ nombre, descripcion, empresa, ruta: 'C:\\Program Files\\' + nombre + '.exe', ram: Math.round(ram * (0.95 + j() * 0.1)), cpu: Math.round(cpu * (0.5 + j()) * 10) / 10, cantidad, pids: [1000 + nombre.length], critico });
+      return { ramTotal: 64 * GB, ramLibre: 41 * GB, cpuTotal: Math.round(14 + j() * 8), procesos: [
+        mk('chrome', 'Google Chrome', 'Google LLC', 3.1 * GB, 6, 28), mk('obs64', 'OBS Studio', 'OBS Project', 1.2 * GB, 9), mk('Discord', 'Discord', 'Discord Inc.', 820 * MB, 1.5, 7),
+        mk('steamwebhelper', 'Steam Client WebHelper', 'Valve Corporation', 610 * MB, 0.8, 9), mk('Code', 'Visual Studio Code', 'Microsoft Corporation', 540 * MB, 0.6, 12),
+        mk('MsMpEng', 'Antimalware Service Executable', 'Microsoft Corporation', 380 * MB, 0.9, 1, true), mk('explorer', 'Explorador de Windows', 'Microsoft Corporation', 290 * MB, 0.4),
+        mk('svchost', 'Proceso host para los servicios de Windows', 'Microsoft Corporation', 1.4 * GB, 1.1, 92, true), mk('Spotify', 'Spotify', 'Spotify AB', 260 * MB, 0.7, 6),
+        mk('dwm', 'Administrador de ventanas del escritorio', 'Microsoft Corporation', 180 * MB, 1.9, 1, true), mk('ollama', 'Ollama', 'Ollama', 4.6 * GB, 0.2, 2)
+      ] };
+    }
     case 'desinstalar': await steps(onProgress, ['Desinstalando ' + p.nombre + ' en silencio...'], 1300); return { ok: true, metodo: 'silencioso-nsis', reinicio: false, nombre: p.nombre };
     case 'residuos':
       await steps(onProgress, ['Buscando restos...', 'Revisando el registro...'], 900);

@@ -2,7 +2,7 @@
 // Abre la ventana, conecta la interfaz con el motor (scripts de PowerShell)
 // y guarda los ajustes. No envía ningún dato a internet (sin telemetría).
 
-const { app, BrowserWindow, ipcMain, shell, net, Tray, Menu, Notification, nativeImage, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, net, Tray, Menu, Notification, nativeImage, dialog, screen } = require('electron');
 const { execFile, spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
@@ -61,12 +61,31 @@ function loadData(name) {
 }
 
 // ---------- Ventana ----------
+// ---------- Tamaño adaptable ----------
+// La ventana nunca es más grande que la pantalla, y el contenido se escala solo
+// (zoom) para que todo quepa igual en un portátil de 1366x768 que en un 4K.
+const BASE_W = 1240, BASE_H = 800;
+function areaTrabajo() {
+  try { return screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea; }
+  catch { return { x: 0, y: 0, width: 1366, height: 728 }; }
+}
+function ajustarZoom() {
+  if (!win || win.isDestroyed()) return;
+  const [w, h] = win.getContentSize();
+  // Por debajo del tamaño de diseño se reduce el zoom (mínimo 70 %); por encima se queda al 100 %
+  const z = Math.max(0.7, Math.min(1, w / (BASE_W - 60), h / (BASE_H - 60)));
+  if (Math.abs(win.webContents.getZoomFactor() - z) > 0.01) win.webContents.setZoomFactor(z);
+}
 function createWindow() {
+  const wa = areaTrabajo();
+  const width = Math.min(BASE_W, Math.floor(wa.width * 0.94));
+  const height = Math.min(BASE_H, Math.floor(wa.height * 0.94));
   win = new BrowserWindow({
-    width: 1240,
-    height: 800,
-    minWidth: 980,
-    minHeight: 640,
+    width, height,
+    x: Math.round(wa.x + (wa.width - width) / 2),
+    y: Math.round(wa.y + (wa.height - height) / 2),
+    minWidth: Math.min(760, width),
+    minHeight: Math.min(500, height),
     frame: false,
     backgroundColor: '#0d0b1a',
     show: false,
@@ -81,6 +100,11 @@ function createWindow() {
   });
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   win.once('ready-to-show', () => win.show());
+  win.webContents.on('did-finish-load', ajustarZoom);
+  win.on('resize', ajustarZoom);
+  win.on('maximize', ajustarZoom); win.on('unmaximize', ajustarZoom);
+  // Si la ventana quedó fuera de la pantalla (p. ej. al desconectar un monitor), se recoloca
+  if (!global.__rlPantalla) { global.__rlPantalla = true; screen.on('display-removed', () => { try { if (win && !win.isDestroyed()) win.center(); } catch {} }); }
   // Red de seguridad: si Windows no avisa de que la ventana está lista, se muestra igual
   setTimeout(() => { if (win && !win.isDestroyed() && !win.isVisible() && !BACKGROUND_HIDDEN()) win.show(); }, 3000);
   win.webContents.on('render-process-gone', () => { if (win && !win.isDestroyed()) win.reload(); });
@@ -518,13 +542,55 @@ async function fallbackCheck() {
   } finally { fallbackBusy = false; }
 }
 function relaunchHelper(extraWait) {
-  // Ayudante oculto (con permisos de administrador, como RetroLimpia) que espera a que termine
-  // el instalador y vuelve a abrir el programa. Así no queda escondido el aviso de Windows.
-  const exe = process.execPath.replace(/'/g, "''");
-  const ps = `$ErrorActionPreference='SilentlyContinue'; Wait-Process -Id ${process.pid} -Timeout 60; Start-Sleep -Seconds ${extraWait || 2}; ` +
-    `$t=[Diagnostics.Stopwatch]::StartNew(); while ($t.Elapsed.TotalSeconds -lt 300 -and (Get-Process | Where-Object { $_.ProcessName -like 'RetroLimpia-Instalador*' -or $_.ProcessName -like 'installer' -or $_.ProcessName -like 'Un_A*' })) { Start-Sleep -Seconds 1 }; ` +
-    `Start-Sleep -Seconds 1; if (-not (Get-Process -Name 'RetroLimpia' -ErrorAction SilentlyContinue)) { Start-Process -FilePath '${exe}' }`;
-  spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-Command', ps], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+  // Reabre RetroLimpia al terminar la actualización.
+  // Antes era un proceso "hijo" del programa, y el instalador lo cerraba junto con RetroLimpia
+  // (por eso no se volvía a abrir). Ahora es una tarea programada de Windows, independiente,
+  // con permisos de administrador (sin aviso escondido) y con su propio registro: relanzar.log
+  const dir = app.getPath('userData');
+  const script = path.join(dir, 'relanzar.ps1');
+  const log = path.join(dir, 'relanzar.log');
+  const q = (x) => String(x).replace(/'/g, "''");
+  const ps = [
+    "$ErrorActionPreference = 'SilentlyContinue'",
+    `$exe = '${q(process.execPath)}'`,
+    `$log = '${q(log)}'`,
+    "function L($m) { Add-Content -LiteralPath $log -Value ('[{0:yyyy-MM-dd HH:mm:ss}] {1}' -f (Get-Date), $m) }",
+    "L 'Ayudante iniciado: esperando a que se cierre RetroLimpia y termine el instalador'",
+    `Wait-Process -Id ${process.pid} -Timeout 90`,
+    `Start-Sleep -Seconds ${extraWait || 2}`,
+    "$t = [Diagnostics.Stopwatch]::StartNew()",
+    "while ($t.Elapsed.TotalSeconds -lt 300) {",
+    "  $inst = Get-Process | Where-Object { $_.ProcessName -like 'RetroLimpia-Instalador*' -or $_.ProcessName -eq 'installer' -or $_.ProcessName -eq 'elevate' -or $_.ProcessName -like 'Un_A*' -or $_.ProcessName -like 'Au_*' }",
+    "  if (-not $inst) { break }",
+    "  Start-Sleep -Seconds 1",
+    "}",
+    "L ('Instalador terminado tras {0} s' -f [int]$t.Elapsed.TotalSeconds)",
+    "Start-Sleep -Seconds 2",
+    "$ok = $false",
+    "for ($i = 1; $i -le 5 -and -not $ok; $i++) {",
+    "  if (Test-Path -LiteralPath $exe) {",
+    "    try { Start-Process -FilePath $exe -ErrorAction Stop; $ok = $true; L ('RetroLimpia abierto (intento ' + $i + ')') }",
+    "    catch { L ('No se pudo abrir (intento ' + $i + '): ' + $_.Exception.Message) }",
+    "  } else { L 'Todavía no existe el programa, esperando...' }",
+    "  if (-not $ok) { Start-Sleep -Seconds 3 }",
+    "}",
+    "schtasks.exe /Delete /F /TN 'RetroLimpia-Reabrir' | Out-Null"
+  ].join('\r\n');
+  try {
+    fs.writeFileSync(script, '﻿' + ps, 'utf8');
+    try { fs.unlinkSync(log); } catch {}
+    const tr = `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${script}"`;
+    const { execFileSync } = require('child_process');
+    execFileSync('schtasks', ['/Create', '/F', '/TN', 'RetroLimpia-Reabrir', '/SC', 'ONCE', '/ST', '23:59', '/RL', 'HIGHEST', '/TR', tr], { windowsHide: true });
+    execFileSync('schtasks', ['/Run', '/TN', 'RetroLimpia-Reabrir'], { windowsHide: true });
+    updLog('Ayudante de reapertura programado');
+    return true;
+  } catch (e) {
+    updLog('No se pudo programar la reapertura (' + (e && e.message || e) + '); se usa el método directo');
+    // Plan B: proceso suelto (sin esperar a que no haya ningún RetroLimpia abierto)
+    spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', script], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    return false;
+  }
 }
 
 async function latestRelease() {

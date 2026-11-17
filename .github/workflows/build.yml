@@ -59,6 +59,11 @@ jobs:
             dist/latest.yml
             dist/SHA256.txt
 
+      - name: Notas de la versión
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: node build/notas-version.js "${GITHUB_REF_NAME}" > RELEASE.md
+
       - name: Publicar versión
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
@@ -68,12 +73,4 @@ jobs:
             dist/*.blockmap
             dist/latest.yml
             dist/SHA256.txt
-          body: |
-            ## Descarga
-            👉 **Descarga solo `RetroLimpia-Instalador-x.x.x.exe`**: se instala como cualquier programa y después se actualiza solo.
-
-            <sub>Los demás archivos (`latest.yml`, `.blockmap` y `SHA256.txt`) **puedes ignorarlos**: los usa el propio programa para actualizarse solo y descargando solo lo que cambió, y `SHA256.txt` sirve para quien quiera comprobar que el archivo es original.</sub>
-
-            ### ¿Windows dice "Windows protegió su PC"?
-            Es normal: el programa no tiene firma digital de pago. Pulsa **Más información → Ejecutar de todas formas**.
-            Lee [por qué pasa](https://github.com/${{ github.repository }}/blob/main/docs/POR-QUE-AVISA-WINDOWS.md). Puedes comprobar el archivo en [VirusTotal](https://www.virustotal.com) y comparar su huella con `SHA256.txt`.
+          body_path: RELEASE.md

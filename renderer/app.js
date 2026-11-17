@@ -120,7 +120,7 @@ async function task(label, fn, opts = {}) {
   try { return await fn(); }
   catch (e) {
     if (isCancel(e)) toast(L('Tarea cancelada.', 'Task cancelled.'));
-    else { console.error(e); toast(L('Algo falló: ', 'Something failed: ') + (e.message || e), 'err'); }
+    else { console.error(e); toast(L('Algo falló: ', 'Something failed: ') + cleanErr(e), 'err'); }
   }
   finally { S.busy = null; S.cancelRequested = false; rl.setBusy && rl.setBusy(false); setStatus(''); render(); }
 }
@@ -665,7 +665,7 @@ function renderNav() {
     return `<button class="nav-item ${S.view === id ? 'active' : ''}" data-nav="${id}"><svg viewBox="0 0 24 24">${ICONS[id]}</svg><span>${L(es, en)}</span>${c ? `<span class="count ${c[1]}">${esc(c[0])}</span>` : ''}</button>`;
   }).join('') + `<div class="nav-foot">${/^https:\/\//.test(S.info.paypal || '') ? `<div class="donate"><div class="d-title"><svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.8 4.5c2.1 0 3.6 1.1 5.2 3 1.6-1.9 3.1-3 5.2-3 3.8 0 5.9 3.9 4.4 7.3C19.5 16.4 12 21 12 21z"/></svg>${L('Tu donación lo mantiene vivo', 'Your donation keeps it alive')}</div>
     <p>${L('No hay empresa detrás: hay una persona que le dedica sus noches. Si te ayudó, donar, por poco que sea, lo mantiene vivo para todos.', 'No company behind it: one person giving it their nights. If it helped you, donating, however little, keeps it alive for everyone.')}</p>
-    <button class="donate-btn big-donate" data-act="donateAsk">${L('Donar con PayPal', 'Donate with PayPal')}</button><div class="d-note">${L('Cada donación cuenta 💜', 'Every donation counts 💜')}</div></div>` : ''}<div class="side-row">${S.info.reportes ? `<button class="side-mini" data-act="reportOpen" title="${L('Envíanos lo que pasó, con captura y registro técnico', 'Send us what happened, with screenshot and technical log')}">🐞 ${L('Reportar problema', 'Report a problem')}</button>` : ''}${/^https:\/\//.test(S.info.discord || '') ? `<button class="side-mini discord" data-open="${S.info.discord}" title="${L('Únete a la comunidad en Discord', 'Join the community on Discord')}">${DISCORD_ICON}<span>Discord</span></button>` : ''}</div>${repoUrl() ? `<button class="gh-btn" data-open="${repoUrl()}" title="${L('Revisar el código abierto en GitHub', 'Review the open source code on GitHub')}">${GH_ICON}<span>${L('Ver el código en GitHub', 'View code on GitHub')}</span></button>` : ''}<div class="trust">${L('Sin telemetría · Código abierto', 'No telemetry · Open source')}</div>${L('Todo lo que borra se puede deshacer.', 'Everything it removes can be undone.')}</div>`;
+    <button class="donate-btn big-donate" data-act="donateAsk">${L('Donar con PayPal', 'Donate with PayPal')}</button><div class="d-note">${L('Cada donación cuenta 💜', 'Every donation counts 💜')}</div></div>` : ''}<div class="side-row">${S.info.reportes ? `<button class="side-mini" data-act="reportOpen" title="${L('Envíanos lo que pasó, con captura y registro técnico', 'Send us what happened, with screenshot and technical log')}">🐞 <span>${L('Reportar un problema', 'Report a problem')}</span></button>` : ''}${/^https:\/\//.test(S.info.discord || '') ? `<button class="side-mini discord" data-open="${S.info.discord}" title="${L('Únete a la comunidad en Discord', 'Join the community on Discord')}">${DISCORD_ICON}<span>${L('Únete al Discord', 'Join our Discord')}</span></button>` : ''}</div>${repoUrl() ? `<button class="gh-btn" data-open="${repoUrl()}" title="${L('Revisar el código abierto en GitHub', 'Review the open source code on GitHub')}">${GH_ICON}<span>${L('Ver el código en GitHub', 'View code on GitHub')}</span></button>` : ''}<div class="trust">${L('Sin telemetría · Código abierto', 'No telemetry · Open source')}</div>${L('Todo lo que borra se puede deshacer.', 'Everything it removes can be undone.')}</div>`;
 }
 
 function head(title, desc, right = '') {
@@ -1060,21 +1060,47 @@ function viewAjustes() {
     </div>
     <h2>${L('Acerca de RetroLimpia', 'About RetroLimpia')}</h2>
     <div class="card"><div class="kv"><span>${L('Versión', 'Version')}</span><span>${esc(S.info.version)}</span><span>${L('Licencia', 'License')}</span><span>MIT (${L('código abierto', 'open source')})</span><span>${L('Privacidad', 'Privacy')}</span><span>${L('Sin telemetría. Solo envía un reporte si tú lo pides, después de ver qué se manda.', 'No telemetry. It only sends a report if you ask, after showing you what is sent.')}</span></div>
-      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap"><button class="btn" data-act="tour">🧭 ${L('Ver el tour de bienvenida', 'Watch the welcome tour')}</button><button class="btn" data-act="trust">${L('¿Por qué Windows o mi antivirus avisan?', 'Why does Windows or my antivirus warn me?')}</button>${S.info.reportes ? `<button class="btn" data-act="reportOpen">🐞 ${L('Reportar un problema', 'Report a problem')}</button>` : ''}${S.info.discord ? `<button class="btn ghost" data-open="${S.info.discord}">💬 ${L('Comunidad en Discord', 'Discord community')}</button>` : ''}
+      <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap"><button class="btn" data-act="tour">🧭 ${L('Ver el tour de bienvenida', 'Watch the welcome tour')}</button><button class="btn" data-act="news">📰 ${L('Ver novedades', "What's new")}</button><button class="btn" data-act="trust">${L('¿Por qué Windows o mi antivirus avisan?', 'Why does Windows or my antivirus warn me?')}</button>${S.info.reportes ? `<button class="btn" data-act="reportOpen">🐞 ${L('Reportar un problema', 'Report a problem')}</button>` : ''}${S.info.discord ? `<button class="btn ghost" data-open="${S.info.discord}">💬 ${L('Comunidad en Discord', 'Discord community')}</button>` : ''}
       ${repo ? `<button class="btn ghost" data-open="${repo}">${L('Ver el código', 'View the code')}</button>` : ''}
       <button class="btn ghost" data-act="checkUpdate" ${S.checkingUpd ? 'disabled' : ''}>${S.checkingUpd ? L('Buscando...', 'Checking...') : L('Buscar actualizaciones', 'Check for updates')}</button></div>
       <p class="meta" style="margin-top:12px">${updStatusText()}</p></div></div>`;
 }
 
+// Cada pestaña carga lo suyo en segundo plano, sin bloquear a las demás.
+// Puedes cambiar de pestaña cuando quieras: la carga sigue y al volver ya está lista.
+const VIEW_SCRIPTS = { programas: ['programas', 'inicio'], limpieza: ['limpieza'], arranque: ['inicio'], hardware: ['hardware'], drivers: ['drivers', 'hardware'], actualizaciones: ['actualizaciones'], deshacer: ['cuarentena', 'restauracion'] };
+const cleanErr = (e) => String((e && e.message) || e).replace(/^Error invoking remote method '[^']+': (Error: )?/, '').slice(0, 300);
+function bgScriptActive(script) { return Object.values(S.loads || {}).some((l) => (l.scripts || []).includes(script)); }
+function loadCardHTML(title) {
+  const l = (S.loads || {})[title] || { start: Date.now() };
+  const sp = (l.scripts || []).map((k) => (S.sp || {})[k]).filter(Boolean);
+  const cur = sp.find((x) => x.pct < 100) || sp[sp.length - 1];
+  const pct = cur ? Math.min(99, Math.round(cur.pct || 0)) : 0;
+  return `<div class="progress-card" id="loadCard" data-title="${esc(title)}"><div class="msg"><span><b>${L('Cargando', 'Loading')} · ${esc(title)}</b>${cur && cur.msg ? ' · ' + esc(cur.msg) : ''}</span><span class="eta">${pct ? pct + '% · ' + fmtEta(l.start, pct) : ''}</span></div>
+  <div class="prow"><div class="pbar ${pct ? '' : 'indet'}"><i style="width:${pct}%"></i></div></div>
+  <p class="meta" style="margin:10px 0 0">${L('Puedes ir a otra sección mientras tanto: esto sigue cargando y al volver estará listo.', 'You can visit another section meanwhile: this keeps loading and will be ready when you come back.')}</p></div>`;
+}
 function loadingView(title, loader, msg) {
-  S.failed = S.failed || {};
+  S.failed = S.failed || {}; S.loads = S.loads || {};
   if (S.failed[title]) {
     return `<div class="view">${banners()}${head(title, '')}<div class="banner bad"><div class="grow"><b>${L('No se pudo leer esta información', 'Could not read this information')}</b> · ${esc(S.failed[title])}</div><button class="btn small" data-retry="${esc(title)}">${L('Reintentar', 'Retry')}</button></div></div>`;
   }
-  if (!S.busy) setTimeout(() => task(L('Cargando', 'Loading') + ' · ' + title, async () => {
-    try { await loader(); } catch (e) { S.failed[title] = String(e.message || e).slice(0, 300); throw e; }
-  }), 0);
-  return `<div class="view">${banners()}${head(title, msg || L('Un momento...', 'One moment...'))}${progressHTML()}</div>`;
+  if (!S.loads[title]) {
+    S.loads[title] = { start: Date.now(), scripts: VIEW_SCRIPTS[S.view] || [] };
+    setTimeout(async () => {
+      try { await loader(); }
+      catch (e) {
+        // Si se canceló (por ejemplo, desde otra tarea), no es un error: se vuelve a cargar al entrar
+        if (!/CANCELADO/.test(String(e && e.message || e))) S.failed[title] = cleanErr(e);
+      }
+      finally { delete S.loads[title]; render(); }
+    }, 0);
+  }
+  return `<div class="view">${banners()}${head(title, msg || L('Un momento...', 'One moment...'))}${loadCardHTML(title)}</div>`;
+}
+function updateLoadCard() {
+  const c = document.getElementById('loadCard');
+  if (c) c.outerHTML = loadCardHTML(c.dataset.title);
 }
 
 // ============================================================ Confianza
@@ -1120,6 +1146,30 @@ function showDonate() {
     <div class="banner good" style="margin-top:14px"><div class="grow">😊 <b>${L('Puedes estar tranquilo.', 'You can relax.')}</b> ${L('Se abrirá en tu navegador y puedes cerrarlo cuando quieras.', 'It opens in your browser and you can close it whenever you like.')}</div></div>
     <div class="foot"><button class="btn primary" data-act="donateGo">💜 ${L('Ir a donar', 'Go to donate')}</button><button class="btn ghost" data-act="modalClose">${L('Ahora no', 'Not now')}</button></div></div>`;
   $('#modal').classList.remove('hidden');
+}
+
+// ============================================================ Notas del parche
+// REGLA: después de cada actualización se muestran las novedades (data/novedades.json).
+const cmpVer = (a, b) => { const x = String(a).split('.').map(Number), y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) - (y[i] || 0); } return 0; };
+async function showNews(desde, todas) {
+  let datos;
+  try { datos = await rl.data('novedades'); } catch { return false; }
+  const lista = (datos && datos.versiones || []).filter((v) => {
+    if (cmpVer(v.version, S.info.version) > 0) return false;   // nunca notas de versiones futuras
+    if (todas) return true;                                    // Ajustes > Ver novedades: todas
+    if (desde) return cmpVer(v.version, desde) > 0;            // tras actualizar: todo lo nuevo desde la versión anterior
+    return v.version === S.info.version;
+  });
+  if (!lista.length) return false;
+  const en = S.settings.idioma === 'en';
+  $('#modal').innerHTML = `<div class="modal news-modal" role="dialog" aria-modal="true">
+    <div class="news-badge">✨ v${esc(S.info.version)}</div>
+    <h2>${todas ? L('Novedades de RetroLimpia', "What's new in RetroLimpia") : L('¡RetroLimpia se actualizó!', 'RetroLimpia was updated!')}</h2>
+    <p class="lead">${todas ? L('Lo que cambió en cada versión.', 'What changed in each version.') : L('Esto es lo que se arregló y mejoró:', 'Here is what was fixed and improved:')}</p>
+    <div class="news-list">${lista.map((v) => `<div class="news-ver"><div class="news-head"><b>${L('Versión', 'Version')} ${esc(v.version)}</b>${v.fecha ? `<span>${esc(v.fecha)}</span>` : ''}</div><ul>${(en ? v.en || v.es : v.es).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>`).join('')}</div>
+    <div class="foot"><button class="btn primary" data-act="modalClose">${L('¡Genial!', 'Great!')}</button>${S.info.discord ? `<button class="btn ghost" data-open="${S.info.discord}">💬 ${L('Comentar en Discord', 'Discuss on Discord')}</button>` : ''}</div></div>`;
+  $('#modal').classList.remove('hidden');
+  return true;
 }
 
 // ============================================================ Reportar un problema
@@ -1405,6 +1455,7 @@ document.addEventListener('click', async (e) => {
     case 'donateAsk': return showDonate();
     case 'donateGo': $('#modal').classList.add('hidden'); return rl.open(S.info.paypal);
     case 'modalClose': $('#modal').classList.add('hidden'); S.rep = null; return;
+    case 'news': return showNews(null, true);
     case 'crashSeen': S.crashSeen = true; return render();
     case 'reportOpen': return openReport(t.dataset.ctx || '');
     case 'repPick': {
@@ -1553,6 +1604,9 @@ document.addEventListener('input', (e) => {
 rl.onProgress((p) => {
   if (p.log) { monLog(p.log); return; }
   if (S.mon && !S.mon.done && p.script === 'desinstalar') monProgress(p);
+  // Progreso de las cargas en segundo plano de cada pestaña
+  S.sp = S.sp || {}; S.sp[p.script] = { pct: p.pct, msg: S.settings.idioma === 'en' ? p.en : p.msg };
+  if (bgScriptActive(p.script) && !(S.scan && S.scan.state === 'running')) { updateLoadCard(); if (!S.busy || !S.busy.script || S.busy.script !== p.script) return; }
   if (!S.busy) return;
   const msg = S.settings.idioma === 'en' ? p.en : p.msg;
   if (S.scan.state === 'running') {
@@ -1565,7 +1619,7 @@ rl.onProgress((p) => {
   updateProgressOnly();
 });
 // El tiempo restante se recalcula cada segundo aunque el motor no informe.
-setInterval(() => { if (S.busy) updateProgressOnly(); }, 1000);
+setInterval(() => { if (S.busy) updateProgressOnly(); updateLoadCard(); }, 1000);
 
 // ============================================================ Arranque
 (async function init() {
@@ -1581,7 +1635,8 @@ setInterval(() => { if (S.busy) updateProgressOnly(); }, 1000);
   rl.onUpdate((st) => { const was = S.upd && S.upd.estado; S.upd = st; if (was === 'descargando' && st.estado === 'lista') S.updHide = false; setTimeout(renderUpdWin, 0); if (st.estado !== 'lista') S.updCount = null; if (was !== st.estado) render(); else { const el = document.getElementById('updBanner'); if (el) el.outerHTML = updBannerHTML(); else if (st.estado === 'descargando') render(); } });
   // ¿Venimos de una actualización? Se avisa una sola vez
   if (S.settings.ultimaVersion && S.settings.ultimaVersion !== S.info.version) {
-    setTimeout(() => toast('✨ ' + L(`RetroLimpia se actualizó a la versión ${S.info.version}. ¡Ya estás al día!`, `RetroLimpia was updated to version ${S.info.version}. You're up to date!`)), 1200);
+    const desde = S.settings.ultimaVersion;
+    setTimeout(() => showNews(desde).then((ok) => { if (!ok) toast('✨ ' + L(`RetroLimpia se actualizó a la versión ${S.info.version}. ¡Ya estás al día!`, `RetroLimpia was updated to version ${S.info.version}. You're up to date!`)); }), 900);
   }
   if (S.settings.ultimaVersion !== S.info.version) rl.setSettings({ ultimaVersion: S.info.version }).then((st) => { S.settings = st; });
   rl.onSettings((st) => { S.settings = st; render(); });

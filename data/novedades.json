@@ -1,0 +1,51 @@
+{
+  "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
+  "versiones": [
+    {
+      "version": "2.7.0",
+      "fecha": "2026-11-17",
+      "es": [
+        "A partir de esta versión, al actualizarse RetroLimpia se vuelve a abrir solo y te muestra esta ventana con las novedades.",
+        "La ventana se adapta a cualquier pantalla: nunca es más grande que tu monitor y el contenido se ajusta solo en portátiles pequeños o monitores grandes.",
+        "Puedes cambiar de sección mientras otra está cargando: cada una carga lo suyo y ya no se queda mostrando la tarea de otra.",
+        "Se acabó el error \"CANCELADO\" al cambiar de sección: si una carga se interrumpe, vuelve a cargar sola.",
+        "El botón de Discord ya no queda escondido: ahora se ve entero y destaca en la barra lateral.",
+        "Nuevo botón \"Ver novedades\" en Ajustes para leer qué cambió en cada versión."
+      ],
+      "en": [
+        "From this version on, RetroLimpia reopens by itself after updating and shows this window with what is new.",
+        "The window fits any screen: it is never bigger than your monitor and the content adjusts on small laptops or big monitors.",
+        "You can switch sections while another one is loading: each loads its own data instead of showing another task.",
+        "No more \"CANCELADO\" error when switching sections: an interrupted load simply reloads.",
+        "The Discord button is no longer hidden: it is fully visible and stands out in the sidebar.",
+        "New \"What's new\" button in Settings to read what changed in each version."
+      ]
+    },
+    {
+      "version": "2.6.0",
+      "fecha": "2026-11-17",
+      "es": [
+        "Nuevo botón \"Reportar un problema\": describe qué pasó, añade una captura (o pégala con Ctrl+V) y el registro técnico. Antes de enviarlo ves exactamente qué se manda.",
+        "Botón para unirte a la comunidad en Discord."
+      ],
+      "en": [
+        "New \"Report a problem\" button: describe what happened, add a screenshot (or paste it with Ctrl+V) and the technical log. You see exactly what is sent before sending.",
+        "Button to join the community on Discord."
+      ]
+    },
+    {
+      "version": "2.5.4",
+      "fecha": "2026-11-17",
+      "es": [
+        "RetroLimpia abre a la primera con doble clic.",
+        "Los juegos de Steam, Epic, EA y otras tiendas se desinstalan esperando a la tienda, sin quedarse atascados.",
+        "Nuevo botón \"Detener ahora\" en la ventana de desinstalación."
+      ],
+      "en": [
+        "RetroLimpia opens on the first double click.",
+        "Games from Steam, Epic, EA and other stores are uninstalled waiting for the store, without getting stuck.",
+        "New \"Stop now\" button in the uninstall window."
+      ]
+    }
+  ]
+}

@@ -407,3 +407,17 @@ select { background: var(--panel-2); border: 1px solid var(--line-2); border-rad
 .mon-foot { display: flex; justify-content: flex-end; align-items: center; gap: 12px; }
 .mon-foot .meta { margin-right: auto; }
 .mon-detail { overflow-y: auto; }
+
+/* Ventana de actualización */
+.modal.upw { width: min(560px, 92vw); }
+.upw-steps { list-style: none; padding: 0; margin: 4px 0 18px; display: grid; gap: 12px; }
+.upw-step { display: flex; gap: 12px; align-items: flex-start; opacity: .5; }
+.upw-step.now, .upw-step.ok { opacity: 1; }
+.upw-ico { width: 22px; text-align: center; font-weight: 700; }
+.upw-step.ok .upw-ico { color: #39e58c; }
+.upw-step.now .upw-ico { color: #2de2e6; animation: upwPulse 1.2s ease-in-out infinite; }
+.upw-det { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.upw-estado { font-weight: 600; margin-bottom: 8px; }
+.upw-btns { display: flex; gap: 10px; justify-content: flex-end; margin-top: 18px; }
+.upw-btns:empty { display: none; }
+@keyframes upwPulse { 50% { opacity: .35; } }

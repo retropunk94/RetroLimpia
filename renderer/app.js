@@ -541,12 +541,53 @@ setInterval(() => {
   const up = S.upd || {};
   if (up.estado !== 'lista' || S.updLater || S.updInstalling) return;
   const modalOpen = !$('#tour').classList.contains('hidden') || !$('#modal').classList.contains('hidden') || !$('#monitor').classList.contains('hidden');
+  if (S.updHide && !modalOpen && !S.busy) S.updHide = false;   // al terminar la descarga vuelve a mostrarse la ventana
   if (S.busy || modalOpen) { S.updCount = null; return; }
   S.updCount = S.updCount == null ? 15 : S.updCount - 1;
   if (S.updCount <= 0) { S.updInstalling = true; render(); rl.installUpdate(); return; }
   const el = document.getElementById('updBanner');
   if (el) el.outerHTML = updBannerHTML(); else render();
+  renderUpdWin();
 }, 1000);
+
+// ---------- Ventana de actualización: muestra cada paso ----------
+function renderUpdWin() {
+  const box = $('#updwin'); if (!box) return;
+  const up = S.upd || {};
+  const activo = (up.estado === 'descargando' || up.estado === 'lista') && !S.updHide && !S.updLater;
+  if (!activo) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  const v = esc(up.version || '');
+  const pct = up.estado === 'lista' ? 100 : (up.pct || 0);
+  const fase = S.updInstalling ? 3 : up.estado === 'lista' ? 2 : 1;
+  const n = S.updCount == null ? 15 : S.updCount;
+  const paso = (i, es, en, det) => {
+    const st = fase > i ? 'ok' : fase === i ? 'now' : 'todo';
+    const ico = st === 'ok' ? '✔' : st === 'now' ? '●' : '○';
+    return `<li class="upw-step ${st}"><span class="upw-ico">${ico}</span><div><b>${L(es, en)}</b>${det ? `<div class="upw-det">${det}</div>` : ''}</div></li>`;
+  };
+  let estado;
+  if (fase === 1) estado = L('Descargando en segundo plano', 'Downloading in the background') + ` · ${pct}%`;
+  else if (fase === 2 && S.busy) estado = L('Esperando a que termine la tarea actual', 'Waiting for the current task to finish');
+  else if (fase === 2) estado = L('Se cerrará y volverá a abrir en ' + n + ' s', 'It will close and reopen in ' + n + ' s');
+  else estado = L('Instalando… no apagues el PC', 'Installing… do not turn off the PC');
+  const barra = fase === 1 ? pct : fase === 2 ? Math.round(((15 - n) / 15) * 100) : 100;
+  let btns = '';
+  if (fase === 1) btns = `<button class="btn ghost" data-act="updHide">${L('Seguir usando el programa', 'Keep using the program')}</button>`;
+  else if (fase === 2) btns = `<button class="btn ghost" data-act="updLater">${L('Más tarde (al cerrar)', 'Later (on close)')}</button><button class="btn primary" data-act="installUpdate">${L('Actualizar ya', 'Update now')}</button>`;
+  box.innerHTML = `<div class="modal upw">
+    <h2>✨ ${L('Actualizando RetroLimpia a la ' + v, 'Updating RetroLimpia to ' + v)}</h2>
+    <p class="lead">${L('No tienes que hacer nada. Se descarga sola desde GitHub, se instala en silencio y el programa se vuelve a abrir.', 'Nothing to do. It downloads from GitHub, installs silently and the program reopens.')}</p>
+    <ol class="upw-steps">
+      ${paso(1, 'Descargar la versión nueva', 'Download the new version', L('Desde github.com/' + esc(S.info.repo || 'retropunk94/RetroLimpia') + ' · comprobada con su firma SHA-512', 'From github.com/' + esc(S.info.repo || 'retropunk94/RetroLimpia') + ' · checked with its SHA-512 hash'))}
+      ${paso(2, 'Preparar la instalación', 'Prepare the install', L('Tus ajustes y la cuarentena se conservan', 'Your settings and quarantine are kept'))}
+      ${paso(3, 'Cerrar, instalar y volver a abrir', 'Close, install and reopen', L('La ventana se cierra unos segundos y vuelve sola', 'The window closes a few seconds and comes back by itself'))}
+    </ol>
+    <div class="upw-estado">${estado}</div>
+    <div class="upd-bar"><i style="width:${barra}%"></i></div>
+    <div class="upw-btns">${btns}</div>
+  </div>`;
+  box.classList.remove('hidden');
+}
 
 // ============================================================ Vistas
 const ICONS = {
@@ -1323,8 +1364,9 @@ document.addEventListener('click', async (e) => {
       else toast(r.modo === 'auto' ? L(`Versión ${r.version} encontrada: se está descargando sola.`, `Version ${r.version} found: downloading by itself.`) : L(`Hay una versión nueva: ${r.version}.`, `New version: ${r.version}.`));
       return render();
     }
-    case 'installUpdate': S.updInstalling = true; S.updLater = false; render(); return rl.installUpdate();
-    case 'updLater': S.updLater = true; S.updCount = null; return render();
+    case 'installUpdate': S.updInstalling = true; S.updLater = false; S.updHide = false; render(); renderUpdWin(); return rl.installUpdate();
+    case 'updLater': S.updLater = true; S.updCount = null; renderUpdWin(); return render();
+    case 'updHide': S.updHide = true; renderUpdWin(); return render();
   }
 });
 
@@ -1385,7 +1427,7 @@ setInterval(() => { if (S.busy) updateProgressOnly(); }, 1000);
   if (!S.settings.confianzaVista) showTrust();
   else if (!S.settings.tourVisto) startTour();
   else if (!S.settings.recordatoriosPreguntado) showReminders();
-  rl.onUpdate((st) => { const was = S.upd && S.upd.estado; S.upd = st; if (st.estado !== 'lista') S.updCount = null; if (was !== st.estado) render(); else { const el = document.getElementById('updBanner'); if (el) el.outerHTML = updBannerHTML(); else if (st.estado === 'descargando') render(); } });
+  rl.onUpdate((st) => { const was = S.upd && S.upd.estado; S.upd = st; if (was === 'descargando' && st.estado === 'lista') S.updHide = false; setTimeout(renderUpdWin, 0); if (st.estado !== 'lista') S.updCount = null; if (was !== st.estado) render(); else { const el = document.getElementById('updBanner'); if (el) el.outerHTML = updBannerHTML(); else if (st.estado === 'descargando') render(); } });
   // ¿Venimos de una actualización? Se avisa una sola vez
   if (S.settings.ultimaVersion && S.settings.ultimaVersion !== S.info.version) {
     setTimeout(() => toast('✨ ' + L(`RetroLimpia se actualizó a la versión ${S.info.version}. ¡Ya estás al día!`, `RetroLimpia was updated to version ${S.info.version}. You're up to date!`)), 1200);

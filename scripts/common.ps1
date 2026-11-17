@@ -51,7 +51,7 @@ function Write-RLLog {
     param([string]$Msg)
     try {
         $f = Join-Path (Get-RLFolder 'logs') ('{0:yyyy-MM}.log' -f (Get-Date))
-        Add-Content -LiteralPath $f -Value ('[{0:yyyy-MM-dd HH:mm:ss}] {1}' -f (Get-Date), $Msg) -Encoding UTF8
+        Add-Content -LiteralPath $f -Value ('[{0:yyyy-MM-dd HH:mm:ss}] {1}' -f (Get-Date), $Msg) -Encoding UTF8 -ErrorAction SilentlyContinue
     } catch {}
 }
 

@@ -52,6 +52,8 @@ foreach ($b in $bases) {
     # En Documentos puede haber trabajos del usuario: nunca se quita sin preguntar
     $conf = 'alta'
     if ($b -eq $docs) { $conf = 'media' }
+    # Juegos: fuera de su carpeta puede haber partidas guardadas, así que siempre se pregunta
+    if ($p.juego) { $conf = 'media' }
     foreach ($n in $names) {
         $c = Join-Path $b $n
         if (Test-Path -LiteralPath $c) { Add-Found 'carpeta' $c $conf }

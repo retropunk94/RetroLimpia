@@ -344,6 +344,7 @@ function monLine(l) {
 function monSummary(it) {
   const r = it.res;
   if (!r) return '';
+  if (!r.ok && r.cancelado) return `<div class="mon-sum info">ℹ ${esc(r.mensaje || L('No se desinstaló. No se tocó nada.', 'Not uninstalled. Nothing was touched.'))}</div>`;
   if (!r.ok) return `<div class="mon-sum bad">✖ ${L('No se pudo desinstalar', 'Could not uninstall')}${r.mensaje ? ': ' + esc(r.mensaje) : ''}</div>`;
   const reg = r.regRestos || [];
   const regAllMoved = reg.length && reg.every((x) => x.movido) && r.registroLimpio;
@@ -400,11 +401,12 @@ async function uninstallPrograms(list, motivo) {
     if (S.busy) { S.busy.label = L(`Desinstalando (${i}/${list.length})`, `Uninstalling (${i}/${list.length})`); S.busy.msg = p.cls.nombre; S.busy.pct = Math.round(((i - 1) / list.length) * 100); updateProgressOnly(); setStatus(S.busy.label + ' · ' + p.cls.nombre); }
     const r = obj(await rl.run('desinstalar', { ...p, cls: undefined, imp: undefined, etiqueta: p.cls.nombre, permitirVentana: true }).catch((e) => ({ ok: false, mensaje: String(e.message || e) })));
     if (r.reinicio) res.reinicio = true;
-    it.res = { ok: !!r.ok, metodo: r.metodo, registroLimpio: r.registroLimpio !== false, clave: p.clave, mensaje: r.mensaje, regRestos: [], archivos: [] };
+    it.res = { ok: !!r.ok, metodo: r.metodo, plataforma: r.plataforma, cancelado: !!r.cancelado, registroLimpio: r.registroLimpio !== false, clave: p.clave, mensaje: r.mensaje, regRestos: [], archivos: [] };
+    if (!r.ok && r.cancelado) { it.estado = 'cancel'; (res.saltados = res.saltados || []).push(p.cls.nombre); renderMonitor(); continue; }
     if (!r.ok) { it.estado = 'err'; res.fail.push(p.cls.nombre); renderMonitor(); continue; }
     res.ok++;
     if (p.tipo === 'win32') {
-      const rr = obj(await rl.run('residuos', { nombre: p.nombre, editor: p.editor, carpeta: p.carpeta, clave: p.clave }).catch(() => ({})));
+      const rr = obj(await rl.run('residuos', { nombre: p.nombre, editor: p.editor, carpeta: p.carpeta, clave: p.clave, juego: !!r.plataforma }).catch(() => ({})));
       const restos = arr(rr.restos);
       const altos = restos.filter((x) => x.confianza === 'alta');
       const dudosos = restos.filter((x) => x.confianza !== 'alta');
@@ -755,7 +757,7 @@ function viewProgramas() {
   const chips = [['todos', 'Todos', 'All'], ['verde', 'Seguro quitar', 'Safe to remove'], ['amarillo', 'Opcionales', 'Optional'], ['impacto', 'Con impacto', 'With impact'], ['clasicos', 'Programas', 'Programs'], ['store', 'Store', 'Store']];
   const sortOpts = [['rec', 'Recomendado', 'Recommended'], ['peso', 'Más pesados', 'Largest'], ['impacto', 'Mayor impacto', 'Highest impact'], ['nombre', 'Nombre (A-Z)', 'Name (A-Z)']];
   const nVerde = all.filter((p) => p.cls.color === 'verde').length;
-  return `<div class="view">${banners()}${head(L('Programas y bloatware', 'Programs & bloatware'), L(`${all.length} programas ocupan <b>${fmtBytes(totalSize)}</b>${nAlto ? ` · <b>${nAlto}</b> con impacto alto en el sistema` : ''}. Desinstala sin ventanas y sin dejar restos.`, `${all.length} programs take up <b>${fmtBytes(totalSize)}</b>${nAlto ? ` · <b>${nAlto}</b> with high system impact` : ''}. Uninstall without pop-ups or leftovers.`), nVerde ? `<button class="btn" data-act="selVerde">${L(`Marcar los ${nVerde} recomendados`, `Tick the ${nVerde} recommended`)}</button>` : '')}
+  return `<div class="view">${banners()}${head(L('Programas y bloatware', 'Programs & bloatware'), L(`${all.length} programas ocupan <b>${fmtBytes(totalSize)}</b>${nAlto ? ` · <b>${nAlto}</b> con impacto alto en el sistema` : ''}. Desinstala sin ventanas y sin dejar restos.`, `${all.length} programs take up <b>${fmtBytes(totalSize)}</b>${nAlto ? ` · <b>${nAlto}</b> with high system impact` : ''}. Uninstall without pop-ups or leftovers.`), `<button class="btn ghost" data-act="refreshProgs" title="${L('Vuelve a leer los programas instalados', 'Re-read installed programs')}">⟳ ${L('Actualizar lista', 'Refresh list')}</button>` + (nVerde ? ` <button class="btn" data-act="selVerde">${L(`Marcar los ${nVerde} recomendados`, `Tick the ${nVerde} recommended`)}</button>` : ''))}
     ${progressHTML()}${residuesReviewHTML()}
     <div class="toolbar"><input class="search" id="search" placeholder="${L('Buscar un programa...', 'Search a program...')}" value="${esc(S.search)}">
       <label class="sortsel">${L('Ordenar:', 'Sort:')} <select data-sort>${sortOpts.map(([id, es, en]) => `<option value="${id}" ${S.progSort === id ? 'selected' : ''}>${L(es, en)}</option>`).join('')}</select></label></div>
@@ -1285,6 +1287,12 @@ document.addEventListener('click', async (e) => {
     case 'report': { const f = await rl.saveReport(buildReport()); toast(L('Informe guardado en Documentos\\RetroLimpia', 'Report saved to Documents\\RetroLimpia')); return f; }
     case 'selVerde': allPrograms().filter((p) => p.cls.color === 'verde').forEach((p) => S.sel.add(p.id)); return render();
     case 'selNone': S.sel.clear(); return render();
+    case 'refreshProgs': return task(L('Actualizando la lista de programas', 'Refreshing program list'), async () => {
+      await loadPrograms();
+      const ids = new Set(allPrograms().map((p) => p.id));
+      [...S.sel].forEach((id) => { if (!ids.has(id)) S.sel.delete(id); });
+      toast(L(`Lista actualizada: ${ids.size} programas.`, `List refreshed: ${ids.size} programs.`));
+    });
     case 'uninstallSel': {
       const list = allPrograms().filter((p) => S.sel.has(p.id));
       return taskC(L('Desinstalando', 'Uninstalling'), async () => {
@@ -1293,6 +1301,7 @@ document.addEventListener('click', async (e) => {
         if (r.dudosos.length) S.pendingResidues = r.dudosos;
         toast(L(`${r.ok} programa(s) quitados`, `${r.ok} program(s) removed`) + (r.restosMovidos ? L(` y ${r.restosMovidos} resto(s) a la cuarentena (${fmtBytes(r.bytes)})`, ` and ${r.restosMovidos} leftover(s) quarantined (${fmtBytes(r.bytes)})`) : '') + '.');
         if (r.fail.length) toast(L('No se pudieron quitar: ', 'Could not remove: ') + r.fail.join(', '), 'err');
+        if (r.saltados && r.saltados.length) toast(L('No se desinstalaron (cancelado en su tienda): ', 'Not uninstalled (cancelled in its store): ') + r.saltados.join(', '));
         await loadPrograms(); S.quarantine = null;
       });
     }

@@ -3,7 +3,7 @@
 // y guarda los ajustes. No envía ningún dato a internet (sin telemetría).
 
 const { app, BrowserWindow, ipcMain, shell, net, Tray, Menu, Notification, nativeImage } = require('electron');
-const { execFile } = require('child_process');
+const { execFile, spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -15,6 +15,7 @@ const BACKGROUND = process.argv.includes('--background');   // arrancado con Win
 let win = null;
 let tray = null;
 let quitting = false;
+let installing = false;   // instalando una actualización: no relanzar nada mientras tanto
 let timers = [];
 let checking = false;
 
@@ -80,6 +81,9 @@ function createWindow() {
   });
   win.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
   win.once('ready-to-show', () => win.show());
+  // Red de seguridad: si Windows no avisa de que la ventana está lista, se muestra igual
+  setTimeout(() => { if (win && !win.isDestroyed() && !win.isVisible() && !BACKGROUND_HIDDEN()) win.show(); }, 3000);
+  win.webContents.on('render-process-gone', () => { if (win && !win.isDestroyed()) win.reload(); });
   // Ningún enlace abre ventanas nuevas dentro de la app
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\//i.test(url)) shell.openExternal(url);
@@ -103,7 +107,10 @@ function createWindow() {
   });
   win.on('closed', () => { win = null; });
 }
+let wantHidden = false;
+function BACKGROUND_HIDDEN() { return wantHidden; }
 function showWindow() {
+  wantHidden = false;
   if (!win) createWindow();
   else { if (win.isMinimized()) win.restore(); win.show(); win.focus(); }
 }
@@ -196,13 +203,24 @@ async function backgroundCheck(force) {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', () => showWindow());
+  // Doble clic con RetroLimpia ya abierto (o en la bandeja): se muestra la ventana.
+  // Se espera a "ready" por si el primer arranque aún no terminó de cargar.
+  app.on('second-instance', () => {
+    app.whenReady().then(() => {
+      if (installing) return;                       // se está actualizando: volverá a abrirse solo
+      if (quitting) { app.relaunch(); return; }     // se estaba cerrando: vuelve a abrirse al salir
+      showWindow();
+    });
+  });
   app.whenReady().then(() => {
     engine.init({ demo: DEMO, scriptsDir: app.isPackaged ? path.join(process.resourcesPath, 'scripts') : path.join(__dirname, '..', 'scripts') });
     if (process.platform === 'win32') app.setAppUserModelId(pkg.build.appId);
     let s = loadSettings();
     // Si se actualizó estando en la bandeja, vuelve a la bandeja (sin abrir ventana)
-    const enBandeja = BACKGROUND || !!s.relanzarEnBandeja;
+    // relanzarEnBandeja guarda la hora: solo vale justo después de una actualización
+    // (antes era true/false y, si se quedaba "pegado", el programa abría sin ventana)
+    const recien = typeof s.relanzarEnBandeja === 'number' && Date.now() - s.relanzarEnBandeja < 10 * 60 * 1000;
+    const enBandeja = BACKGROUND || recien;
     if (s.relanzarEnBandeja) s = saveSettings({ ...s, relanzarEnBandeja: false });
     if (s.inicioWindows || enBandeja) { createTray(); startTimers(); }
     if (!enBandeja) createWindow();
@@ -289,12 +307,26 @@ function installWhenIdle() {
   const visible = win && !win.isDestroyed() && win.isVisible();
   if (visible) return;               // con ventana abierta decide la cuenta atrás de la interfaz
   if (rendererBusy) return setTimeout(installWhenIdle, 30 * 1000);
-  saveSettings({ ...loadSettings(), relanzarEnBandeja: !!tray });
+  saveSettings({ ...loadSettings(), relanzarEnBandeja: tray ? Date.now() : false });
   doInstall();
 }
 function doInstall() {
   if (!autoUpdater) return false;
-  quitting = true;
+  quitting = true; installing = true;
+  if (app.isPackaged && process.platform === 'win32') {
+    // El instalador reabre el programa "como usuario" y Windows deja el aviso de administrador
+    // escondido en la barra de tareas (parecía que no abría). Así que lo reabrimos nosotros:
+    // un ayudante oculto, ya con permisos, espera a que termine el instalador y abre RetroLimpia.
+    const exe = process.execPath.replace(/'/g, "''");
+    const ps = `$ErrorActionPreference='SilentlyContinue'; Wait-Process -Id ${process.pid} -Timeout 60; Start-Sleep -Seconds 2; ` +
+      `$t=[Diagnostics.Stopwatch]::StartNew(); while ($t.Elapsed.TotalSeconds -lt 300 -and (Get-Process | Where-Object { $_.ProcessName -like 'RetroLimpia-Instalador*' -or $_.ProcessName -like 'Un_A*' })) { Start-Sleep -Seconds 1 }; ` +
+      `Start-Sleep -Seconds 1; if (-not (Get-Process -Name 'RetroLimpia' -ErrorAction SilentlyContinue)) { Start-Process -FilePath '${exe}' }`;
+    try {
+      spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-Command', ps], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+      autoUpdater.quitAndInstall(true, false);   // silencioso; el ayudante lo vuelve a abrir
+      return true;
+    } catch {}
+  }
   autoUpdater.quitAndInstall(true, true);   // silencioso y vuelve a abrirse
   return true;
 }

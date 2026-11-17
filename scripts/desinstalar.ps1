@@ -119,6 +119,87 @@ if ($p.cerrarProcesos -ne $false) { Stop-AppProcesses $p.carpeta }
 $cmd = [string]$p.desinstalar
 $quiet = [string]$p.desinstalarSilencioso
 
+# ---------------- Juegos de plataformas (Steam, Epic, EA, Ubisoft...) ----------------
+# Estas tiendas desinstalan con su propia ventana y el comando termina al instante:
+# hay que esperar a que la plataforma acabe de verdad antes de revisar nada.
+function Get-Platform {
+    param([string]$Key, [string]$Cmd)
+    if ($Key -match 'Steam App (\d+)$' -or $Cmd -match 'steam://uninstall/(\d+)') { return @{ nombre = 'Steam'; id = $Matches[1] } }
+    if ($Cmd -match 'com\.epicgames\.launcher://') { return @{ nombre = 'Epic Games' } }
+    if ($Cmd -match 'uplay://|ubisoft') { return @{ nombre = 'Ubisoft Connect' } }
+    if ($Cmd -match 'EADesktop|\\Origin\\|origin2://|ealink://') { return @{ nombre = 'EA app' } }
+    if ($Cmd -match 'Battle\.net') { return @{ nombre = 'Battle.net' } }
+    if ($Cmd -match 'GalaxyClient|goggalaxy://') { return @{ nombre = 'GOG Galaxy' } }
+    if ($Cmd -match '^\s*"?[^"]*\.exe"?\s+[a-z0-9\.\-]+://' ) { return @{ nombre = 'su tienda' } }
+    return $null
+}
+
+function Get-Firma {
+    # "Huella" de lo que hay en disco: si cambia, la plataforma está trabajando
+    param([string]$Folder, [string]$Manifest)
+    $f = ''
+    if ($Folder -and (Test-Path -LiteralPath $Folder)) {
+        try { $f += 'D' + @(Get-ChildItem -LiteralPath $Folder -Force -ErrorAction SilentlyContinue).Count } catch {}
+    } else { $f += 'sinCarpeta' }
+    if ($Manifest -and (Test-Path -LiteralPath $Manifest)) { $f += 'M' + (Get-Item -LiteralPath $Manifest).LastWriteTimeUtc.Ticks } else { $f += 'sinManifest' }
+    return $f
+}
+
+$plat = Get-Platform $key $cmd
+if ($plat) {
+    $result.plataforma = $plat.nombre
+    $loc0 = ([string]$p.carpeta).Trim('"')
+    $manifest = $null
+    if ($plat.nombre -eq 'Steam' -and $plat.id -and $loc0) {
+        $sa = Split-Path (Split-Path $loc0 -Parent) -Parent   # ...\steamapps
+        $manifest = Join-Path $sa ('appmanifest_' + $plat.id + '.acf')
+        Send-Log 'info' 'Ficha del juego en Steam' 'Game manifest in Steam' $manifest
+    }
+    Send-Log 'paso' ('Este juego es de ' + $plat.nombre + ': se lo pedimos a ' + $plat.nombre + '. Confirma en su ventana (botón Desinstalar).') ('This game belongs to ' + $plat.nombre + ': we ask ' + $plat.nombre + ' to remove it. Confirm in its window.') $cmd
+    Send-Progress 30 ('Confirma en la ventana de ' + $plat.nombre + '...') ('Confirm in the ' + $plat.nombre + ' window...')
+    try {
+        $c = Split-Command $cmd
+        $null = Start-Cmd $c.exe $c.args
+    } catch { $result.mensaje = $_.Exception.Message }
+
+    # Espera: termina cuando desaparece su entrada. Si en 3 minutos no cambia nada, se da por cancelado.
+    $sw = [Diagnostics.Stopwatch]::StartNew(); $quieto = [Diagnostics.Stopwatch]::StartNew()
+    $firma = Get-Firma $loc0 $manifest; $avisado = $false
+    while ($sw.Elapsed.TotalMinutes -lt 45) {
+        if (Test-Gone $key) { break }
+        Start-Sleep -Seconds 2
+        $f2 = Get-Firma $loc0 $manifest
+        if ($f2 -ne $firma) {
+            $firma = $f2; $quieto.Restart()
+            if (-not $avisado) { $avisado = $true; Send-Log 'paso' ($plat.nombre + ' está borrando el juego...') ($plat.nombre + ' is deleting the game...') $loc0 }
+        }
+        $seg = [int]$sw.Elapsed.TotalSeconds
+        if ($avisado) { Send-Progress 60 ($plat.nombre + ' está borrando el juego... (' + $seg + ' s)') ($plat.nombre + ' is deleting the game... (' + $seg + ' s)') }
+        else { Send-Progress 30 ('Esperando que confirmes en la ventana de ' + $plat.nombre + '... (' + $seg + ' s)') ('Waiting for you to confirm in ' + $plat.nombre + '... (' + $seg + ' s)') }
+        if ($quieto.Elapsed.TotalMinutes -ge 3) { break }
+    }
+    # La tienda borra la carpeta justo después de la entrada: margen de 1 minuto
+    if (Test-Gone $key) {
+        for ($i = 0; $i -lt 30 -and $loc0 -and (Test-Path -LiteralPath $loc0); $i++) { Start-Sleep -Seconds 2 }
+    }
+    $result.metodo = 'plataforma'
+    $result.ok = Test-Gone $key
+    $result.registroLimpio = $result.ok
+    $result.carpetaQueda = [bool]($loc0 -and (Test-Path -LiteralPath $loc0))
+    if ($result.ok) {
+        Send-Log 'ok' ($plat.nombre + ' desinstaló el juego') ($plat.nombre + ' uninstalled the game') $key
+        if ($result.carpetaQueda) { Send-Log 'aviso' ($plat.nombre + ' dejó la carpeta del juego (partidas, mods o ajustes): se revisará como resto') ($plat.nombre + ' left the game folder: checked as leftover') $loc0 }
+    } else {
+        $result.cancelado = $true
+        $result.mensaje = $plat.nombre + ' no lo desinstaló (¿cancelaste en su ventana?). No se tocó nada.'
+        Send-Log 'aviso' ($plat.nombre + ' no lo desinstaló: si cancelaste en su ventana, no pasa nada. No se tocó nada del juego.') ($plat.nombre + ' did not uninstall it. Nothing of the game was touched.')
+    }
+    Write-RLLog ('Desinstalar (plataforma ' + $plat.nombre + ') ' + $p.nombre + ' ok=' + $result.ok)
+    Send-Progress 100 'Listo' 'Done'
+    Send-Result $result
+    return
+}
+
 Send-Progress 15 ('Desinstalando ' + $label + ' en silencio...') ('Silently uninstalling ' + $label + '...')
 
 try {

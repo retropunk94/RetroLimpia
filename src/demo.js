@@ -118,6 +118,7 @@ async function run(script, p, onProgress) {
       if (p.accion === 'buscar') { await steps(onProgress, ['Preguntando a Windows Update...', 'Buscando actualizaciones de programas...'], 1600); return updates; }
       if (p.accion === 'instalarWU') { await steps(onProgress, ['Descargando...', 'Instalando...'], 1800); return { resultados: (p.ids || updates.windows.map((u) => u.id)).map((id) => ({ id, ok: true })), reinicio: true }; }
       if (p.accion === 'winget') { await steps(onProgress, ['Actualizando...'], 1500); return { resultados: (p.ids || updates.apps.map((a) => a.id)).map((id) => ({ id, ok: true })) }; }
+      if (p.accion === 'instalar') { for (const it of p.items || []) { onProgress({ msg: 'Instalando ' + it.nombre + '...', log: { tipo: 'ok', msg: 'Instalado: ' + it.nombre, en: 'Installed: ' + it.nombre } }); await wait(500); } return { ok: true, resultados: (p.items || []).map((it) => ({ id: it.id, ok: true })) }; }
       break;
     case 'limpieza':
       if (p.accion === 'analizar') { await steps(onProgress, ['Midiendo archivos basura...'], 900); return { categorias: limpieza }; }

@@ -42,7 +42,7 @@ const defaultSettings = {
   modoLigero: 'auto',      // auto | on | off  (bajos recursos)
   mascota: 'activa',       // activa | tranquila | off
   mascotaPresentada: false,
-  misJuegos: [], juegoAuto: false, juegoIntensidad: 'equilibrado', juegoCerrar: [], juegoReabrir: true, juegoPartidas: 0
+  misJuegos: [], juegoAuto: false, juegoIntensidad: 'equilibrado', juegoCerrar: [], juegoReabrir: true, juegoPartidas: 0, formateoPasos: {}
 };
 function loadSettings() {
   try { return { ...defaultSettings, ...JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) }; }
@@ -309,7 +309,7 @@ ipcMain.handle('rl:info', async () => ({
   equipo: os.hostname()
 }));
 ipcMain.handle('rl:open', (e, url) => {
-  if (typeof url === 'string' && /^https:\/\//i.test(url)) return shell.openExternal(url);
+  if (typeof url === 'string' && (/^https:\/\//i.test(url) || /^ms-windows-store:\/\/pdp\/\?ProductId=[A-Z0-9]{12}$/.test(url))) return shell.openExternal(url);
   return false;
 });
 ipcMain.handle('rl:openFolder', (e, which) => {

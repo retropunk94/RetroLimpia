@@ -46,6 +46,11 @@ $AJUSTES = [ordered]@{
     copilot = @(
         @{ k = 'HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot'; n = 'TurnOffWindowsCopilot'; v = 1 },
         @{ k = $adv; n = 'ShowCopilotButton'; v = 0 })
+    # Ajustes cómodos del asistente "Acabo de formatear" (no salen en la lista de Privacidad)
+    ver_extensiones = @(
+        @{ k = $adv; n = 'HideFileExt'; v = 0 })
+    explorador_este_equipo = @(
+        @{ k = $adv; n = 'LaunchTo'; v = 1 })
 }
 
 if (-not (Test-Path -LiteralPath $Global:RLBase)) { New-Item -ItemType Directory -Path $Global:RLBase -Force | Out-Null }

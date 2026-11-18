@@ -121,6 +121,31 @@ switch ($p.accion) {
         Send-Progress 100 'Listo' 'Done'
         Send-Result @{ resultados = $results.ToArray(); reinicio = $reboot }
     }
+    'instalar' {
+        # Asistente "Acabo de formatear": instala programas elegidos con winget, en silencio y uno a uno.
+        # Si ya estaba instalado, no lo toca.
+        $wg = Get-Winget
+        if (-not $wg) { Send-Result @{ ok = $false; sinWinget = $true }; return }
+        $common = @('-e', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity')
+        $results = New-Object System.Collections.Generic.List[object]
+        $items = @($p.items); $n = 0
+        foreach ($it in $items) {
+            $n++
+            $id = [string]$it.id; $src = if ($it.fuente) { [string]$it.fuente } else { 'winget' }
+            if ($id -notmatch '^[A-Za-z0-9][A-Za-z0-9.\-_]{1,80}$') { continue }   # solo ids válidos
+            Send-Progress ([int](100 * ($n - 1) / [Math]::Max(1, $items.Count))) ("($n/$($items.Count)) Instalando " + $it.nombre + '...') ("($n/$($items.Count)) Installing " + $it.nombre + '...')
+            $null = & $wg list --id $id -e -s $src --accept-source-agreements --disable-interactivity 2>&1
+            if ($LASTEXITCODE -eq 0) { $results.Add(@{ id = $id; ok = $true; yaEstaba = $true }); Send-Log 'ok' ($it.nombre + ' ya estaba instalado') ($it.nombre + ' was already installed'); continue }
+            $null = & $wg install --id $id -s $src @common 2>&1
+            $code = $LASTEXITCODE
+            $ok = ($code -eq 0 -or $code -eq -1978335189 -or $code -eq -1978335135)   # 0x8A15002B / 0x8A150061: ya instalado
+            $results.Add(@{ id = $id; ok = $ok; codigo = $code })
+            if ($ok) { Send-Log 'ok' ('Instalado: ' + $it.nombre) ('Installed: ' + $it.nombre) } else { Send-Log 'aviso' ('No se pudo instalar ' + $it.nombre + ' (código ' + $code + ')') ('Could not install ' + $it.nombre) }
+        }
+        Write-RLLog ('Instalar tras formatear: ' + (@($results | Where-Object { $_.ok }).Count) + ' de ' + $items.Count)
+        Send-Progress 100 'Listo' 'Done'
+        Send-Result @{ ok = $true; resultados = $results.ToArray() }
+    }
     'winget' {
         $wg = Get-Winget
         if (-not $wg) { Send-Result @{ ok = $false; mensaje = 'winget no está disponible' }; return }

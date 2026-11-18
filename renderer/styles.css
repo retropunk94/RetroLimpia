@@ -519,3 +519,19 @@ details.prot { margin: 8px 0 0; } details.prot summary { cursor: pointer; color:
 label.inline { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; cursor: pointer; }
 .btn.big { padding: 12px 20px; font-size: 15px; }
 @media (max-width: 900px) { .intens { grid-template-columns: 1fr; } }
+/* ---------- Acabo de formatear ---------- */
+.paso-f { padding: 18px 20px; margin-bottom: 12px; }
+.paso-f.hecho { opacity: .72; border-color: rgba(46, 213, 115, .35); }
+.pf-head { display: flex; gap: 14px; align-items: flex-start; }
+.pf-head h3 { margin: 0 0 2px; font-size: 16px; }
+.pf-num { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: rgba(177,76,255,.18); font-weight: 700; flex-shrink: 0; }
+.paso-f.hecho .pf-num { background: rgba(46, 213, 115, .2); color: #2ed573; }
+.pf-acc { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; padding-left: 48px; }
+.paso-f .row { margin-left: 48px; }
+.pf-prog { font-size: 14px; color: var(--muted); white-space: nowrap; }
+.catalogo { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin: 14px 0 0 48px; }
+.cat-t { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; }
+.prog { display: flex; gap: 10px; align-items: flex-start; padding: 9px 10px; border-radius: 10px; cursor: pointer; }
+.prog:hover { background: rgba(255,255,255,.04); } .prog.on { background: rgba(177,76,255,.10); }
+.prog .pi { font-size: 20px; width: 26px; text-align: center; }
+@media (max-width: 900px) { .catalogo, .pf-acc, .paso-f .row { margin-left: 0; padding-left: 0; } }

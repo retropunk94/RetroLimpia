@@ -1,6 +1,7 @@
 'use strict';
 // ============================================================ Vistas
 const ICONS = {
+  formateo: '<path d="M12 3l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L4.8 8.3l5-.7z"/>',
   juego: '<rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3"/><circle cx="16" cy="11.5" r="1"/><circle cx="18" cy="13.5" r="1"/>',
   privacidad: '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
   inicio: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
@@ -21,6 +22,7 @@ const NAV = [
   ['arranque', 'Arranque de Windows', 'Windows startup'],
   ['privacidad', 'Privacidad', 'Privacy'],
   ['juego', 'Modo Juego', 'Game Mode'],
+  ['formateo', 'Acabo de formatear', 'Fresh install'],
   'sep',
   ['hardware', 'Hardware y salud', 'Hardware & health'],
   ['drivers', 'Drivers', 'Drivers'],

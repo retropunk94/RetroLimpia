@@ -501,3 +501,21 @@ body.ligero .pbar.indet i { width: 100% !important; opacity: .45; }
 .card-head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
 .card-head h3 { margin: 0 0 4px; font-size: 16px; }
 .card.restos .list { max-height: 420px; overflow: auto; }
+/* ---------- Modo Juego ---------- */
+h3.paso { font-size: 15px; margin: 22px 0 8px; }
+.intens { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.int-card { display: block; padding: 14px 16px; border-radius: 14px; border: 1px solid var(--line, rgba(255,255,255,.08)); background: var(--card, rgba(255,255,255,.03)); cursor: pointer; }
+.int-card input { position: absolute; opacity: 0; pointer-events: none; }
+.int-card.on { border-color: #b14cff; box-shadow: 0 0 0 1px #b14cff inset; }
+.int-t { font-weight: 700; margin-bottom: 6px; }
+.int-card ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+details.prot { margin: 8px 0 0; } details.prot summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+.logros { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 22px 0 6px; }
+.logro { padding: 4px 10px; border-radius: 999px; font-size: 12px; background: rgba(255,255,255,.04); opacity: .45; filter: grayscale(1); }
+.logro.on { opacity: 1; filter: none; background: rgba(177,76,255,.18); }
+.juego-on { display: flex; gap: 18px; align-items: center; padding: 22px; margin-top: 8px; border: 1px solid rgba(177,76,255,.5); }
+.juego-on h3 { margin: 0 0 4px; } .juego-on p { margin: 0 0 8px; color: var(--muted); }
+.juego-big { font-size: 44px; }
+label.inline { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; cursor: pointer; }
+.btn.big { padding: 12px 20px; font-size: 15px; }
+@media (max-width: 900px) { .intens { grid-template-columns: 1fr; } }

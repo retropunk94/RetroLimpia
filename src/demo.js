@@ -6,6 +6,7 @@ const GB = 1024 ** 3, MB = 1024 ** 2;
 
 let token = 0;
 const demoPriv = { id_publicidad: true };
+let demoJuego = null;
 const demoRestos = [
   { tipo: 'carpeta', clase: 'vacia', ruta: 'C:\\Program Files (x86)\\ManyCam', nombre: 'ManyCam', confianza: 'alta', tamano: 0 },
   { tipo: 'carpeta', clase: 'vacia', ruta: 'C:\\ProgramData\\FxSound LLC', nombre: 'FxSound LLC', confianza: 'alta', tamano: 0 },
@@ -92,7 +93,7 @@ const updates = {
 
 const limpieza = [
   ['temp_usuario', 3.2 * GB, 'verde'], ['temp_windows', 640 * MB, 'verde'], ['wu_cache', 2.1 * GB, 'verde'], ['entrega', 900 * MB, 'verde'],
-  ['informes', 120 * MB, 'verde'], ['miniaturas', 260 * MB, 'verde'], ['navegadores', 1.4 * GB, 'amarillo'], ['volcados', 0, 'amarillo'], ['papelera', 5.6 * GB, 'amarillo']
+  ['informes', 120 * MB, 'verde'], ['miniaturas', 260 * MB, 'verde'], ['navegadores', 1.4 * GB, 'amarillo'], ['volcados', 0, 'amarillo'], ['papelera', 5.6 * GB, 'amarillo'], ['shaders', 2.3 * GB, 'amarillo'], ['launchers', 640 * MB, 'verde']
 ].map(([id, tamano, color]) => ({ id, tamano, color }));
 
 const inicio = [
@@ -130,6 +131,18 @@ async function run(script, p, onProgress) {
       if (p.accion === 'crear') { await steps(onProgress, ['Creando punto de restauración...'], 1200); return { ok: true }; }
       if (p.accion === 'listar') return { puntos: [{ numero: 41, descripcion: 'RetroLimpia - Antes de limpiar', fecha: '2026-11-10' }] };
       return { ok: true };
+    case 'modojuego': {
+      if (p.accion === 'listar') return { apps: [
+        { nombre: 'onedrive', titulo: 'Microsoft OneDrive', ram: 96e6, sugerido: true, protegido: false, nota: 'Sincroniza tus archivos con la nube y usa disco e internet mientras juegas. Se vuelve a abrir al terminar.' },
+        { nombre: 'phoneexperiencehost', titulo: 'Enlace Móvil', ram: 210e6, sugerido: true, protegido: false, nota: '"Enlace Móvil" de Windows: conecta tu teléfono. No hace falta para jugar.' },
+        { nombre: 'chrome', titulo: 'Google Chrome', ram: 1.4e9, sugerido: false, protegido: false, nota: 'Navegador: si lo cierras, guarda antes lo que tengas abierto. Las pestañas suelen volver al reabrirlo.' },
+        { nombre: 'spotify', titulo: 'Spotify', ram: 310e6, sugerido: false, protegido: false, nota: 'Programa abierto. Si lo cierras, guarda antes lo que estés haciendo.' },
+        { nombre: 'discord', titulo: 'Discord', ram: 600e6, protegido: true }, { nombre: 'obs64', titulo: 'OBS Studio', ram: 400e6, protegido: true }, { nombre: 'steam', titulo: 'Steam', ram: 200e6, protegido: true }
+      ], activo: !!demoJuego, estado: demoJuego };
+      if (p.accion === 'activar') { await steps(onProgress, ['Cerrando lo que elegiste...', 'Poniendo el PC a máxima potencia...', 'Silenciando notificaciones...'], 600); demoJuego = { activo: true, desde: new Date().toISOString(), intensidad: p.intensidad, cerrados: (p.cerrar || []).map((nombre) => ({ nombre })) }; return { ok: true, estado: demoJuego, hecho: ['cerrar', 'energia'] }; }
+      if (p.accion === 'restaurar') { await steps(onProgress, ['Devolviendo el PC a como estaba...'], 700); const m = demoJuego ? Math.round((Date.now() - new Date(demoJuego.desde)) / 60000) : 0; const nada = !demoJuego; demoJuego = null; return { ok: true, minutos: m, nada }; }
+      return { activo: !!demoJuego, estado: demoJuego };
+    }
     case 'restos': {
       await steps(onProgress, ['Leyendo qué programas tienes instalados...', 'Buscando carpetas que quedaron de programas viejos...', 'Buscando accesos directos que ya no abren nada...'], 700);
       return { restos: demoRestos.filter((x) => !x.quitado), total: 0 };

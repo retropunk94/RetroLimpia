@@ -1,6 +1,7 @@
 'use strict';
 // ============================================================ Vistas
 const ICONS = {
+  juego: '<rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3"/><circle cx="16" cy="11.5" r="1"/><circle cx="18" cy="13.5" r="1"/>',
   privacidad: '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
   inicio: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   programas: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 17.5h7M17.5 14v7"/>',
@@ -19,6 +20,7 @@ const NAV = [
   ['limpieza', 'Limpieza', 'Cleanup'],
   ['arranque', 'Arranque de Windows', 'Windows startup'],
   ['privacidad', 'Privacidad', 'Privacy'],
+  ['juego', 'Modo Juego', 'Game Mode'],
   'sep',
   ['hardware', 'Hardware y salud', 'Hardware & health'],
   ['drivers', 'Drivers', 'Drivers'],
@@ -54,6 +56,7 @@ function banners() {
   let h = '';
   if (S.info.demo) h += `<div class="banner info"><div class="grow"><b>${L('Modo demostración', 'Demo mode')}</b> · ${L('Los datos son de ejemplo y no se cambia nada en este equipo.', 'Sample data; nothing on this computer is changed.')}</div></div>`;
   if (!S.info.esAdmin) h += `<div class="banner warn"><div class="grow"><b>${L('Abre RetroLimpia como administrador', 'Run RetroLimpia as administrator')}</b> · ${L('Sin permisos de administrador no puede desinstalar ni actualizar drivers. Ciérralo, haz clic derecho en su icono y elige "Ejecutar como administrador".', 'Without admin rights it cannot uninstall or update drivers. Close it, right-click its icon and choose "Run as administrator".')}</div></div>`;
+  if (S.view !== 'juego' && ((S.juego && S.juego.activo) || (!S.juego && S.info.juegoActivo))) h += `<div class="banner info"><div class="grow">🕶️ <b>${L('El Modo Juego está activo', 'Game Mode is on')}</b> · ${L('Cuando termines de jugar, restaura el PC para que todo vuelva a como estaba.', 'When you finish playing, restore your PC so everything goes back to normal.')}</div><button class="btn small" data-nav="juego">${L('Ir a Modo Juego', 'Go to Game Mode')}</button></div>`;
   if (S.needsReboot) h += `<div class="banner warn"><div class="grow"><b>${L('Reinicia el PC cuando puedas', 'Restart your PC when you can')}</b> · ${L('Algunas actualizaciones o desinstalaciones terminan al reiniciar.', 'Some updates or uninstalls finish after a restart.')}</div></div>`;
   if (S.refreshing && S.refreshing.has(VIEW_REFRESH[S.view])) h += `<div class="banner info"><div class="grow">🔄 <b>${L('Actualizando esta pestaña', 'Refreshing this tab')}</b> · ${L('Leyendo de nuevo lo que cambió tras la última acción...', 'Re-reading what changed after the last action...')}</div></div>`;
   if (S.info.cierreRaro && !S.crashSeen && S.info.reportes) h += `<div class="banner warn"><div class="grow"><b>${L('La última vez RetroLimpia se cerró de forma inesperada', 'Last time RetroLimpia closed unexpectedly')}</b> · ${L('¿Nos cuentas qué estabas haciendo? Nos ayuda a arreglarlo en la próxima versión.', 'Tell us what you were doing? It helps us fix it in the next version.')}</div><button class="btn small" data-act="reportOpen">🐞 ${L('Reportar', 'Report')}</button><button class="btn small ghost" data-act="crashSeen">${L('Ahora no', 'Not now')}</button></div>`;

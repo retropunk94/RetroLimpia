@@ -2,7 +2,7 @@
 // ============================================================ Render y eventos
 function render() {
   renderNav();
-  const views = { inicio: viewInicio, programas: viewProgramas, limpieza: viewLimpieza, arranque: viewArranque, privacidad: viewPrivacidad, hardware: viewHardware, drivers: viewDrivers, actualizaciones: viewActualizaciones, procesos: viewProcesos, deshacer: viewDeshacer, ajustes: viewAjustes };
+  const views = { inicio: viewInicio, programas: viewProgramas, limpieza: viewLimpieza, arranque: viewArranque, privacidad: viewPrivacidad, juego: viewJuego, hardware: viewHardware, drivers: viewDrivers, actualizaciones: viewActualizaciones, procesos: viewProcesos, deshacer: viewDeshacer, ajustes: viewAjustes };
   const focusId = document.activeElement && ['search', 'procSearch'].includes(document.activeElement.id) ? document.activeElement.id : null;
   const caret = focusId ? document.activeElement.selectionStart : 0;
   let html;
@@ -17,8 +17,9 @@ function render() {
 }
 
 document.addEventListener('click', async (e) => {
-  const t = e.target.closest('[data-reveal],[data-copy],[data-monview],[data-psort],[data-pask],[data-pkill],[data-updall],[data-retry],[data-nav],[data-act],[data-win],[data-open],[data-filter],[data-folder],[data-restore],[data-wu],[data-wg]');
+  const t = e.target.closest('[data-reveal],[data-copy],[data-monview],[data-psort],[data-pask],[data-pkill],[data-updall],[data-retry],[data-nav],[data-act],[data-win],[data-open],[data-filter],[data-folder],[data-restore],[data-wu],[data-wg],[data-juego-quitar]');
   if (!t) return;
+  if (t.dataset.juegoQuitar !== undefined) { const l = arr(S.settings.misJuegos).filter((_, i) => i !== Number(t.dataset.juegoQuitar)); S.settings = await rl.setSettings({ misJuegos: l, ...(l.length ? {} : { juegoAuto: false }) }); return render(); }
   if (t.dataset.reveal) { const ok = await rl.reveal(t.dataset.reveal); if (!ok) toast(L('Esa ubicación ya no existe (se movió a la cuarentena o se borró).', 'That location no longer exists (moved to quarantine or deleted).'), 'err'); return; }
   if (t.dataset.copy) { try { await navigator.clipboard.writeText(t.dataset.copy); toast(L('Ruta copiada.', 'Path copied.')); } catch { toast(t.dataset.copy); } return; }
   if (t.dataset.monview) { S.mon.view = Number(t.dataset.monview); return renderMonitor(); }
@@ -80,6 +81,10 @@ document.addEventListener('click', async (e) => {
     case 'modalClose': $('#modal').classList.add('hidden'); S.rep = null; return;
     case 'retroMenu': return retroMenu();
     case 'restosBuscar': return restosBuscar();
+    case 'juegoOn': return juegoOn();
+    case 'juegoOff': return juegoOff();
+    case 'juegoAdd': return juegoAdd();
+    case 'juegoReload': S.juego = null; return render();
     case 'restosQuitar': return restosQuitar();
     case 'privRec': { const st = Object.fromEntries(S.privacidad.map((a) => [a.id, a])); return privCambiar(PRIVACIDAD.map((x) => x[0]).filter((id) => st[id] && !st[id].aplicado && st[id].permitido !== false && !PRIV_OPCIONAL.has(id)), true); }
     case 'retroOk': S.settings = await rl.setSettings({ mascotaPresentada: true }); return renderRetro();
@@ -213,6 +218,10 @@ document.addEventListener('change', async (e) => {
   if (t.dataset.sort !== undefined) { S.progSort = t.value; return render(); }
   if (t.dataset.upd) { t.checked ? S.updSel.add(t.dataset.upd) : S.updSel.delete(t.dataset.upd); return render(); }
   if (t.dataset.sel) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); return render(); }
+  if (t.dataset.intens) { S.settings = await rl.setSettings({ juegoIntensidad: t.dataset.intens }); return render(); }
+  if (t.dataset.juegoApp !== undefined) { t.checked ? S.juegoSel.add(t.dataset.juegoApp) : S.juegoSel.delete(t.dataset.juegoApp); return render(); }
+  if (t.dataset.juegoAuto !== undefined) { S.settings = await rl.setSettings({ juegoAuto: t.checked }); toast(t.checked ? L('Listo: el Modo Juego se activará solo al abrir uno de tus juegos.', 'Done: Game Mode will turn on when you open one of your games.') : L('Modo automático apagado.', 'Auto mode off.')); return render(); }
+  if (t.dataset.juegoReabrir !== undefined) { S.settings = await rl.setSettings({ juegoReabrir: t.checked }); return; }
   if (t.dataset.resto !== undefined) { t.checked ? S.restosSel.add(t.dataset.resto) : S.restosSel.delete(t.dataset.resto); return render(); }
   if (t.dataset.junk) { t.checked ? S.junkSel.add(t.dataset.junk) : S.junkSel.delete(t.dataset.junk); return render(); }
   if (t.dataset.finding) { const f = S.scan.findings.find((x) => x.id === t.dataset.finding); if (f) f.elegido = t.checked; return render(); }

@@ -41,7 +41,8 @@ const defaultSettings = {
   ultimaVersion: '',
   modoLigero: 'auto',      // auto | on | off  (bajos recursos)
   mascota: 'activa',       // activa | tranquila | off
-  mascotaPresentada: false
+  mascotaPresentada: false,
+  misJuegos: [], juegoAuto: false, juegoIntensidad: 'equilibrado', juegoCerrar: [], juegoReabrir: true, juegoPartidas: 0
 };
 function loadSettings() {
   try { return { ...defaultSettings, ...JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) }; }
@@ -262,6 +263,7 @@ if (!app.requestSingleInstanceLock()) {
     if (s.inicioWindows || enBandeja) paso('bandeja', () => { createTray(); startTimers(); });
     if (!enBandeja) paso('ventana', () => createWindow());
     paso('actualizador', () => initUpdater());
+    paso('juego', () => juegoWatch());
     // Mantenimiento silencioso: vacía la cuarentena vieja al arrancar
     paso('cuarentena', () => engine.run('cuarentena', { accion: 'purgar', dias: s.diasCuarentena }).catch(() => {}));
   }).catch((e) => { updLog('Arranque: ' + (e && e.stack || e)); try { if (!win) createWindow(); } catch {} });
@@ -289,6 +291,7 @@ ipcMain.handle('rl:settings:get', () => loadSettings());
 ipcMain.handle('rl:settings:set', (e, s) => {
   const nuevo = saveSettings({ ...loadSettings(), ...s });
   if ('modoLigero' in (s || {})) engine.init({ ligero: ligeroActivo(nuevo) });
+  if ('juegoAuto' in (s || {}) || 'misJuegos' in (s || {})) juegoWatch();
   return nuevo;
 });
 ipcMain.handle('rl:info', async () => ({
@@ -298,6 +301,7 @@ ipcMain.handle('rl:info', async () => ({
   discord: pkg.retrolimpia.discord || '',
   reportes: !!pkg.retrolimpia.reportes,
   cierreRaro: cierreRaro,
+  juegoActivo: !DEMO && fs.existsSync(path.join(process.env.ProgramData || 'C:\\ProgramData', 'RetroLimpia', 'modojuego-estado.json')),
   equipoLimitado: EQUIPO_LIMITADO,
   demo: DEMO,
   plataforma: process.platform,
@@ -466,6 +470,57 @@ ipcMain.handle('rl:report:capture', async () => {
     if (sz.width > 1920) img = img.resize({ width: 1920 });
     return img.toDataURL();
   } catch { return null; }
+});
+// ---------- Modo Juego automático ----------
+// Solo si el usuario lo activa y tiene juegos en su lista. Cada 15 s mira la lista de procesos
+// con "tasklist" (unos milisegundos, sin PowerShell) y nada más: casi no gasta.
+let juegoTimer = null, juegoAuto = null, juegoMirando = false;
+const juegoEnviar = (ev) => { if (win && !win.isDestroyed()) win.webContents.send('rl:juego', ev); };
+function juegoWatch() {
+  if (juegoTimer) { clearInterval(juegoTimer); juegoTimer = null; }
+  const s = loadSettings();
+  if (DEMO || !s.juegoAuto || !Array.isArray(s.misJuegos) || !s.misJuegos.length) return;
+  juegoTimer = setInterval(juegoTick, 15000);
+}
+function juegoTick() {
+  if (juegoMirando || installing) return;
+  juegoMirando = true;
+  execFile('tasklist', ['/FO', 'CSV', '/NH'], { windowsHide: true, maxBuffer: 8 * 1024 * 1024 }, async (err, out) => {
+    try {
+      if (err) return;
+      const abiertos = new Set(String(out).split(/\r?\n/).map((l) => (l.match(/^"([^"]+)"/) || [])[1]).filter(Boolean).map((n) => n.toLowerCase()));
+      const s = loadSettings();
+      const juego = (s.misJuegos || []).find((g) => abiertos.has(path.basename(g.ruta).toLowerCase()));
+      if (juego && !juegoAuto) {
+        const r = await engine.run('modojuego', { accion: 'activar', intensidad: s.juegoIntensidad || 'equilibrado', cerrar: s.juegoCerrar || [], juego: path.basename(juego.ruta) });
+        if (r && r.yaActivo) return;               // lo activó el usuario a mano: no se apaga solo
+        juegoAuto = juego.nombre;
+        juegoEnviar({ activo: true, juego: juego.nombre, estado: r && r.estado });
+        notify('RetroLimpia', T(`Modo Juego activo para ${juego.nombre}. Se apagará solo al cerrarlo.`, `Game Mode on for ${juego.nombre}. It turns off when you close it.`));
+      } else if (!juego && juegoAuto) {
+        juegoAuto = null;
+        const r = await engine.run('modojuego', { accion: 'restaurar', reabrir: s.juegoReabrir !== false });
+        const partidas = (Number(s.juegoPartidas) || 0) + (r && r.nada ? 0 : 1);
+        saveSettings({ ...loadSettings(), juegoPartidas: partidas });
+        juegoEnviar({ activo: false, partidas });
+      }
+    } catch (e) { updLog('Modo Juego automático: ' + (e && e.message || e)); }
+    finally { juegoMirando = false; }
+  });
+}
+ipcMain.handle('rl:pickExe', async () => {
+  const r = await dialog.showOpenDialog(win, {
+    title: T('Elige el juego o emulador (.exe)', 'Choose the game or emulator (.exe)'),
+    properties: ['openFile'], filters: [{ name: T('Programas', 'Programs'), extensions: ['exe'] }]
+  });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const f = r.filePaths[0];
+  // "duckstation-qt-x64-ReleaseLTCG" -> "Duckstation"; "Game.exe" -> nombre de su carpeta
+  const limpiar = (n) => n.split(/[-_. ]+/).filter((w) => w && !/^(qt|x64|x86|amd64|win64|win32|64|32|bit|release.*|shipping|dx\d+|vulkan|launcher|game|client|start|play|bin|binaries)$/i.test(w)).join(' ');
+  let nombre = limpiar(path.basename(f, path.extname(f)));
+  if (!nombre) nombre = limpiar(path.basename(path.dirname(f))) || path.basename(f, path.extname(f));
+  nombre = nombre.charAt(0).toUpperCase() + nombre.slice(1);
+  return { ruta: f, nombre };
 });
 ipcMain.handle('rl:report:pickImage', async () => {
   const r = await dialog.showOpenDialog(win, {

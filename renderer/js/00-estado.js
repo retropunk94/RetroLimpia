@@ -84,6 +84,8 @@ const JUNK = {
   miniaturas: ['Miniaturas de imágenes', 'Thumbnail cache', 'Se vuelven a crear solas al abrir carpetas.', 'Rebuilt automatically when you open folders.'],
   navegadores: ['Caché de navegadores', 'Browser cache', 'Solo la caché: no borra contraseñas, historial ni sesiones. Las páginas tardarán un poco más la primera vez.', 'Cache only: passwords, history and sessions stay. Pages load a bit slower the first time.'],
   volcados: ['Volcados de memoria', 'Memory dumps', 'Archivos de pantallazos azules antiguos. Solo los usan técnicos.', 'Old blue-screen dumps. Only technicians use them.'],
+  shaders: ['🎮 Caché de shaders (juegos)', '🎮 Shader cache (games)', 'Gráficos precalculados de tus juegos. Bórrala si un juego va a tirones o tras cambiar de driver: la primera partida cargará un poco más lenta mientras se rehace.', 'Pre-built graphics for your games. Clear it if a game stutters or after a driver change: the first game will load a bit slower while it rebuilds.'],
+  launchers: ['🎮 Caché de Steam, Epic, Battle.net, EA y Discord', '🎮 Steam, Epic, Battle.net, EA & Discord cache', 'Solo las páginas web guardadas de sus tiendas y chats. Tus juegos, partidas y sesiones no se tocan.', 'Only their saved store and chat web pages. Your games, saves and logins are untouched.'],
   papelera: ['Papelera de reciclaje', 'Recycle Bin', 'Vacía la papelera. Revísala antes si tiene algo importante.', 'Empties the Recycle Bin. Check it first if it holds anything important.']
 };
 const PNP_CODES = {

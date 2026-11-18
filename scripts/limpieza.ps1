@@ -22,6 +22,20 @@ function Get-BrowserCacheDirs {
     return $dirs
 }
 
+# Cachés web de launchers y Discord (solo la caché: nunca juegos, partidas ni sesiones)
+function Get-LauncherCacheDirs {
+    $l = @(
+        "$env:LOCALAPPDATA\Steam\htmlcache\Cache", "$env:LOCALAPPDATA\Steam\htmlcache\Code Cache", "$env:LOCALAPPDATA\Steam\htmlcache\GPUCache",
+        "$env:LOCALAPPDATA\EpicGamesLauncher\Saved\webcache", "$env:LOCALAPPDATA\EpicGamesLauncher\Saved\webcache_4147", "$env:LOCALAPPDATA\EpicGamesLauncher\Saved\webcache_4430", "$env:LOCALAPPDATA\EpicGamesLauncher\Saved\webcache_6099",
+        "$env:LOCALAPPDATA\Battle.net\BrowserCaches", "$env:LOCALAPPDATA\Battle.net\Cache",
+        "$env:LOCALAPPDATA\Electronic Arts\EA Desktop\CEF\BrowserCache",
+        "$env:APPDATA\discord\Cache", "$env:APPDATA\discord\Code Cache", "$env:APPDATA\discord\GPUCache"
+    )
+    $steam = (Get-ItemProperty 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath
+    if ($steam) { $l += (Join-Path ($steam -replace '/', '\') 'appcache\httpcache') }
+    return @($l | Where-Object { Test-Path -LiteralPath $_ })
+}
+
 $categories = [ordered]@{
     temp_usuario  = @{ rutas = @($env:TEMP); color = 'verde' }
     temp_windows  = @{ rutas = @("$env:windir\Temp"); color = 'verde' }
@@ -32,6 +46,10 @@ $categories = [ordered]@{
     navegadores   = @{ rutas = @(Get-BrowserCacheDirs); color = 'amarillo' }
     volcados      = @{ rutas = @("$env:windir\Minidump", "$env:windir\MEMORY.DMP"); color = 'amarillo' }
     papelera      = @{ rutas = @(); color = 'amarillo' }
+    # Limpieza gamer: se vuelven a crear solas. Los shaders hacen que la primera partida tras limpiar
+    # tarde un poco más en cargar (por eso es amarillo): útil si un juego va a tirones o tras cambiar de driver.
+    shaders       = @{ rutas = @("$env:LOCALAPPDATA\D3DSCache", "$env:LOCALAPPDATA\NVIDIA\DXCache", "$env:LOCALAPPDATA\NVIDIA\GLCache", "$env:ProgramData\NVIDIA Corporation\NV_Cache", "$env:LOCALAPPDATA\AMD\DxCache", "$env:LOCALAPPDATA\AMD\DxcCache", "$env:LOCALAPPDATA\AMD\GLCache", "$env:LOCALAPPDATA\AMD\VkCache", "$env:LOCALAPPDATA\Intel\ShaderCache"); color = 'amarillo' }
+    launchers     = @{ rutas = @(Get-LauncherCacheDirs); color = 'verde' }
 }
 
 function Get-RecycleSize {

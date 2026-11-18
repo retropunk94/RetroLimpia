@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://retropunk94.github.io/RetroLimpia/sitemap.xml

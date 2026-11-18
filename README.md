@@ -6,6 +6,8 @@
 
 Gratis · Código abierto (MIT) · Sin telemetría · Todo se puede deshacer
 
+🌐 **Web oficial: [retropunk94.github.io/RetroLimpia](https://retropunk94.github.io/RetroLimpia/)**
+
 ![Pantalla de inicio](docs/capturas/inicio.png)
 
 ## Descargar

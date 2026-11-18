@@ -119,7 +119,9 @@ function createWindow() {
     const s = loadSettings();
     if (!quitting && s.inicioWindows && tray) {
       e.preventDefault();
-      win.hide();
+      // Amigable con el PC: en la bandeja se libera la ventana entera (unos 150 MB de RAM).
+      // Solo se esconde si está trabajando, para no cortar la tarea a medias.
+      if (rendererBusy) win.hide(); else { const w = win; win = null; w.destroy(); }
       setTimeout(installWhenIdle, 5000);
       if (!s.bandejaAvisada) {
         saveSettings({ ...s, bandejaAvisada: true });
@@ -129,7 +131,8 @@ function createWindow() {
       }
     }
   });
-  win.on('closed', () => { win = null; });
+  const esta = win;
+  win.on('closed', () => { if (win === esta) { win = null; rendererBusy = false; } });
 }
 let wantHidden = false;
 function BACKGROUND_HIDDEN() { return wantHidden; }

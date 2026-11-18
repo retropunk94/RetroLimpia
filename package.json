@@ -81,6 +81,12 @@
         "repo": "RetroLimpia",
         "releaseType": "release"
       }
-    ]
+    ],
+    "electronLanguages": [
+      "es",
+      "es-419",
+      "en-US"
+    ],
+    "compression": "maximum"
   }
 }

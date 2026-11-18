@@ -21,7 +21,14 @@ Ve a **[Releases](../../releases/latest)** y descarga **`RetroLimpia-Instalador-
 | **Revisar mi PC** | Un solo botón lo analiza todo y da una **nota de salud del 1 al 100**. Después, "Arreglar todo" aplica lo recomendado. |
 | **Programas y bloatware** | Desinstala en silencio, sin el asistente de cada programa. Muestra cuánto pesa cada uno y su **impacto en el sistema** (si arranca con Windows, servicios y RAM). Marca cada programa en **verde** (seguro quitarlo), **amarillo** (opcional) o **rojo** (mejor no tocar). |
 | **Restos** | Al desinstalar, una ventana te enseña en vivo qué hace y dónde (desinstalador, carpetas, registro) y al final te dice si **quedó algo en el registro**. Lo que seguro es del programa va a la cuarentena; lo dudoso te lo pregunta. |
-| **Limpieza** | Temporales, caché de Windows Update, informes de error, miniaturas y caché de navegadores. Nunca toca documentos, contraseñas ni historial. |
+| **Limpieza** | Temporales, caché de Windows Update, informes de error, miniaturas, caché de navegadores y **limpieza gamer** (shaders de NVIDIA/AMD/Intel/DirectX y caché de Steam, Battle.net y Discord). Nunca toca documentos, contraseñas ni historial. |
+| **Restos de programas antiguos** | Carpetas vacías, accesos directos rotos y programas "fantasma" que dejaron cosas que ya desinstalaste (aunque no fuera con RetroLimpia). Todo a la cuarentena. |
+| **Privacidad** | Apaga anuncios del menú Inicio, apps que se instalan solas, publicidad personalizada, Bing en la búsqueda y el envío de datos opcional. Cada interruptor explicado y reversible. |
+| **Modo Juego** | Cierra **solo lo que tú elijas** (OBS, Discord, Steam y periféricos protegidos), máxima potencia, notificaciones en silencio y Windows Update en pausa, con tres intensidades. Añade tus juegos o **emuladores** y se activa solo. Un botón lo deja todo como estaba. |
+| **Acabo de formatear** | Pasos guiados tras instalar Windows: drivers, actualizaciones, programas imprescindibles instalados solos con winget (cada uno explicado), quitar bloatware, privacidad, ajustes cómodos y punto de restauración. |
+| **¿Por qué se reinició?** | Traduce el registro de Windows: pantallazos azules (con su causa probable), apagados de golpe y reinicios de Windows Update. |
+| **Retro, la mascota** | Reacciona a lo que pasa. Se puede poner tranquila o apagar con un clic. |
+| **Modo PC modesto** | En equipos con poca RAM o pocos núcleos se aligera solo: sin animaciones y con menos prioridad. 0 % de CPU en reposo siempre. |
 | **Arranque** | Desactiva los programas que arrancan con Windows sin hacer falta. Usa el mismo interruptor que el Administrador de tareas. |
 | **Hardware y salud** | CPU, gráfica, RAM, placa, BIOS, batería. **Salud y desgaste de los discos**, temperaturas y consejos fáciles de entender. |
 | **Drivers** | Dispositivos con problemas, drivers antiguos y copia de seguridad de tus drivers. Solo fuentes oficiales: Windows Update y la app de NVIDIA, AMD o Intel. |
@@ -30,6 +37,29 @@ Ve a **[Releases](../../releases/latest)** y descarga **`RetroLimpia-Instalador-
 | **Procesos (avanzado)** | Qué consume más CPU y RAM ahora mismo, con opción de cerrarlo. Los procesos vitales de Windows están protegidos. |
 | **Se actualiza solo** | Busca versión nueva en GitHub, descarga solo lo que cambió y se instala sola: con una cuenta atrás si lo estás usando (con botón "Más tarde") o en silencio si está en la bandeja. |
 | **Deshacer** | Punto de restauración antes de cada cambio y **cuarentena de 7 días** con botón de restaurar. |
+
+## RetroLimpia vs Microsoft PC Manager
+
+PC Manager es una buena herramienta básica. RetroLimpia va más allá en lo que más se nota:
+
+| | RetroLimpia | PC Manager |
+|---|:---:|:---:|
+| Limpieza de temporales | ✅ | ✅ |
+| Programas que arrancan con Windows | ✅ | ✅ |
+| Desinstalar **en silencio y quitar los restos** (carpetas y registro) | ✅ | ❌ |
+| Restos de programas desinstalados hace tiempo | ✅ | ❌ |
+| Bloatware marcado por colores (seguro / opcional / no tocar) | ✅ | ❌ |
+| Apagar anuncios y envío de datos de Windows | ✅ | ❌ |
+| Drivers: problemas, copia de seguridad y fuentes oficiales | ✅ | ❌ |
+| Actualizar todos tus programas de una vez (winget) | ✅ | ❌ |
+| Salud y desgaste de los discos, temperaturas | ✅ | ❌ |
+| ¿Por qué se reinició mi PC? (pantallazos azules explicados) | ✅ | ❌ |
+| Modo Juego con emuladores y protección de OBS/Discord | ✅ | ❌ |
+| Asistente tras formatear | ✅ | ❌ |
+| Cuarentena de 7 días para deshacer | ✅ | ❌ |
+| Código abierto y sin telemetría | ✅ | ❌ |
+
+<sub>Comparado con PC Manager en noviembre de 2026. Si Microsoft añade algo, avísanos en Discord y lo corregimos.</sub>
 
 ![Programas](docs/capturas/programas.png)
 ![Hardware](docs/capturas/hardware.png)

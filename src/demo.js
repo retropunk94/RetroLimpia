@@ -5,6 +5,15 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const GB = 1024 ** 3, MB = 1024 ** 2;
 
 let token = 0;
+const demoPriv = { id_publicidad: true };
+let demoJuego = null;
+const demoRestos = [
+  { tipo: 'carpeta', clase: 'vacia', ruta: 'C:\\Program Files (x86)\\ManyCam', nombre: 'ManyCam', confianza: 'alta', tamano: 0 },
+  { tipo: 'carpeta', clase: 'vacia', ruta: 'C:\\ProgramData\\FxSound LLC', nombre: 'FxSound LLC', confianza: 'alta', tamano: 0 },
+  { tipo: 'archivo', clase: 'acceso', ruta: 'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Juego Viejo.lnk', nombre: 'Juego Viejo', confianza: 'alta', tamano: 0 },
+  { tipo: 'carpeta', clase: 'huerfana', ruta: 'C:\\Program Files\\EditorDeFotos', nombre: 'EditorDeFotos', confianza: 'media', tamano: 48234496 },
+  { tipo: 'registro', clase: 'fantasma', ruta: 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ToolbarX', nombre: 'ToolbarX', confianza: 'alta', tamano: 0 }
+];
 function cancel() { token++; }
 async function steps(onProgress, msgs, total = 1200) {
   const my = token;
@@ -84,7 +93,7 @@ const updates = {
 
 const limpieza = [
   ['temp_usuario', 3.2 * GB, 'verde'], ['temp_windows', 640 * MB, 'verde'], ['wu_cache', 2.1 * GB, 'verde'], ['entrega', 900 * MB, 'verde'],
-  ['informes', 120 * MB, 'verde'], ['miniaturas', 260 * MB, 'verde'], ['navegadores', 1.4 * GB, 'amarillo'], ['volcados', 0, 'amarillo'], ['papelera', 5.6 * GB, 'amarillo']
+  ['informes', 120 * MB, 'verde'], ['miniaturas', 260 * MB, 'verde'], ['navegadores', 1.4 * GB, 'amarillo'], ['volcados', 0, 'amarillo'], ['papelera', 5.6 * GB, 'amarillo'], ['shaders', 2.3 * GB, 'amarillo'], ['launchers', 640 * MB, 'verde']
 ].map(([id, tamano, color]) => ({ id, tamano, color }));
 
 const inicio = [
@@ -109,6 +118,7 @@ async function run(script, p, onProgress) {
       if (p.accion === 'buscar') { await steps(onProgress, ['Preguntando a Windows Update...', 'Buscando actualizaciones de programas...'], 1600); return updates; }
       if (p.accion === 'instalarWU') { await steps(onProgress, ['Descargando...', 'Instalando...'], 1800); return { resultados: (p.ids || updates.windows.map((u) => u.id)).map((id) => ({ id, ok: true })), reinicio: true }; }
       if (p.accion === 'winget') { await steps(onProgress, ['Actualizando...'], 1500); return { resultados: (p.ids || updates.apps.map((a) => a.id)).map((id) => ({ id, ok: true })) }; }
+      if (p.accion === 'instalar') { for (const it of p.items || []) { onProgress({ msg: 'Instalando ' + it.nombre + '...', log: { tipo: 'ok', msg: 'Instalado: ' + it.nombre, en: 'Installed: ' + it.nombre } }); await wait(500); } return { ok: true, resultados: (p.items || []).map((it) => ({ id: it.id, ok: true })) }; }
       break;
     case 'limpieza':
       if (p.accion === 'analizar') { await steps(onProgress, ['Midiendo archivos basura...'], 900); return { categorias: limpieza }; }
@@ -122,6 +132,38 @@ async function run(script, p, onProgress) {
       if (p.accion === 'crear') { await steps(onProgress, ['Creando punto de restauración...'], 1200); return { ok: true }; }
       if (p.accion === 'listar') return { puntos: [{ numero: 41, descripcion: 'RetroLimpia - Antes de limpiar', fecha: '2026-11-10' }] };
       return { ok: true };
+    case 'modojuego': {
+      if (p.accion === 'listar') return { apps: [
+        { nombre: 'onedrive', titulo: 'Microsoft OneDrive', ram: 96e6, sugerido: true, protegido: false, nota: 'Sincroniza tus archivos con la nube y usa disco e internet mientras juegas. Se vuelve a abrir al terminar.' },
+        { nombre: 'phoneexperiencehost', titulo: 'Enlace Móvil', ram: 210e6, sugerido: true, protegido: false, nota: '"Enlace Móvil" de Windows: conecta tu teléfono. No hace falta para jugar.' },
+        { nombre: 'chrome', titulo: 'Google Chrome', ram: 1.4e9, sugerido: false, protegido: false, nota: 'Navegador: si lo cierras, guarda antes lo que tengas abierto. Las pestañas suelen volver al reabrirlo.' },
+        { nombre: 'spotify', titulo: 'Spotify', ram: 310e6, sugerido: false, protegido: false, nota: 'Programa abierto. Si lo cierras, guarda antes lo que estés haciendo.' },
+        { nombre: 'discord', titulo: 'Discord', ram: 600e6, protegido: true }, { nombre: 'obs64', titulo: 'OBS Studio', ram: 400e6, protegido: true }, { nombre: 'steam', titulo: 'Steam', ram: 200e6, protegido: true }
+      ], activo: !!demoJuego, estado: demoJuego };
+      if (p.accion === 'activar') { await steps(onProgress, ['Cerrando lo que elegiste...', 'Poniendo el PC a máxima potencia...', 'Silenciando notificaciones...'], 600); demoJuego = { activo: true, desde: new Date().toISOString(), intensidad: p.intensidad, cerrados: (p.cerrar || []).map((nombre) => ({ nombre })) }; return { ok: true, estado: demoJuego, hecho: ['cerrar', 'energia'] }; }
+      if (p.accion === 'restaurar') { await steps(onProgress, ['Devolviendo el PC a como estaba...'], 700); const m = demoJuego ? Math.round((Date.now() - new Date(demoJuego.desde)) / 60000) : 0; const nada = !demoJuego; demoJuego = null; return { ok: true, minutos: m, nada }; }
+      return { activo: !!demoJuego, estado: demoJuego };
+    }
+    case 'reinicios': {
+      await steps(onProgress, ['Leyendo el historial de Windows...'], 700);
+      const h = (d, hr) => new Date(Date.now() - d * 864e5 - hr * 36e5).toISOString();
+      return { eventos: [
+        { fecha: h(0, 2), clase: 'usuario', titulo: 'Lo apagaste tú', detalle: 'Desde el menú Inicio o un programa que te lo pidió.' },
+        { fecha: h(1, 5), clase: 'update', titulo: 'Windows Update reinició para instalar actualizaciones', detalle: 'Es normal. Si te molesta que pase mientras usas el PC, elige tus "horas activas" en Configuración > Windows Update.' },
+        { fecha: h(3, 1), clase: 'bsod', titulo: 'Pantallazo azul', detalle: 'La tarjeta gráfica dejó de responder (driver de vídeo o gráfica forzada/caliente).', codigo: '0x00000116' },
+        { fecha: h(9, 4), clase: 'corte', titulo: 'Se apagó de golpe', detalle: 'Sin aviso de Windows: corte de luz, botón de encendido mantenido, o la fuente/temperatura.' }
+      ], dias: 30 };
+    }
+    case 'restos': {
+      await steps(onProgress, ['Leyendo qué programas tienes instalados...', 'Buscando carpetas que quedaron de programas viejos...', 'Buscando accesos directos que ya no abren nada...'], 700);
+      return { restos: demoRestos.filter((x) => !x.quitado), total: 0 };
+    }
+    case 'privacidad': {
+      if (p.accion === 'listar') return { ajustes: ['anuncios_inicio', 'sugerencias_ajustes', 'consejos_windows', 'apps_solas', 'pantalla_bloqueo', 'id_publicidad', 'explorador_anuncios', 'bing_busqueda', 'experiencias_personalizadas', 'telemetria_opcional', 'copilot'].map((id) => ({ id, aplicado: !!demoPriv[id], permitido: true })) };
+      await steps(onProgress, ['Aplicando...'], 500);
+      for (const id of p.ids || []) demoPriv[id] = p.accion === 'aplicar';
+      return { resultados: (p.ids || []).map((id) => ({ id, ok: true })) };
+    }
     case 'procesos': {
       if (p.accion === 'terminar') { await wait(300); return { ok: true, terminados: (p.pids || []).length }; }
       await wait(500);
@@ -181,6 +223,7 @@ async function run(script, p, onProgress) {
         for (const it of p.items) { onProgress({ log: { tipo: 'ok', msg: it.tipo === 'registro' ? 'Entrada del registro copiada a la cuarentena y borrada' : 'Movido a la cuarentena', en: 'Moved to quarantine', ruta: it.ruta } }); await wait(250); }
         onProgress({ log: { tipo: 'info', msg: 'Todo lo quitado está guardado aquí unos días por si quieres restaurarlo', en: 'Kept here for a few days', ruta: 'C:\\ProgramData\\RetroLimpia\\Cuarentena\\20261117-0315' } });
         const lote = { id: String(Date.now()), fecha: new Date().toISOString(), motivo: p.motivo, cantidad: p.items.length, bytes: p.items.reduce((a, i) => a + (i.tamano || 0), 0), items: p.items };
+        for (const it of p.items) { const d = demoRestos.find((x) => x.ruta === it.ruta); if (d) d.quitado = true; }
         cuarentena.unshift(lote); return { id: lote.id, guardados: p.items.length, fallidos: [], bytes: lote.bytes };
       }
       if (p.accion === 'listar') return { lotes: cuarentena };

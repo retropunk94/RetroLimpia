@@ -1,6 +1,9 @@
 'use strict';
 // ============================================================ Vistas
 const ICONS = {
+  formateo: '<path d="M12 3l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L4.8 8.3l5-.7z"/>',
+  juego: '<rect x="2" y="7" width="20" height="11" rx="5"/><path d="M7 11v3M5.5 12.5h3"/><circle cx="16" cy="11.5" r="1"/><circle cx="18" cy="13.5" r="1"/>',
+  privacidad: '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
   inicio: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   programas: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 17.5h7M17.5 14v7"/>',
   limpieza: '<path d="M14 3l7 7M4 20l7-7M9.5 8.5l6 6-2.5 5.5-9-9z"/><path d="M5 4v3M3.5 5.5h3"/>',
@@ -17,6 +20,9 @@ const NAV = [
   ['programas', 'Programas y bloatware', 'Programs & bloatware'],
   ['limpieza', 'Limpieza', 'Cleanup'],
   ['arranque', 'Arranque de Windows', 'Windows startup'],
+  ['privacidad', 'Privacidad', 'Privacy'],
+  ['juego', 'Modo Juego', 'Game Mode'],
+  ['formateo', 'Acabo de formatear', 'Fresh install'],
   'sep',
   ['hardware', 'Hardware y salud', 'Hardware & health'],
   ['drivers', 'Drivers', 'Drivers'],
@@ -52,6 +58,7 @@ function banners() {
   let h = '';
   if (S.info.demo) h += `<div class="banner info"><div class="grow"><b>${L('Modo demostración', 'Demo mode')}</b> · ${L('Los datos son de ejemplo y no se cambia nada en este equipo.', 'Sample data; nothing on this computer is changed.')}</div></div>`;
   if (!S.info.esAdmin) h += `<div class="banner warn"><div class="grow"><b>${L('Abre RetroLimpia como administrador', 'Run RetroLimpia as administrator')}</b> · ${L('Sin permisos de administrador no puede desinstalar ni actualizar drivers. Ciérralo, haz clic derecho en su icono y elige "Ejecutar como administrador".', 'Without admin rights it cannot uninstall or update drivers. Close it, right-click its icon and choose "Run as administrator".')}</div></div>`;
+  if (S.view !== 'juego' && ((S.juego && S.juego.activo) || (!S.juego && S.info.juegoActivo))) h += `<div class="banner info"><div class="grow">🕶️ <b>${L('El Modo Juego está activo', 'Game Mode is on')}</b> · ${L('Cuando termines de jugar, restaura el PC para que todo vuelva a como estaba.', 'When you finish playing, restore your PC so everything goes back to normal.')}</div><button class="btn small" data-nav="juego">${L('Ir a Modo Juego', 'Go to Game Mode')}</button></div>`;
   if (S.needsReboot) h += `<div class="banner warn"><div class="grow"><b>${L('Reinicia el PC cuando puedas', 'Restart your PC when you can')}</b> · ${L('Algunas actualizaciones o desinstalaciones terminan al reiniciar.', 'Some updates or uninstalls finish after a restart.')}</div></div>`;
   if (S.refreshing && S.refreshing.has(VIEW_REFRESH[S.view])) h += `<div class="banner info"><div class="grow">🔄 <b>${L('Actualizando esta pestaña', 'Refreshing this tab')}</b> · ${L('Leyendo de nuevo lo que cambió tras la última acción...', 'Re-reading what changed after the last action...')}</div></div>`;
   if (S.info.cierreRaro && !S.crashSeen && S.info.reportes) h += `<div class="banner warn"><div class="grow"><b>${L('La última vez RetroLimpia se cerró de forma inesperada', 'Last time RetroLimpia closed unexpectedly')}</b> · ${L('¿Nos cuentas qué estabas haciendo? Nos ayuda a arreglarlo en la próxima versión.', 'Tell us what you were doing? It helps us fix it in the next version.')}</div><button class="btn small" data-act="reportOpen">🐞 ${L('Reportar', 'Report')}</button><button class="btn small ghost" data-act="crashSeen">${L('Ahora no', 'Not now')}</button></div>`;
@@ -108,7 +115,8 @@ function viewInicio() {
           <button class="btn primary" data-act="fixAll" ${S.busy ? 'disabled' : ''}>${L('Arreglar todo', 'Fix all')}</button></div>` : ''}`;
     }
   }
-  return `<div class="view">${banners()}${body}</div>`;
+  const extras = sc.state !== 'running' && !S.fix ? `<div class="extras-inicio">${historialHTML()}${ganadoHTML()}</div>` : '';
+  return `<div class="view">${banners()}${body}${extras}</div>`;
 }
 
 function residuesReviewHTML() {
@@ -198,7 +206,8 @@ function viewLimpieza() {
       <div class="grow"><div class="name">${L(es, en)}</div><div class="note">${L(des, den)}</div></div>
       <span class="badge ${c.color}">${c.color === 'verde' ? L('Seguro', 'Safe') : L('Revisa antes', 'Check first')}</span><div class="size">${fmtBytes(c.tamano)}</div></label>`; }).join('')}</div>
     <div class="actionbar"><div class="info">${L('Seleccionado:', 'Selected:')} <b>${fmtBytes(total)}</b></div>
-      <button class="btn primary" data-act="clean" ${!total || S.busy ? 'disabled' : ''}>${L('Liberar ', 'Free ')}${fmtBytes(total)}</button></div></div>`;
+      <button class="btn primary" data-act="clean" ${!total || S.busy ? 'disabled' : ''}>${L('Liberar ', 'Free ')}${fmtBytes(total)}</button></div>
+    ${restosCardHTML()}</div>`;
 }
 
 function viewArranque() {
@@ -240,7 +249,8 @@ function viewHardware() {
       ${d.desgaste != null ? `<div class="meter"><i class="${d.desgaste >= 80 ? 'rojo' : d.desgaste >= 50 ? 'amarillo' : ''}" style="width:${Math.max(2, d.desgaste)}%"></i></div><div class="meta">${L('Desgaste', 'Wear')}: ${d.desgaste}%</div>` : ''}
       ${d.errores ? `<div class="meta" style="color:var(--rojo)">${d.errores} ${L('errores de lectura/escritura', 'read/write errors')}</div>` : ''}</div>`).join('')}</div>
     <h2>${L('Espacio', 'Space')}</h2>
-    <div class="grid c2">${(h.unidades || []).map((v) => { const used = v.total ? 1 - v.libre / v.total : 0; return `<div class="card"><div class="big">${esc(v.letra)} ${esc(v.etiqueta || '')}</div><div class="meter"><i class="${used > 0.9 ? 'rojo' : used > 0.8 ? 'amarillo' : ''}" style="width:${Math.round(used * 100)}%"></i></div><div class="meta">${fmtBytes(v.libre)} ${L('libres de', 'free of')} ${fmtBytes(v.total)}</div></div>`; }).join('')}</div></div>`;
+    <div class="grid c2">${(h.unidades || []).map((v) => { const used = v.total ? 1 - v.libre / v.total : 0; return `<div class="card"><div class="big">${esc(v.letra)} ${esc(v.etiqueta || '')}</div><div class="meter"><i class="${used > 0.9 ? 'rojo' : used > 0.8 ? 'amarillo' : ''}" style="width:${Math.round(used * 100)}%"></i></div><div class="meta">${fmtBytes(v.libre)} ${L('libres de', 'free of')} ${fmtBytes(v.total)}</div></div>`; }).join('')}</div>
+    ${reiniciosHTML()}</div>`;
 }
 
 function viewDrivers() {

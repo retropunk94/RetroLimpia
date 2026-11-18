@@ -19,6 +19,16 @@ const S = {
   appUpdate: null
 };
 
+// Lo que RetroLimpia consiguió en esta sesión (para el resumen "lo que ganaste")
+const RESUMEN = { liberado: 0, anuncios: 0, programas: 0, restos: 0, desinstalados: 0 };
+// Suma a lo de esta sesión y al total de siempre (se guarda en ajustes: un número por clave, nada más)
+function ganar(clave, n) {
+  n = Number(n) || 0; if (n <= 0) return;
+  RESUMEN[clave] = (RESUMEN[clave] || 0) + n;
+  const t = { ...(S.settings.totales || {}) }; t[clave] = (Number(t[clave]) || 0) + n;
+  S.settings.totales = t; rl.setSettings({ totales: t }).catch(() => {});
+}
+
 const repoUrl = () => (S.info.repo && !S.info.repo.startsWith('TU_USUARIO') ? 'https://github.com/' + S.info.repo : null);
 const DISCORD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.3 4.4A19.6 19.6 0 0 0 15.4 3l-.6 1.3a18 18 0 0 0-5.6 0L8.6 3a19.6 19.6 0 0 0-4.9 1.4C.6 9 -.3 13.5.1 18a19.8 19.8 0 0 0 6 3l1.3-2a12.7 12.7 0 0 1-2-1l.5-.4a14 14 0 0 0 12.2 0l.5.4c-.6.4-1.3.7-2 1l1.3 2a19.7 19.7 0 0 0 6-3c.5-5.2-.8-9.7-3.6-13.6zM8.5 15.3c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4zm7 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4z"/></svg>';
 const GH_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38v-1.33c-2.23.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.22 1.87.87 2.33.66.07-.52.28-.87.5-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48v2.19c0 .21.15.46.55.38A8 8 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>';
@@ -81,6 +91,8 @@ const JUNK = {
   miniaturas: ['Miniaturas de imágenes', 'Thumbnail cache', 'Se vuelven a crear solas al abrir carpetas.', 'Rebuilt automatically when you open folders.'],
   navegadores: ['Caché de navegadores', 'Browser cache', 'Solo la caché: no borra contraseñas, historial ni sesiones. Las páginas tardarán un poco más la primera vez.', 'Cache only: passwords, history and sessions stay. Pages load a bit slower the first time.'],
   volcados: ['Volcados de memoria', 'Memory dumps', 'Archivos de pantallazos azules antiguos. Solo los usan técnicos.', 'Old blue-screen dumps. Only technicians use them.'],
+  shaders: ['🎮 Caché de shaders (juegos)', '🎮 Shader cache (games)', 'Gráficos precalculados de tus juegos. Bórrala si un juego va a tirones o tras cambiar de driver: la primera partida cargará un poco más lenta mientras se rehace.', 'Pre-built graphics for your games. Clear it if a game stutters or after a driver change: the first game will load a bit slower while it rebuilds.'],
+  launchers: ['🎮 Caché de Steam, Battle.net y Discord', '🎮 Steam, Battle.net & Discord cache', 'Solo las páginas web guardadas de sus tiendas y chats. Tus juegos, partidas y sesiones no se tocan.', 'Only their saved store and chat web pages. Your games, saves and logins are untouched.'],
   papelera: ['Papelera de reciclaje', 'Recycle Bin', 'Vacía la papelera. Revísala antes si tiene algo importante.', 'Empties the Recycle Bin. Check it first if it holds anything important.']
 };
 const PNP_CODES = {

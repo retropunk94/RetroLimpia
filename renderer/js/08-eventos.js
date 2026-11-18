@@ -2,7 +2,7 @@
 // ============================================================ Render y eventos
 function render() {
   renderNav();
-  const views = { inicio: viewInicio, programas: viewProgramas, limpieza: viewLimpieza, arranque: viewArranque, hardware: viewHardware, drivers: viewDrivers, actualizaciones: viewActualizaciones, procesos: viewProcesos, deshacer: viewDeshacer, ajustes: viewAjustes };
+  const views = { inicio: viewInicio, programas: viewProgramas, limpieza: viewLimpieza, arranque: viewArranque, privacidad: viewPrivacidad, juego: viewJuego, formateo: viewFormateo, hardware: viewHardware, drivers: viewDrivers, actualizaciones: viewActualizaciones, procesos: viewProcesos, deshacer: viewDeshacer, ajustes: viewAjustes };
   const focusId = document.activeElement && ['search', 'procSearch'].includes(document.activeElement.id) ? document.activeElement.id : null;
   const caret = focusId ? document.activeElement.selectionStart : 0;
   let html;
@@ -12,12 +12,15 @@ function render() {
     html = `<div class="view"><div class="banner bad"><div class="grow"><b>${L('Esta pantalla tuvo un problema', 'This screen had a problem')}</b> · ${esc(e.message)}</div><button class="btn small" data-nav="inicio">${L('Volver al inicio', 'Back to start')}</button></div></div>`;
   }
   $('#main').innerHTML = html;
+  aplicarModoLigero(); renderRetro();
   if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); el.setSelectionRange(caret, caret); } }
 }
 
 document.addEventListener('click', async (e) => {
-  const t = e.target.closest('[data-reveal],[data-copy],[data-monview],[data-psort],[data-pask],[data-pkill],[data-updall],[data-retry],[data-nav],[data-act],[data-win],[data-open],[data-filter],[data-folder],[data-restore],[data-wu],[data-wg]');
+  const t = e.target.closest('[data-reveal],[data-copy],[data-monview],[data-psort],[data-pask],[data-pkill],[data-updall],[data-retry],[data-nav],[data-act],[data-win],[data-open],[data-filter],[data-folder],[data-restore],[data-wu],[data-wg],[data-juego-quitar],[data-form-ir]');
   if (!t) return;
+  if (t.dataset.formIr) { const paso = { drivers: 'drivers', actualizaciones: 'windows', programas: 'bloatware' }[t.dataset.formIr]; formMarcar(paso); S.view = t.dataset.formIr; if (S.view === 'programas') S.progFilter = 'verde'; render(); $('#main').scrollTop = 0; return; }
+  if (t.dataset.juegoQuitar !== undefined) { const l = arr(S.settings.misJuegos).filter((_, i) => i !== Number(t.dataset.juegoQuitar)); S.settings = await rl.setSettings({ misJuegos: l, ...(l.length ? {} : { juegoAuto: false }) }); return render(); }
   if (t.dataset.reveal) { const ok = await rl.reveal(t.dataset.reveal); if (!ok) toast(L('Esa ubicación ya no existe (se movió a la cuarentena o se borró).', 'That location no longer exists (moved to quarantine or deleted).'), 'err'); return; }
   if (t.dataset.copy) { try { await navigator.clipboard.writeText(t.dataset.copy); toast(L('Ruta copiada.', 'Path copied.')); } catch { toast(t.dataset.copy); } return; }
   if (t.dataset.monview) { S.mon.view = Number(t.dataset.monview); return renderMonitor(); }
@@ -72,11 +75,30 @@ document.addEventListener('click', async (e) => {
     case 'procBack': $('#modal').classList.add('hidden'); S.view = 'inicio'; return render();
     case 'procPause': S.procPaused = !S.procPaused; return render();
     case 'tour': return startTour();
+    case 'miniTour': $('#modal').classList.add('hidden'); return startTour(true);
     case 'monClose': $('#monitor').classList.add('hidden'); S.mon = null; return render();
     case 'monQuar': $('#monitor').classList.add('hidden'); S.mon = null; S.quarantine = null; S.view = 'deshacer'; return render();
     case 'donateAsk': return showDonate();
     case 'donateGo': $('#modal').classList.add('hidden'); return rl.open(S.info.paypal);
     case 'modalClose': $('#modal').classList.add('hidden'); S.rep = null; return;
+    case 'retroMenu': return retroMenu();
+    case 'restosBuscar': return restosBuscar();
+    case 'juegoOn': return juegoOn();
+    case 'reinicios': return reinicios();
+    case 'formInstalar': return formInstalar();
+    case 'formPriv': return formPriv();
+    case 'formComodo': return formComodo();
+    case 'formPunto': return formPunto();
+    case 'formReset': S.settings = await rl.setSettings({ formateoPasos: {} }); return render();
+    case 'juegoOff': return juegoOff();
+    case 'juegoAdd': return juegoAdd();
+    case 'juegoReload': S.juego = null; return render();
+    case 'restosQuitar': return restosQuitar();
+    case 'privRec': { const st = Object.fromEntries(S.privacidad.map((a) => [a.id, a])); return privCambiar(PRIVACIDAD.map((x) => x[0]).filter((id) => st[id] && !st[id].aplicado && st[id].permitido !== false && !PRIV_OPCIONAL.has(id)), true); }
+    case 'retroOk': S.settings = await rl.setSettings({ mascotaPresentada: true }); return renderRetro();
+    case 'retroActiva': return setMascota('activa');
+    case 'retroTranquila': return setMascota('tranquila');
+    case 'retroOff': return setMascota('off');
     case 'news': return showNews(null, true);
     case 'crashSeen': S.crashSeen = true; return render();
     case 'reportOpen': return openReport(t.dataset.ctx || '');
@@ -135,6 +157,8 @@ document.addEventListener('click', async (e) => {
       return taskC(L('Limpiando', 'Cleaning'), async () => {
         const r = await rl.run('limpieza', { accion: 'limpiar', categorias: [...S.junkSel] });
         toast(L('¡Liberaste ', 'You freed ') + fmtBytes(r.liberado) + '!');
+        ganar('liberado', r.liberado);
+        retroReacciona('guino', L('¡Más limpio! 😉', 'Squeaky clean! 😉'));
         await loadJunk();
       });
     case 'reloadJunk': S.junk = null; return render();
@@ -202,6 +226,13 @@ document.addEventListener('change', async (e) => {
   if (t.dataset.sort !== undefined) { S.progSort = t.value; return render(); }
   if (t.dataset.upd) { t.checked ? S.updSel.add(t.dataset.upd) : S.updSel.delete(t.dataset.upd); return render(); }
   if (t.dataset.sel) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); return render(); }
+  if (t.dataset.formProg) { t.checked ? formSel().add(t.dataset.formProg) : formSel().delete(t.dataset.formProg); return render(); }
+  if (t.dataset.formCom) { if (!S.formCom) S.formCom = new Set(['ver_extensiones', 'explorador_este_equipo']); t.checked ? S.formCom.add(t.dataset.formCom) : S.formCom.delete(t.dataset.formCom); return; }
+  if (t.dataset.intens) { S.settings = await rl.setSettings({ juegoIntensidad: t.dataset.intens }); return render(); }
+  if (t.dataset.juegoApp !== undefined) { t.checked ? S.juegoSel.add(t.dataset.juegoApp) : S.juegoSel.delete(t.dataset.juegoApp); return render(); }
+  if (t.dataset.juegoAuto !== undefined) { S.settings = await rl.setSettings({ juegoAuto: t.checked }); toast(t.checked ? L('Listo: el Modo Juego se activará solo al abrir uno de tus juegos.', 'Done: Game Mode will turn on when you open one of your games.') : L('Modo automático apagado.', 'Auto mode off.')); return render(); }
+  if (t.dataset.juegoReabrir !== undefined) { S.settings = await rl.setSettings({ juegoReabrir: t.checked }); return; }
+  if (t.dataset.resto !== undefined) { t.checked ? S.restosSel.add(t.dataset.resto) : S.restosSel.delete(t.dataset.resto); return render(); }
   if (t.dataset.junk) { t.checked ? S.junkSel.add(t.dataset.junk) : S.junkSel.delete(t.dataset.junk); return render(); }
   if (t.dataset.finding) { const f = S.scan.findings.find((x) => x.id === t.dataset.finding); if (f) f.elegido = t.checked; return render(); }
   if (t.dataset.res) { const [g, r] = t.dataset.res.split(':').map(Number); S.pendingResidues[g].restos[r].elegido = t.checked; return; }
@@ -214,6 +245,7 @@ document.addEventListener('change', async (e) => {
     toast(t.checked ? (r.ok ? L('RetroLimpia arrancará con Windows y te avisará.', 'RetroLimpia will start with Windows and remind you.') : L('No se pudo activar.', 'Could not enable.')) : L('Ya no arrancará con Windows.', 'It will no longer start with Windows.'), r.ok ? 'ok' : 'err');
     return render();
   }
+  if (t.dataset.priv) { if (S.busy) { t.checked = !t.checked; return toast(L('Espera a que termine la tarea actual.', 'Wait for the current task to finish.'), 'err'); } return privCambiar([t.dataset.priv], t.checked); }
   if (t.dataset.setting) {
     const k = t.dataset.setting;
     const v = t.type === 'checkbox' ? t.checked : (['diasCuarentena', 'frecuenciaDias'].includes(k) ? Number(t.value) : t.value);

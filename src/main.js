@@ -38,7 +38,11 @@ const defaultSettings = {
   tourVisto: false,
   ultimoResumen: '',
   relanzarEnBandeja: false,
-  ultimaVersion: ''
+  ultimaVersion: '',
+  modoLigero: 'auto',      // auto | on | off  (bajos recursos)
+  mascota: 'activa',       // activa | tranquila | off
+  mascotaPresentada: false,
+  misJuegos: [], juegoAuto: false, juegoIntensidad: 'equilibrado', juegoCerrar: [], juegoReabrir: true, juegoPartidas: 0, formateoPasos: {}
 };
 function loadSettings() {
   try { return { ...defaultSettings, ...JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) }; }
@@ -55,6 +59,9 @@ const T = (es, en) => (loadSettings().idioma === 'en' ? en : es);
 function dataDir() {
   return app.isPackaged ? path.join(process.resourcesPath, 'data') : path.join(__dirname, '..', 'data');
 }
+// Equipo con pocos recursos: 4 GB de RAM o menos, o 2 núcleos o menos
+const EQUIPO_LIMITADO = os.totalmem() <= 4.5 * 1024 ** 3 || (os.cpus() || []).length <= 2;
+function ligeroActivo(s) { s = s || loadSettings(); return s.modoLigero === 'on' || (s.modoLigero !== 'off' && EQUIPO_LIMITADO); }
 function loadData(name) {
   const safe = path.basename(name).replace(/[^a-z0-9_-]/gi, '');
   return JSON.parse(fs.readFileSync(path.join(dataDir(), safe + '.json'), 'utf8'));
@@ -245,7 +252,7 @@ if (!app.requestSingleInstanceLock()) {
     // Marca de sesión: si al arrancar sigue ahí, la vez anterior se cerró de golpe (fallo)
     try { cierreRaro = fs.existsSync(sesionFlag()); fs.writeFileSync(sesionFlag(), String(Date.now())); } catch {}
     const paso = (nombre, fn) => { try { return fn(); } catch (e) { updLog('Arranque, fallo en ' + nombre + ': ' + (e && e.stack || e)); } };
-    paso('motor', () => engine.init({ demo: DEMO, scriptsDir: app.isPackaged ? path.join(process.resourcesPath, 'scripts') : path.join(__dirname, '..', 'scripts') }));
+    paso('motor', () => engine.init({ ligero: ligeroActivo(), demo: DEMO, scriptsDir: app.isPackaged ? path.join(process.resourcesPath, 'scripts') : path.join(__dirname, '..', 'scripts') }));
     // OJO: el instalador quita la sección "build" de package.json, así que el id va escrito aquí
     paso('appId', () => { if (process.platform === 'win32') app.setAppUserModelId('com.retropunk94.retrolimpia'); });
     let s = paso('ajustes', () => loadSettings()) || { ...defaultSettings };
@@ -256,6 +263,7 @@ if (!app.requestSingleInstanceLock()) {
     if (s.inicioWindows || enBandeja) paso('bandeja', () => { createTray(); startTimers(); });
     if (!enBandeja) paso('ventana', () => createWindow());
     paso('actualizador', () => initUpdater());
+    paso('juego', () => juegoWatch());
     // Mantenimiento silencioso: vacía la cuarentena vieja al arrancar
     paso('cuarentena', () => engine.run('cuarentena', { accion: 'purgar', dias: s.diasCuarentena }).catch(() => {}));
   }).catch((e) => { updLog('Arranque: ' + (e && e.stack || e)); try { if (!win) createWindow(); } catch {} });
@@ -273,14 +281,19 @@ ipcMain.handle('rl:checkNow', () => backgroundCheck(true));
 
 // ---------- Comunicación con la interfaz ----------
 ipcMain.handle('rl:run', async (e, script, params) => {
-  return engine.run(script, params || {}, (p) => {
-    if (!e.sender.isDestroyed()) e.sender.send('rl:progress', { script, ...p });
-  });
+  const prog = (p) => { if (!e.sender.isDestroyed()) e.sender.send('rl:progress', { script, ...p }); };
+  if (script === 'modojuego' && params && params.accion !== 'listar' && params.accion !== 'estado') return runJuego(params, prog);
+  return engine.run(script, params || {}, prog);
 });
 ipcMain.handle('rl:cancel', () => engine.cancelAll());
 ipcMain.handle('rl:data', (e, name) => loadData(name));
 ipcMain.handle('rl:settings:get', () => loadSettings());
-ipcMain.handle('rl:settings:set', (e, s) => saveSettings({ ...loadSettings(), ...s }));
+ipcMain.handle('rl:settings:set', (e, s) => {
+  const nuevo = saveSettings({ ...loadSettings(), ...s });
+  if ('modoLigero' in (s || {})) engine.init({ ligero: ligeroActivo(nuevo) });
+  if ('juegoAuto' in (s || {}) || 'misJuegos' in (s || {})) juegoWatch();
+  return nuevo;
+});
 ipcMain.handle('rl:info', async () => ({
   version: pkg.version,
   repo: pkg.retrolimpia.repo,
@@ -288,13 +301,15 @@ ipcMain.handle('rl:info', async () => ({
   discord: pkg.retrolimpia.discord || '',
   reportes: !!pkg.retrolimpia.reportes,
   cierreRaro: cierreRaro,
+  juegoActivo: !DEMO && fs.existsSync(path.join(process.env.ProgramData || 'C:\\ProgramData', 'RetroLimpia', 'modojuego-estado.json')),
+  equipoLimitado: EQUIPO_LIMITADO,
   demo: DEMO,
   plataforma: process.platform,
   esAdmin: DEMO ? true : await engine.isAdmin(),
   equipo: os.hostname()
 }));
 ipcMain.handle('rl:open', (e, url) => {
-  if (typeof url === 'string' && /^https:\/\//i.test(url)) return shell.openExternal(url);
+  if (typeof url === 'string' && (/^https:\/\//i.test(url) || /^ms-windows-store:\/\/pdp\/\?ProductId=[A-Z0-9]{12}$/.test(url))) return shell.openExternal(url);
   return false;
 });
 ipcMain.handle('rl:openFolder', (e, which) => {
@@ -455,6 +470,78 @@ ipcMain.handle('rl:report:capture', async () => {
     if (sz.width > 1920) img = img.resize({ width: 1920 });
     return img.toDataURL();
   } catch { return null; }
+});
+// ---------- Modo Juego automático ----------
+// Solo si el usuario lo activa y tiene juegos en su lista. Cada 15 s mira la lista de procesos
+// con "tasklist" (unos milisegundos, sin PowerShell) y nada más: casi no gasta.
+let juegoTimer = null, juegoMirando = false, juegoAusente = 0;
+const juegoEstadoFile = () => path.join(process.env.ProgramData || 'C:\\ProgramData', 'RetroLimpia', 'modojuego-estado.json');
+function juegoEstado() { try { return JSON.parse(fs.readFileSync(juegoEstadoFile(), 'utf8').replace(/^\uFEFF/, '')); } catch { return null; } }
+const juegoEnviar = (ev) => { if (win && !win.isDestroyed()) win.webContents.send('rl:juego', ev); };
+// Todo lo del Modo Juego (botón y automático) va en fila: nunca dos a la vez
+let juegoCola = Promise.resolve();
+function runJuego(params, onProgress, opts) {
+  const p = juegoCola.then(() => engine.run('modojuego', params, onProgress || (() => {}), opts));
+  juegoCola = p.catch(() => {});
+  return p;
+}
+async function juegoRestaurarAuto() {
+  const s = loadSettings();
+  const r = await runJuego({ accion: 'restaurar', reabrir: s.juegoReabrir !== false }, null, { sinCancelar: true });
+  const partidas = (Number(s.juegoPartidas) || 0) + (r && r.nada ? 0 : 1);
+  saveSettings({ ...loadSettings(), juegoPartidas: partidas });
+  juegoEnviar({ activo: false, partidas });
+}
+function juegoWatch() {
+  if (juegoTimer) { clearInterval(juegoTimer); juegoTimer = null; }
+  if (DEMO) return;
+  const s = loadSettings(), est = juegoEstado();
+  const hayJuegos = Array.isArray(s.misJuegos) && s.misJuegos.length;
+  // Se apagó el automático (o se quitaron los juegos) con una partida automática en marcha: se restaura ya
+  if (est && est.auto && (!s.juegoAuto || !hayJuegos)) { juegoRestaurarAuto().catch((e) => updLog('Modo Juego: ' + e.message)); return; }
+  // El vigilante también corre si quedó una partida automática de antes (p. ej. tras reiniciar RetroLimpia)
+  if ((s.juegoAuto && hayJuegos) || (est && est.auto)) { juegoTimer = setInterval(juegoTick, 15000); setTimeout(juegoTick, 3000); }
+}
+function juegoTick() {
+  if (juegoMirando || installing) return;
+  juegoMirando = true;
+  execFile('tasklist', ['/FO', 'CSV', '/NH'], { windowsHide: true, maxBuffer: 8 * 1024 * 1024 }, async (err, out) => {
+    try {
+      if (err) return;
+      const abiertos = new Set(String(out).split(/\r?\n/).map((l) => (l.match(/^"([^"]+)"/) || [])[1]).filter(Boolean).map((n) => n.toLowerCase()));
+      const s = loadSettings(), est = juegoEstado();
+      const lista = Array.isArray(s.misJuegos) ? s.misJuegos : [];
+      const juego = lista.find((g) => abiertos.has(path.basename(g.ruta).toLowerCase()));
+      if (juego) juegoAusente = 0;
+      if (juego && !est && s.juegoAuto) {
+        const r = await runJuego({ accion: 'activar', auto: true, intensidad: s.juegoIntensidad || 'equilibrado', cerrar: s.juegoCerrar || [], juego: path.basename(juego.ruta), juegos: lista.map((g) => path.basename(g.ruta)) }, null, { sinCancelar: true });
+        if (!r || r.yaActivo || r.ok === false) return;
+        juegoEnviar({ activo: true, juego: juego.nombre, estado: r.estado });
+        notify('RetroLimpia', T(`Modo Juego activo para ${juego.nombre}. Se apagará solo al cerrarlo.`, `Game Mode on for ${juego.nombre}. It turns off when you close it.`));
+      } else if (!juego && est && est.auto) {
+        // Dos comprobaciones seguidas sin el juego (30 s): así un launcher que abre el juego y se cierra no lo apaga
+        if (++juegoAusente < 2) return;
+        juegoAusente = 0;
+        await juegoRestaurarAuto();
+        if (!s.juegoAuto) juegoWatch();
+      }
+    } catch (e) { updLog('Modo Juego automático: ' + (e && e.message || e)); }
+    finally { juegoMirando = false; }
+  });
+}
+ipcMain.handle('rl:pickExe', async () => {
+  const r = await dialog.showOpenDialog(win, {
+    title: T('Elige el juego o emulador (.exe)', 'Choose the game or emulator (.exe)'),
+    properties: ['openFile'], filters: [{ name: T('Programas', 'Programs'), extensions: ['exe'] }]
+  });
+  if (r.canceled || !r.filePaths[0]) return null;
+  const f = r.filePaths[0];
+  // "duckstation-qt-x64-ReleaseLTCG" -> "Duckstation"; "Game.exe" -> nombre de su carpeta
+  const limpiar = (n) => n.split(/[-_. ]+/).filter((w) => w && !/^(qt|x64|x86|amd64|win64|win32|64|32|bit|release.*|shipping|dx\d+|vulkan|launcher|game|client|start|play|bin|binaries)$/i.test(w)).join(' ');
+  let nombre = limpiar(path.basename(f, path.extname(f)));
+  if (!nombre) nombre = limpiar(path.basename(path.dirname(f))) || path.basename(f, path.extname(f));
+  nombre = nombre.charAt(0).toUpperCase() + nombre.slice(1);
+  return { ruta: f, nombre };
 });
 ipcMain.handle('rl:report:pickImage', async () => {
   const r = await dialog.showOpenDialog(win, {

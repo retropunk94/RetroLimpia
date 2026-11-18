@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld('rl', {
   win: (action) => ipcRenderer.send('rl:win', action),
   reportPrepare: () => ipcRenderer.invoke('rl:report:prepare'),
   reportCapture: () => ipcRenderer.invoke('rl:report:capture'),
+  pickExe: () => ipcRenderer.invoke('rl:pickExe'),
+  onJuego: (cb) => { const fn = (e, ev) => cb(ev); ipcRenderer.on('rl:juego', fn); return () => ipcRenderer.removeListener('rl:juego', fn); },
   reportPickImage: () => ipcRenderer.invoke('rl:report:pickImage'),
   reportSend: (r) => ipcRenderer.invoke('rl:report:send', r),
   onProgress: (cb) => {

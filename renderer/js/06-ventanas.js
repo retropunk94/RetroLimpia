@@ -63,14 +63,14 @@ async function showNews(desde, todas) {
     <h2>${todas ? L('Novedades de RetroLimpia', "What's new in RetroLimpia") : L('¡RetroLimpia se actualizó!', 'RetroLimpia was updated!')}</h2>
     <p class="lead">${todas ? L('Lo que cambió en cada versión.', 'What changed in each version.') : L('Esto es lo que se arregló y mejoró:', 'Here is what was fixed and improved:')}</p>
     <div class="news-list">${lista.map((v) => `<div class="news-ver"><div class="news-head"><b>${L('Versión', 'Version')} ${esc(v.version)}</b>${v.fecha ? `<span>${esc(v.fecha)}</span>` : ''}</div><ul>${(en ? v.en || v.es : v.es).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>`).join('')}</div>
-    <div class="foot"><button class="btn primary" data-act="modalClose">${L('¡Genial!', 'Great!')}</button>${S.info.discord ? `<button class="btn ghost" data-open="${S.info.discord}">💬 ${L('Comentar en Discord', 'Discuss on Discord')}</button>` : ''}</div></div>`;
+    <div class="foot">${lista.some((v) => /^4\./.test(v.version)) ? `<button class="btn primary" data-act="miniTour">🧭 ${L('Enséñame lo nuevo (1 min)', 'Show me what is new (1 min)')}</button><button class="btn ghost" data-act="modalClose">${L('Ahora no', 'Not now')}</button>` : `<button class="btn primary" data-act="modalClose">${L('¡Genial!', 'Great!')}</button>`}${S.info.discord ? `<button class="btn ghost" data-open="${S.info.discord}">💬 ${L('Comentar en Discord', 'Discuss on Discord')}</button>` : ''}</div></div>`;
   $('#modal').classList.remove('hidden');
   return true;
 }
 
 // ============================================================ Reportar un problema
 // Nada se envía solo: se muestra exactamente qué se manda y la persona pulsa Enviar.
-const VIEW_NAMES = { inicio: 'Revisar mi PC', programas: 'Programas y bloatware', limpieza: 'Limpieza', arranque: 'Arranque de Windows', hardware: 'Hardware y salud', drivers: 'Drivers', actualizaciones: 'Actualizaciones', procesos: 'Procesos', deshacer: 'Deshacer y cuarentena', ajustes: 'Ajustes' };
+const VIEW_NAMES = { inicio: 'Revisar mi PC', programas: 'Programas y bloatware', limpieza: 'Limpieza', arranque: 'Arranque de Windows', privacidad: 'Privacidad', juego: 'Modo Juego', formateo: 'Acabo de formatear', hardware: 'Hardware y salud', drivers: 'Drivers', actualizaciones: 'Actualizaciones', procesos: 'Procesos', deshacer: 'Deshacer y cuarentena', ajustes: 'Ajustes' };
 function monitorLogText() {
   if (!S.mon) return '';
   return S.mon.items.map((it) => `--- ${it.nombre} [${it.estado}] ---\n` + it.log.map((l) => `${l.tipo}: ${l.msg}${l.ruta ? ' | ' + l.ruta : ''}`).join('\n') + (it.res ? `\nresultado: ${JSON.stringify({ ok: it.res.ok, metodo: it.res.metodo, plataforma: it.res.plataforma, registroLimpio: it.res.registroLimpio, mensaje: it.res.mensaje })}` : '')).join('\n');

@@ -109,7 +109,7 @@ async function uninstallPrograms(list, motivo) {
     it.res = { ok: !!r.ok, metodo: r.metodo, plataforma: r.plataforma, cancelado: !!r.cancelado, registroLimpio: r.registroLimpio !== false, clave: p.clave, mensaje: r.mensaje, regRestos: [], archivos: [] };
     if (!r.ok && r.cancelado) { it.estado = 'cancel'; (res.saltados = res.saltados || []).push(p.cls.nombre); renderMonitor(); continue; }
     if (!r.ok) { it.estado = 'err'; res.fail.push(p.cls.nombre); renderMonitor(); continue; }
-    res.ok++;
+    res.ok++; ganar('desinstalados', 1);
     if (p.tipo === 'win32') {
       const rr = obj(await rl.run('residuos', { nombre: p.nombre, editor: p.editor, carpeta: p.carpeta, clave: p.clave, juego: !!r.plataforma }).catch(() => ({})));
       const restos = arr(rr.restos);
@@ -191,6 +191,7 @@ async function fixAll() {
           if (st.id === 'junk') {
             const cats = S.junk.categorias.filter((c) => c.color === 'verde' && c.tamano > 0).map((c) => c.id);
             const r = await rl.run('limpieza', { accion: 'limpiar', categorias: cats });
+            ganar('liberado', r.liberado);
             st.extra = L('Liberado ', 'Freed ') + fmtBytes(r.liberado);
           } else if (st.id === 'bloat') {
             const list = allPrograms().filter((p) => p.cls.color === 'verde');

@@ -77,7 +77,7 @@ function formInstalar() {
     const r = obj(await rl.run('actualizaciones', { accion: 'instalar', items }));
     if (r.sinWinget) { toast(L('Falta "Instalador de aplicación" de Microsoft. Te abro la tienda para instalarlo (es gratis) y vuelve a intentarlo.', 'Microsoft "App Installer" is missing. Opening the Store so you can install it (free), then try again.'), 'err'); rl.open('ms-windows-store://pdp/?ProductId=9NBLGGH4NNS1'); return; }
     const res = arr(r.resultados), malos = res.filter((x) => !x.ok);
-    RESUMEN.programas += res.filter((x) => x.ok && !x.yaEstaba).length;
+    ganar('programas', res.filter((x) => x.ok && !x.yaEstaba).length);
     if (malos.length) toast(L(`Se instalaron ${res.length - malos.length} de ${res.length}. Los que fallaron puedes instalarlos desde su web.`, `${res.length - malos.length} of ${res.length} installed. Install the failed ones from their website.`), 'err');
     else toast(L(`¡Listo! ${res.length} programa(s) instalados.`, `Done! ${res.length} program(s) installed.`));
     await formMarcar('programas');
@@ -91,7 +91,7 @@ function formPriv() {
     await rl.run('privacidad', { accion: 'aplicar', ids });
     S.privacidad = null;
     toast(L('Anuncios y envío de datos apagados. Se notará del todo al reiniciar.', 'Ads and data sharing off. Fully visible after restart.'));
-    RESUMEN.anuncios += ids.length;
+    ganar('anuncios', ids.length);
     await formMarcar('privacidad');
   });
 }

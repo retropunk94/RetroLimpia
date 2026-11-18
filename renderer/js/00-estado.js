@@ -20,7 +20,14 @@ const S = {
 };
 
 // Lo que RetroLimpia consiguió en esta sesión (para el resumen "lo que ganaste")
-const RESUMEN = { liberado: 0, anuncios: 0, programas: 0, restos: 0 };
+const RESUMEN = { liberado: 0, anuncios: 0, programas: 0, restos: 0, desinstalados: 0 };
+// Suma a lo de esta sesión y al total de siempre (se guarda en ajustes: un número por clave, nada más)
+function ganar(clave, n) {
+  n = Number(n) || 0; if (n <= 0) return;
+  RESUMEN[clave] = (RESUMEN[clave] || 0) + n;
+  const t = { ...(S.settings.totales || {}) }; t[clave] = (Number(t[clave]) || 0) + n;
+  S.settings.totales = t; rl.setSettings({ totales: t }).catch(() => {});
+}
 
 const repoUrl = () => (S.info.repo && !S.info.repo.startsWith('TU_USUARIO') ? 'https://github.com/' + S.info.repo : null);
 const DISCORD_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M20.3 4.4A19.6 19.6 0 0 0 15.4 3l-.6 1.3a18 18 0 0 0-5.6 0L8.6 3a19.6 19.6 0 0 0-4.9 1.4C.6 9 -.3 13.5.1 18a19.8 19.8 0 0 0 6 3l1.3-2a12.7 12.7 0 0 1-2-1l.5-.4a14 14 0 0 0 12.2 0l.5.4c-.6.4-1.3.7-2 1l1.3 2a19.7 19.7 0 0 0 6-3c.5-5.2-.8-9.7-3.6-13.6zM8.5 15.3c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4zm7 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4z"/></svg>';

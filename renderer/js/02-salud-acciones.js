@@ -130,6 +130,10 @@ async function scanAll() {
   });
   if (S.scan.state === 'done') {
     const n = S.scan.score;
+    // Historial de salud: una nota por día (la última), máximo 30 días. Pesa casi nada.
+    const hoy = new Date().toISOString().slice(0, 10);
+    const h = arr(S.settings.historial).filter((x) => x.d !== hoy).concat([{ d: hoy, n }]).slice(-30);
+    rl.setSettings({ historial: h }).then((st) => { S.settings = st; render(); }).catch(() => {});
     if (n >= 85) retroReacciona('feliz', L(`¡Un ${n}! Tu PC está en muy buena forma.`, `A ${n}! Your PC is in great shape.`));
     else retroReacciona('piensa', L(`Un ${n}. Tranquilo: abajo te dejo lo que lo mejora.`, `A ${n}. Don't worry: below is what improves it.`), 5000);
   }

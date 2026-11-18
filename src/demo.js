@@ -144,6 +144,16 @@ async function run(script, p, onProgress) {
       if (p.accion === 'restaurar') { await steps(onProgress, ['Devolviendo el PC a como estaba...'], 700); const m = demoJuego ? Math.round((Date.now() - new Date(demoJuego.desde)) / 60000) : 0; const nada = !demoJuego; demoJuego = null; return { ok: true, minutos: m, nada }; }
       return { activo: !!demoJuego, estado: demoJuego };
     }
+    case 'reinicios': {
+      await steps(onProgress, ['Leyendo el historial de Windows...'], 700);
+      const h = (d, hr) => new Date(Date.now() - d * 864e5 - hr * 36e5).toISOString();
+      return { eventos: [
+        { fecha: h(0, 2), clase: 'usuario', titulo: 'Lo apagaste tú', detalle: 'Desde el menú Inicio o un programa que te lo pidió.' },
+        { fecha: h(1, 5), clase: 'update', titulo: 'Windows Update reinició para instalar actualizaciones', detalle: 'Es normal. Si te molesta que pase mientras usas el PC, elige tus "horas activas" en Configuración > Windows Update.' },
+        { fecha: h(3, 1), clase: 'bsod', titulo: 'Pantallazo azul', detalle: 'La tarjeta gráfica dejó de responder (driver de vídeo o gráfica forzada/caliente).', codigo: '0x00000116' },
+        { fecha: h(9, 4), clase: 'corte', titulo: 'Se apagó de golpe', detalle: 'Sin aviso de Windows: corte de luz, botón de encendido mantenido, o la fuente/temperatura.' }
+      ], dias: 30 };
+    }
     case 'restos': {
       await steps(onProgress, ['Leyendo qué programas tienes instalados...', 'Buscando carpetas que quedaron de programas viejos...', 'Buscando accesos directos que ya no abren nada...'], 700);
       return { restos: demoRestos.filter((x) => !x.quitado), total: 0 };

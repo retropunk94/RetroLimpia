@@ -535,3 +535,12 @@ label.inline { display: inline-flex; gap: 8px; align-items: center; font-size: 1
 .prog:hover { background: rgba(255,255,255,.04); } .prog.on { background: rgba(177,76,255,.10); }
 .prog .pi { font-size: 20px; width: 26px; text-align: center; }
 @media (max-width: 900px) { .catalogo, .pf-acc, .paso-f .row { margin-left: 0; padding-left: 0; } }
+/* ---------- Historial y lo ganado ---------- */
+.extras-inicio { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; margin-top: 18px; }
+.extras-inicio:empty { display: none; }
+.card.hist { display: flex; gap: 14px; align-items: center; padding: 16px 18px; }
+.card.ganado { padding: 16px 18px; }
+.ganado-g { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; margin-top: 8px; }
+.ganado-g > div { display: flex; flex-direction: column; gap: 2px; }
+.ganado-g b { font-size: 20px; } .ganado-g .gi { font-size: 18px; }
+.nowrap { white-space: nowrap; }

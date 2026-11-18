@@ -50,7 +50,7 @@ function restosQuitar() {
     const q = obj(await rl.run('cuarentena', { accion: 'mover', items, motivo: L('Restos de programas antiguos', 'Leftovers of old programs') }));
     const fallos = arr(q.fallidos).length;
     const n = items.length - fallos;
-    RESUMEN.restos += n;
+    ganar('restos', n);
     toast(L(`Listo: ${n} resto(s) quitados. Están en "Deshacer y cuarentena" por si acaso.`, `Done: ${n} leftover(s) removed. They are in "Undo & quarantine" just in case.`) + (fallos ? L(` (${fallos} no se pudieron mover)`, ` (${fallos} could not be moved)`) : ''), fallos ? 'err' : undefined);
     retroReacciona('guino', L('¡Más ordenado que nunca! 😉', 'Tidier than ever! 😉'));
     await loadRestos();

@@ -83,6 +83,7 @@ document.addEventListener('click', async (e) => {
     case 'retroMenu': return retroMenu();
     case 'restosBuscar': return restosBuscar();
     case 'juegoOn': return juegoOn();
+    case 'reinicios': return reinicios();
     case 'formInstalar': return formInstalar();
     case 'formPriv': return formPriv();
     case 'formComodo': return formComodo();
@@ -155,7 +156,7 @@ document.addEventListener('click', async (e) => {
       return taskC(L('Limpiando', 'Cleaning'), async () => {
         const r = await rl.run('limpieza', { accion: 'limpiar', categorias: [...S.junkSel] });
         toast(L('¡Liberaste ', 'You freed ') + fmtBytes(r.liberado) + '!');
-        RESUMEN.liberado += Number(r.liberado) || 0;
+        ganar('liberado', r.liberado);
         retroReacciona('guino', L('¡Más limpio! 😉', 'Squeaky clean! 😉'));
         await loadJunk();
       });

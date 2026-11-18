@@ -51,7 +51,7 @@ async function privCambiar(ids, apagar) {
     const malos = arr(r.resultados).filter((x) => !x.ok).length;
     await loadPrivacidad();
     if (malos) toast(L('Algunos ajustes no se pudieron cambiar (Windows los tiene bloqueados).', 'Some settings could not be changed (Windows has them locked).'), 'err');
-    else if (apagar) { toast(L(`Listo: ${ids.length} cosa(s) apagada(s). Se notará del todo al reiniciar.`, `Done: ${ids.length} item(s) turned off. Fully visible after restart.`)); retroReacciona('guino', L('¡Menos anuncios! 😉', 'Fewer ads! 😉')); RESUMEN.anuncios += ids.length; }
+    else if (apagar) { toast(L(`Listo: ${ids.length} cosa(s) apagada(s). Se notará del todo al reiniciar.`, `Done: ${ids.length} item(s) turned off. Fully visible after restart.`)); retroReacciona('guino', L('¡Menos anuncios! 😉', 'Fewer ads! 😉')); ganar('anuncios', ids.length); }
     else toast(L('Vuelto a como estaba.', 'Back to how it was.'));
   });
 }

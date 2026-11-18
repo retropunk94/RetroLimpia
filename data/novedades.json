@@ -2,6 +2,22 @@
   "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
   "versiones": [
     {
+      "version": "4.0.1",
+      "fecha": "2026-11-17",
+      "es": [
+        "Arreglado: quitar Microsoft OneDrive daba el error \"El sistema no puede encontrar el archivo especificado\". Ahora se desinstala en silencio y, si OneDrive se actualizó a otra carpeta, RetroLimpia encuentra su desinstalador actual.",
+        "Si el desinstalador de un programa ya no existe porque el programa se actualizó, RetroLimpia busca el de la versión nueva. Si el programa ya no estaba, quita su nombre de la lista (con copia en la cuarentena).",
+        "Los errores de Windows al desinstalar ahora se explican en palabras sencillas.",
+        "Gracias a quien lo reportó con el botón 🐞 Reportar un problema. ¡Así se arreglan las cosas!"
+      ],
+      "en": [
+        "Fixed: removing Microsoft OneDrive failed with \"The system cannot find the file specified\". It now uninstalls silently and finds its current uninstaller if OneDrive updated itself.",
+        "If a program's uninstaller is gone because the program updated, RetroLimpia uses the new one. If the program was already gone, its entry is removed (with a backup in quarantine).",
+        "Windows uninstall errors are now explained in plain words.",
+        "Thanks to whoever reported it with 🐞 Report a problem!"
+      ]
+    },
+    {
       "version": "4.0.0",
       "fecha": "2026-11-17",
       "es": [

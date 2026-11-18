@@ -23,6 +23,50 @@ function Split-Command {
     return @{ exe = $Cmd; args = '' }
 }
 
+# Si el desinstalador del registro ya no existe (p. ej. el programa se actualizó a otra carpeta de versión),
+# busca el mismo archivo en la carpeta de versión más nueva. OneDrive tiene su propio caso conocido.
+function Resolve-Uninstaller {
+    param([string]$Cmd)
+    $c = Split-Command $Cmd
+    $res = @{ exe = $c.exe; args = $c.args; silencioso = $false; existe = $false; cambiado = $false }
+    $leaf = [IO.Path]::GetFileName($c.exe)
+    if ($leaf -ieq 'OneDriveSetup.exe') {
+        # OneDrive se desinstala en silencio con /uninstall (sin ventanas)
+        $res.silencioso = $true
+        if ($res.args -notmatch '/uninstall') { $res.args = ('/uninstall ' + $res.args).Trim() }
+        if (-not (Test-Path -LiteralPath $c.exe)) {
+            $cands = @()
+            foreach ($b in @("$env:LOCALAPPDATA\Microsoft\OneDrive", "$env:ProgramFiles\Microsoft OneDrive", "${env:ProgramFiles(x86)}\Microsoft OneDrive")) {
+                if ($b -and (Test-Path -LiteralPath $b)) { $cands += @(Get-ChildItem -LiteralPath $b -Filter OneDriveSetup.exe -Recurse -Depth 1 -ErrorAction SilentlyContinue) }
+            }
+            foreach ($f in @("$env:windir\System32\OneDriveSetup.exe", "$env:windir\SysWOW64\OneDriveSetup.exe")) { if (Test-Path -LiteralPath $f) { $cands += Get-Item -LiteralPath $f } }
+            $mejor = $cands | Sort-Object { $_.VersionInfo.FileVersionRaw } -Descending | Select-Object -First 1
+            if ($mejor) { $res.exe = $mejor.FullName; $res.cambiado = $true }
+        }
+    } elseif ($c.exe -and -not (Test-Path -LiteralPath $c.exe)) {
+        # ...\Programa\1.2.3\uninstall.exe -> busca ...\Programa\<otra versión>\uninstall.exe
+        try {
+            $padre = Split-Path (Split-Path $c.exe -Parent) -Parent
+            if ($padre -and (Test-Path -LiteralPath $padre) -and -not (Test-ProtectedPath $padre)) {
+                $otro = Get-ChildItem -LiteralPath $padre -Directory -ErrorAction SilentlyContinue | ForEach-Object { Join-Path $_.FullName $leaf } |
+                    Where-Object { Test-Path -LiteralPath $_ } | ForEach-Object { Get-Item -LiteralPath $_ } |
+                    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+                if ($otro) { $res.exe = $otro.FullName; $res.cambiado = $true }
+            }
+        } catch {}
+    }
+    $res.existe = [bool]($res.exe -and ($res.exe -notmatch '\\' -or (Test-Path -LiteralPath $res.exe)))
+    return $res
+}
+
+# Mensajes de Windows traducidos a algo que se entienda
+function Get-MensajeClaro([string]$m) {
+    if ($m -match 'no puede encontrar el archivo|cannot find the file|could not find') { return 'El desinstalador de este programa ya no está en el PC (suele pasar si el programa se actualizó o se borró a medias).' }
+    if ($m -match 'acceso denegado|access is denied') { return 'Windows no dio permiso. Abre RetroLimpia como administrador y vuelve a intentarlo.' }
+    if ($m -match 'cancel') { return 'Se canceló en la ventana del programa.' }
+    return $m
+}
+
 function Start-Cmd {
     param([string]$Exe, [string]$ArgStr, [switch]$Hidden)
     $sp = @{ FilePath = $Exe; PassThru = $true }
@@ -76,6 +120,8 @@ function Stop-AppProcesses {
     }
 }
 
+if ($p.accion -eq 'resolver') { Send-Result (Resolve-Uninstaller ([string]$p.desinstalar)); return }
+
 $label = [string]$p.nombre
 if ($p.etiqueta) { $label = [string]$p.etiqueta }
 $result = @{ ok = $false; metodo = ''; reinicio = $false; mensaje = ''; nombre = $p.nombre }
@@ -114,7 +160,8 @@ $key = [string]$p.clave
 Send-Log 'info' ('Programa: ' + $label + $(if ($p.version) { ' ' + $p.version } else { '' })) ('Program: ' + $label)
 if ($p.carpeta) { Send-Log 'info' 'Carpeta de instalación' 'Install folder' ([string]$p.carpeta) }
 if ($key) { Send-Log 'info' 'Su entrada en el registro de Windows' 'Its Windows registry entry' $key }
-if ($p.cerrarProcesos -ne $false) { Stop-AppProcesses $p.carpeta }
+# OneDrive se cierra solo al desinstalarse; cerrarlo a la fuerza puede cortar su actualizador a medias
+if ($p.cerrarProcesos -ne $false -and ([string]$p.desinstalar) -notmatch 'OneDriveSetup\.exe') { Stop-AppProcesses $p.carpeta }
 
 $cmd = [string]$p.desinstalar
 $quiet = [string]$p.desinstalarSilencioso
@@ -239,16 +286,31 @@ try {
         $result.ok = Test-Gone $key
     }
     elseif ($cmd) {
-        $c = Split-Command $cmd
-        $kind = Get-InstallerKind $c.exe
+        $c = Resolve-Uninstaller $cmd
+        if ($c.cambiado) { Send-Log 'info' 'Su desinstalador cambió de sitio (el programa se actualizó): uso el actual' 'Its uninstaller moved (program was updated): using the current one' $c.exe }
+        if (-not $c.existe) {
+            Send-Log 'aviso' 'Su desinstalador ya no está en el PC' 'Its uninstaller is no longer on this PC' $c.exe
+            $loc1 = ([string]$p.carpeta).Trim('"')
+            $quedaPrograma = $loc1 -and (Test-Path -LiteralPath $loc1) -and @(Get-ChildItem -LiteralPath $loc1 -Filter *.exe -Recurse -Depth 2 -ErrorAction SilentlyContinue | Select-Object -First 1).Count
+            if (-not $quedaPrograma) {
+                # El programa ya no existe: solo quedaba su entrada en la lista. Se limpia como resto (con copia).
+                Send-Log 'ok' 'El programa ya no estaba instalado: solo quedaba su nombre en la lista de Windows. Se limpia como resto.' 'The program was already gone: only its entry remained. Cleaned as leftover.'
+                $result.ok = $true; $result.metodo = 'ya-no-estaba'
+            } else {
+                $result.mensaje = 'El desinstalador de este programa ya no está, pero sus archivos sí. Vuelve a instalarlo (para reparar su desinstalador) y desinstálalo después.'
+            }
+            $cmd = $null   # no tiene sentido abrir un asistente que no existe
+        }
+        $kind = if (-not $c.existe) { 'desconocido' } elseif ($c.silencioso) { 'oficial' } else { Get-InstallerKind $c.exe }
         $silentArgs = switch ($kind) {
+            'oficial'       { ' ' }
             'inno'          { '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' }
             'nsis'          { '/S' }
             'installshield' { '-s' }
             default         { $null }
         }
         if ($silentArgs) {
-            $args2 = ($c.args + ' ' + $silentArgs).Trim()
+            $args2 = ($c.args + ' ' + $silentArgs.Trim()).Trim()
             Send-Log 'paso' ('Ejecutando su desinstalador en silencio (tipo ' + $kind + ')') ('Running its uninstaller silently (' + $kind + ')') ($c.exe + ' ' + $args2)
             $proc = Start-Cmd $c.exe $args2 -Hidden
             Wait-Uninstall $proc $key
@@ -257,7 +319,7 @@ try {
         }
     }
 } catch {
-    $result.mensaje = $_.Exception.Message
+    $result.mensaje = Get-MensajeClaro $_.Exception.Message
 }
 
 # Último recurso: el desinstalador normal del programa (una ventana, inevitable)
@@ -268,21 +330,22 @@ if (-not $result.ok -and $cmd -and $p.permitirVentana -ne $false) {
         if ($cmd -match 'msiexec' -and $cmd -match '(\{[0-9A-Fa-f\-]{36}\})') {
             $proc = Start-Process -FilePath 'msiexec.exe' -ArgumentList ('/x ' + $Matches[1]) -PassThru
         } else {
-            $c = Split-Command $cmd
+            $c = Resolve-Uninstaller $cmd
             $proc = Start-Cmd $c.exe $c.args
         }
         Wait-Uninstall $proc $key 1800
         $result.metodo = 'asistente'
         $result.ok = Test-Gone $key
     } catch {
-        $result.mensaje = $_.Exception.Message
+        $result.mensaje = Get-MensajeClaro $_.Exception.Message
     }
 }
 
 # Comprobación final: ¿se borró su entrada del registro? ¿queda su carpeta?
 $result.registroLimpio = (-not $key) -or (Test-Gone $key)
 if ($key) {
-    if ($result.registroLimpio) { Send-Log 'ok' 'Su entrada del registro se borró' 'Its registry entry was removed' $key }
+    if ($result.registroLimpio -and $result.ok) { Send-Log 'ok' 'Su entrada del registro se borró' 'Its registry entry was removed' $key }
+    elseif ($result.registroLimpio) { Send-Log 'info' 'Su entrada ya no está en el registro' 'Its registry entry is no longer there' $key }
     else { Send-Log 'aviso' 'Su entrada del registro sigue ahí' 'Its registry entry is still there' $key }
 }
 $loc = ([string]$p.carpeta).Trim('"')

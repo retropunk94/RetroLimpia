@@ -38,7 +38,10 @@ const defaultSettings = {
   tourVisto: false,
   ultimoResumen: '',
   relanzarEnBandeja: false,
-  ultimaVersion: ''
+  ultimaVersion: '',
+  modoLigero: 'auto',      // auto | on | off  (bajos recursos)
+  mascota: 'activa',       // activa | tranquila | off
+  mascotaPresentada: false
 };
 function loadSettings() {
   try { return { ...defaultSettings, ...JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) }; }
@@ -55,6 +58,9 @@ const T = (es, en) => (loadSettings().idioma === 'en' ? en : es);
 function dataDir() {
   return app.isPackaged ? path.join(process.resourcesPath, 'data') : path.join(__dirname, '..', 'data');
 }
+// Equipo con pocos recursos: 4 GB de RAM o menos, o 2 núcleos o menos
+const EQUIPO_LIMITADO = os.totalmem() <= 4.5 * 1024 ** 3 || (os.cpus() || []).length <= 2;
+function ligeroActivo(s) { s = s || loadSettings(); return s.modoLigero === 'on' || (s.modoLigero !== 'off' && EQUIPO_LIMITADO); }
 function loadData(name) {
   const safe = path.basename(name).replace(/[^a-z0-9_-]/gi, '');
   return JSON.parse(fs.readFileSync(path.join(dataDir(), safe + '.json'), 'utf8'));
@@ -245,7 +251,7 @@ if (!app.requestSingleInstanceLock()) {
     // Marca de sesión: si al arrancar sigue ahí, la vez anterior se cerró de golpe (fallo)
     try { cierreRaro = fs.existsSync(sesionFlag()); fs.writeFileSync(sesionFlag(), String(Date.now())); } catch {}
     const paso = (nombre, fn) => { try { return fn(); } catch (e) { updLog('Arranque, fallo en ' + nombre + ': ' + (e && e.stack || e)); } };
-    paso('motor', () => engine.init({ demo: DEMO, scriptsDir: app.isPackaged ? path.join(process.resourcesPath, 'scripts') : path.join(__dirname, '..', 'scripts') }));
+    paso('motor', () => engine.init({ ligero: ligeroActivo(), demo: DEMO, scriptsDir: app.isPackaged ? path.join(process.resourcesPath, 'scripts') : path.join(__dirname, '..', 'scripts') }));
     // OJO: el instalador quita la sección "build" de package.json, así que el id va escrito aquí
     paso('appId', () => { if (process.platform === 'win32') app.setAppUserModelId('com.retropunk94.retrolimpia'); });
     let s = paso('ajustes', () => loadSettings()) || { ...defaultSettings };
@@ -280,7 +286,11 @@ ipcMain.handle('rl:run', async (e, script, params) => {
 ipcMain.handle('rl:cancel', () => engine.cancelAll());
 ipcMain.handle('rl:data', (e, name) => loadData(name));
 ipcMain.handle('rl:settings:get', () => loadSettings());
-ipcMain.handle('rl:settings:set', (e, s) => saveSettings({ ...loadSettings(), ...s }));
+ipcMain.handle('rl:settings:set', (e, s) => {
+  const nuevo = saveSettings({ ...loadSettings(), ...s });
+  if ('modoLigero' in (s || {})) engine.init({ ligero: ligeroActivo(nuevo) });
+  return nuevo;
+});
 ipcMain.handle('rl:info', async () => ({
   version: pkg.version,
   repo: pkg.retrolimpia.repo,
@@ -288,6 +298,7 @@ ipcMain.handle('rl:info', async () => ({
   discord: pkg.retrolimpia.discord || '',
   reportes: !!pkg.retrolimpia.reportes,
   cierreRaro: cierreRaro,
+  equipoLimitado: EQUIPO_LIMITADO,
   demo: DEMO,
   plataforma: process.platform,
   esAdmin: DEMO ? true : await engine.isAdmin(),

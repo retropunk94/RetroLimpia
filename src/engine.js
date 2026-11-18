@@ -14,7 +14,7 @@ const SCRIPTS = new Set([
   'hardware', 'drivers', 'actualizaciones', 'limpieza', 'inicio', 'procesos'
 ]);
 
-let cfg = { demo: false, scriptsDir: '' };
+let cfg = { demo: false, scriptsDir: '', ligero: false };
 const running = new Set();
 
 function init(options) { cfg = { ...cfg, ...options }; }
@@ -30,6 +30,8 @@ function run(script, params = {}, onProgress = () => {}) {
   return new Promise((resolve, reject) => {
     const child = spawn('powershell.exe', args, { windowsHide: true });
     running.add(child);
+    // Modo bajos recursos: el trabajo va con menos prioridad para que el PC siga respondiendo
+    if (cfg.ligero && child.pid) { try { require('os').setPriority(child.pid, require('os').constants.priority.PRIORITY_BELOW_NORMAL); } catch { /* sin permiso: sigue normal */ } }
     let buffer = '';
     let result = null;
     let errText = '';

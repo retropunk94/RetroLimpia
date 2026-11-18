@@ -1,6 +1,7 @@
 'use strict';
 // ============================================================ Utilidades UI
 function toast(msg, type = 'ok') {
+  if (type === 'err' && typeof retroReacciona === 'function') retroReacciona('preocupado', null, 3500);
   const el = document.createElement('div');
   el.className = 'toast ' + type; el.textContent = msg;
   $('#toasts').appendChild(el);

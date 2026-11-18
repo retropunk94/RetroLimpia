@@ -12,6 +12,7 @@ function render() {
     html = `<div class="view"><div class="banner bad"><div class="grow"><b>${L('Esta pantalla tuvo un problema', 'This screen had a problem')}</b> · ${esc(e.message)}</div><button class="btn small" data-nav="inicio">${L('Volver al inicio', 'Back to start')}</button></div></div>`;
   }
   $('#main').innerHTML = html;
+  aplicarModoLigero(); renderRetro();
   if (focusId) { const el = document.getElementById(focusId); if (el) { el.focus(); el.setSelectionRange(caret, caret); } }
 }
 
@@ -77,6 +78,11 @@ document.addEventListener('click', async (e) => {
     case 'donateAsk': return showDonate();
     case 'donateGo': $('#modal').classList.add('hidden'); return rl.open(S.info.paypal);
     case 'modalClose': $('#modal').classList.add('hidden'); S.rep = null; return;
+    case 'retroMenu': return retroMenu();
+    case 'retroOk': S.settings = await rl.setSettings({ mascotaPresentada: true }); return renderRetro();
+    case 'retroActiva': return setMascota('activa');
+    case 'retroTranquila': return setMascota('tranquila');
+    case 'retroOff': return setMascota('off');
     case 'news': return showNews(null, true);
     case 'crashSeen': S.crashSeen = true; return render();
     case 'reportOpen': return openReport(t.dataset.ctx || '');
@@ -135,6 +141,7 @@ document.addEventListener('click', async (e) => {
       return taskC(L('Limpiando', 'Cleaning'), async () => {
         const r = await rl.run('limpieza', { accion: 'limpiar', categorias: [...S.junkSel] });
         toast(L('¡Liberaste ', 'You freed ') + fmtBytes(r.liberado) + '!');
+        retroReacciona('guino', L('¡Más limpio! 😉', 'Squeaky clean! 😉'));
         await loadJunk();
       });
     case 'reloadJunk': S.junk = null; return render();

@@ -128,5 +128,10 @@ async function scanAll() {
     S.scan.state = 'done';
     S.scan.date = new Date();
   });
+  if (S.scan.state === 'done') {
+    const n = S.scan.score;
+    if (n >= 85) retroReacciona('feliz', L(`¡Un ${n}! Tu PC está en muy buena forma.`, `A ${n}! Your PC is in great shape.`));
+    else retroReacciona('piensa', L(`Un ${n}. Tranquilo: abajo te dejo lo que lo mejora.`, `A ${n}. Don't worry: below is what improves it.`), 5000);
+  }
   if (S.scan.state === 'running') S.scan.state = 'idle';   // por si algo inesperado cortó el análisis
 }

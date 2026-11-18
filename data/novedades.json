@@ -2,6 +2,22 @@
   "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
   "versiones": [
     {
+      "version": "4.0.2",
+      "fecha": "2026-11-17",
+      "es": [
+        "🔒 Más seguro: la carpeta de RetroLimpia y la de su cuarentena ahora solo las pueden modificar los administradores. Antes, si lo instalabas fuera de \"Archivos de programa\" (por ejemplo en D:\\), otro programa sin permisos podría haberse aprovechado de RetroLimpia para hacer cambios como administrador.",
+        "🔒 Al desinstalar, RetroLimpia ya solo ejecuta el desinstalador que el propio programa dejó registrado en Windows, nunca otra cosa.",
+        "🔒 Restaurar desde la cuarentena o terminar el Modo Juego ya no puede tocar zonas sensibles de Windows, aunque alguien manipulara sus archivos.",
+        "Gracias a la comunidad por las pruebas: cuanto más se prueba, más sólido queda."
+      ],
+      "en": [
+        "🔒 Safer: the RetroLimpia folder and its quarantine can now only be changed by administrators. Before, if installed outside \"Program Files\" (e.g. D:\\), another program without rights could have abused RetroLimpia to make admin changes.",
+        "🔒 When uninstalling, RetroLimpia now only runs the uninstaller the program itself registered in Windows.",
+        "🔒 Restoring from quarantine or ending Game Mode can no longer touch sensitive parts of Windows, even if its files were tampered with.",
+        "Thanks to the community for testing!"
+      ]
+    },
+    {
       "version": "4.0.1",
       "fecha": "2026-11-17",
       "es": [

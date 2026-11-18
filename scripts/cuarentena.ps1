@@ -83,12 +83,23 @@ switch ($p.accion) {
         if (-not (Test-Path -LiteralPath $mf)) { Send-Result @{ ok = $false; mensaje = 'No existe' }; return }
         $m = Get-Content -LiteralPath $mf -Raw -Encoding UTF8 | ConvertFrom-Json
         $ok = 0; $bad = 0
+        # SEGURIDAD: solo se restaura lo que vive dentro de este lote y vuelve a sitios normales.
+        # Nada hacia Windows ni claves del registro que sirven para arrancar programas solos.
+        $dirN = (Resolve-Path -LiteralPath $dir).Path.TrimEnd('\') + '\'
+        $REG_MALO = '(Image File Execution Options|\\Winlogon|\\CurrentVersion\\Run|\\CurrentVersion\\Policies|AppInit_DLLs|\\Explorer\\ShellExecuteHooks|\\Shell Folders)'
         foreach ($it in @($m.items)) {
+            $g = [string]$it.guardado
+            if (-not $g -or -not ([IO.Path]::GetFullPath($g)).StartsWith($dirN, [StringComparison]::OrdinalIgnoreCase)) { $bad++; continue }
             if ($it.tipo -eq 'registro') {
-                $null = & reg.exe import $it.guardado 2>&1
+                $claves = @(Get-Content -LiteralPath $g -ErrorAction SilentlyContinue | Where-Object { $_ -match '^\[-?([^\]]+)\]' } | ForEach-Object { $Matches[1] })
+                $raras = @($claves | Where-Object { $_ -notmatch '^(HKEY_CURRENT_USER\\Software\\|HKEY_LOCAL_MACHINE\\SOFTWARE\\)' -or $_ -match $REG_MALO })
+                if (-not $claves.Count -or $raras.Count) { Write-RLLog ('Restauración bloqueada (registro sospechoso): ' + ($raras -join ', ')); $bad++; continue }
+                $null = & "$env:windir\System32\reg.exe" import $g 2>&1
                 if ($LASTEXITCODE -eq 0) { $ok++ } else { $bad++ }
             } else {
-                if (Move-Safe $it.guardado $it.origen) { $ok++ } else { $bad++ }
+                $o = [string]$it.origen
+                if (-not $o -or $o -notmatch '^[A-Za-z]:\\' -or (Test-ProtectedPath $o) -or $o.ToLowerInvariant().StartsWith($env:windir.ToLowerInvariant()) -or (Test-Path -LiteralPath $o)) { Write-RLLog ('Restauración bloqueada (destino no permitido u ocupado): ' + $o); $bad++; continue }
+                if (Move-Safe $g $o) { $ok++ } else { $bad++ }
             }
         }
         if ($bad -eq 0) { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue }

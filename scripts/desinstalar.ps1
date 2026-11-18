@@ -165,6 +165,19 @@ if ($p.cerrarProcesos -ne $false -and ([string]$p.desinstalar) -notmatch 'OneDri
 
 $cmd = [string]$p.desinstalar
 $quiet = [string]$p.desinstalarSilencioso
+# SEGURIDAD: el comando nunca se toma a ciegas de la interfaz. Se vuelve a leer de la ficha del programa
+# en el registro de Windows (la única fuente fiable). Así, aunque alguien manipulara la petición,
+# RetroLimpia solo ejecuta el desinstalador que el propio programa registró.
+if ($key -and $key -notmatch '\\Windows\\CurrentVersion\\Uninstall\\[^\\]+$') {
+    $result.mensaje = 'Petición no válida: no es la ficha de un programa instalado.'
+    Send-Log 'error' $result.mensaje 'Invalid request: not an installed program entry'
+    Send-Result $result; return
+}
+if ($key) {
+    $ficha = Get-ItemProperty -LiteralPath ('Registry::' + $key) -ErrorAction SilentlyContinue
+    if ($ficha) { $cmd = [string]$ficha.UninstallString; $quiet = [string]$ficha.QuietUninstallString }
+    else { $cmd = ''; $quiet = '' }   # ya no existe: no se ejecuta nada (se trata como "ya no estaba")
+} else { $cmd = ''; $quiet = '' }
 
 # ---------------- Juegos de plataformas (Steam, Epic, EA, Ubisoft...) ----------------
 # Estas tiendas desinstalan con su propia ventana y el comando termina al instante:
@@ -262,6 +275,19 @@ if ($plat) {
     Send-Progress 100 'Listo' 'Done'
     Send-Result $result
     return
+}
+
+if (-not $cmd -and -not $quiet) {
+    if ($key -and (Test-Gone $key)) {
+        Send-Log 'ok' 'El programa ya no estaba instalado: no queda nada que ejecutar.' 'The program was already gone.'
+        $result.ok = $true; $result.metodo = 'ya-no-estaba'; $result.registroLimpio = $true
+    } else {
+        $result.mensaje = 'Este programa no tiene desinstalador registrado. Quítalo desde Configuración de Windows > Aplicaciones.'
+        Send-Log 'error' $result.mensaje 'No uninstaller registered.'
+    }
+    Write-RLLog ('Desinstalar ' + $p.nombre + ' sin comando ok=' + $result.ok)
+    Send-Progress 100 'Listo' 'Done'
+    Send-Result $result; return
 }
 
 Send-Progress 15 ('Desinstalando ' + $label + ' en silencio...') ('Silently uninstalling ' + $label + '...')

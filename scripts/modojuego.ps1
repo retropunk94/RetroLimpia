@@ -174,20 +174,24 @@ switch ($p.accion) {
         $e = Leer-Estado
         if (-not $e) { Remove-Item -LiteralPath $estadoFile -Force -ErrorAction SilentlyContinue; Send-Result @{ ok = $true; nada = $true }; return }
         Send-Progress 20 'Devolviendo el PC a como estaba...' 'Putting your PC back as it was...'
-        if ($e.plan) { try { & powercfg /setactive $e.plan | Out-Null } catch {} }
+        # SEGURIDAD: el archivo de estado solo puede devolver lo que el Modo Juego toca, nada más
+        $REG_OK = @('HKCU:\Software\Microsoft\Windows\CurrentVersion\PushNotifications|ToastEnabled', 'HKCU:\Software\Microsoft\GameBar|AutoGameModeEnabled', 'HKCU:\Software\Microsoft\GameBar|AllowAutoGameMode')
+        $SERV_OK = @('wuauserv', 'bits', 'dosvc', 'WSearch', 'SysMain')
+        if ($e.plan -and ([string]$e.plan) -match '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$') { try { & "$env:windir\System32\powercfg.exe" /setactive $e.plan | Out-Null } catch {} }
         foreach ($r in @($e.reg)) {
+            if ($REG_OK -notcontains ([string]$r.ruta + '|' + [string]$r.nombre)) { continue }
             try {
-                if ($r.existia) { Set-ItemProperty -Path $r.ruta -Name $r.nombre -Value $r.original -Type DWord -Force }
+                if ($r.existia) { Set-ItemProperty -Path $r.ruta -Name $r.nombre -Value ([int]$r.original) -Type DWord -Force }
                 else { Remove-ItemProperty -Path $r.ruta -Name $r.nombre -ErrorAction SilentlyContinue }
             } catch {}
         }
         Send-Progress 50 'Reanudando tareas de Windows...' 'Resuming Windows tasks...'
-        foreach ($s in @($e.servicios)) { try { Start-Service -Name $s -ErrorAction Stop } catch {} }
+        foreach ($s in @($e.servicios)) { if ($SERV_OK -notcontains [string]$s) { continue }; try { Start-Service -Name $s -ErrorAction Stop } catch {} }
         $reabiertos = 0
         if ($p.reabrir) {
             Send-Progress 75 'Volviendo a abrir lo que se cerró...' 'Reopening what was closed...'
             foreach ($c in @($e.cerrados)) {
-                if (-not $c.ruta -or -not (Test-Path -LiteralPath $c.ruta)) { continue }
+                if (-not $c.ruta -or ([string]$c.ruta) -notmatch '^[A-Za-z]:\\.+\.exe$' -or -not (Test-Path -LiteralPath $c.ruta)) { continue }
                 if ((Get-Exactos ([string]$c.nombre)).Count) { continue }
                 # A través del Explorador: así se abre como usuario normal, no como administrador
                 try { Start-Process -FilePath "$env:windir\explorer.exe" -ArgumentList ('"' + $c.ruta + '"'); $reabiertos++ } catch {}

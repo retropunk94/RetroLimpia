@@ -8,6 +8,7 @@
 <meta name="keywords" content="limpiar pc, limpiador windows gratis, quitar bloatware, desinstalar sin restos, actualizar drivers, optimizar windows 11, alternativa ccleaner, pc manager, modo juego, retrolimpia">
 <link rel="canonical" href="https://retropunk94.github.io/RetroLimpia/">
 <meta name="theme-color" content="#0d0b1a">
+<meta name="color-scheme" content="dark">
 <link rel="icon" type="image/png" href="img/favicon.png">
 <link rel="apple-touch-icon" href="img/icon-180.png">
 <meta property="og:type" content="website">
@@ -23,7 +24,7 @@
 </script>
 <style>
 @font-face { font-family: 'Audiowide'; src: url('img/audiowide.woff2') format('woff2'); font-display: swap; }
-:root { --bg: #0d0b1a; --bg2: #141127; --panel: #1a1631; --line: rgba(255,255,255,.08); --text: #ecebff; --muted: #a6a3c9; --pink: #ff3d9a; --purple: #b14dff; --cyan: #2de2e6; --green: #2ed573; --red: #ff5470; --grad: linear-gradient(90deg, var(--pink), var(--purple) 50%, var(--cyan)); }
+:root { color-scheme: dark; --bg: #0d0b1a; --bg2: #141127; --panel: #1a1631; --line: rgba(255,255,255,.08); --text: #ecebff; --muted: #a6a3c9; --pink: #ff3d9a; --purple: #b14dff; --cyan: #2de2e6; --green: #2ed573; --red: #ff5470; --grad: linear-gradient(90deg, var(--pink), var(--purple) 50%, var(--cyan)); }
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 17px/1.6 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif; }
@@ -32,7 +33,7 @@ img { max-width: 100%; height: auto; display: block; }
 .wrap { max-width: 1120px; margin: 0 auto; padding: 0 22px; }
 h1, h2, h3 { line-height: 1.15; }
 h2 { font-family: 'Audiowide', sans-serif; font-weight: 400; font-size: clamp(26px, 4vw, 38px); margin: 0 0 14px; letter-spacing: .3px; }
-.grad { background: var(--grad); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.grad { background-image: linear-gradient(90deg, #ff3d9a, #b14dff 50%, #2de2e6); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; color: #b14dff; }
 .lead { color: var(--muted); font-size: 19px; max-width: 720px; }
 /* barra */
 .nav { position: sticky; top: 0; z-index: 10; background: rgba(13,11,26,.85); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
@@ -43,7 +44,7 @@ h2 { font-family: 'Audiowide', sans-serif; font-weight: 400; font-size: clamp(26
 .nav nav a { color: var(--muted); text-decoration: none; } .nav nav a:hover { color: var(--text); }
 .nav .btn { color: #120f22; }
 .btn span { white-space: nowrap; }
-.btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 24px; border-radius: 14px; font-weight: 700; text-decoration: none; color: #120f22; background: var(--grad); box-shadow: 0 10px 30px rgba(177,77,255,.35); border: 0; font-size: 17px; cursor: pointer; }
+.btn { display: inline-flex; align-items: center; gap: 10px; padding: 14px 24px; border-radius: 14px; font-weight: 700; text-decoration: none; color: #120f22; background-color: #b14dff; background-image: linear-gradient(90deg, #ff3d9a, #b14dff 50%, #2de2e6); box-shadow: 0 10px 30px rgba(177,77,255,.35); border: 0; font-size: 17px; cursor: pointer; }
 .btn.small { padding: 9px 16px; font-size: 15px; border-radius: 11px; box-shadow: none; }
 .btn.ghost { background: transparent; color: var(--text); border: 1px solid rgba(255,255,255,.18); box-shadow: none; }
 .btn:hover { filter: brightness(1.08); }

@@ -200,7 +200,8 @@ function viewLimpieza() {
       <div class="grow"><div class="name">${L(es, en)}</div><div class="note">${L(des, den)}</div></div>
       <span class="badge ${c.color}">${c.color === 'verde' ? L('Seguro', 'Safe') : L('Revisa antes', 'Check first')}</span><div class="size">${fmtBytes(c.tamano)}</div></label>`; }).join('')}</div>
     <div class="actionbar"><div class="info">${L('Seleccionado:', 'Selected:')} <b>${fmtBytes(total)}</b></div>
-      <button class="btn primary" data-act="clean" ${!total || S.busy ? 'disabled' : ''}>${L('Liberar ', 'Free ')}${fmtBytes(total)}</button></div></div>`;
+      <button class="btn primary" data-act="clean" ${!total || S.busy ? 'disabled' : ''}>${L('Liberar ', 'Free ')}${fmtBytes(total)}</button></div>
+    ${restosCardHTML()}</div>`;
 }
 
 function viewArranque() {

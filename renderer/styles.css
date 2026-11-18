@@ -497,3 +497,7 @@ body.ligero .modal, body.ligero .toast, body.ligero .rt-globo, body.ligero .moni
 body.ligero .rt-cara { filter: none; }
 body.ligero .pbar.indet i { width: 100% !important; opacity: .45; }
 .priv-ico { font-size: 22px; width: 34px; text-align: center; flex-shrink: 0; }
+.card.restos { margin-top: 18px; padding: 18px 20px; }
+.card-head { display: flex; gap: 16px; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+.card-head h3 { margin: 0 0 4px; font-size: 16px; }
+.card.restos .list { max-height: 420px; overflow: auto; }

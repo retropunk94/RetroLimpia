@@ -6,6 +6,13 @@ const GB = 1024 ** 3, MB = 1024 ** 2;
 
 let token = 0;
 const demoPriv = { id_publicidad: true };
+const demoRestos = [
+  { tipo: 'carpeta', clase: 'vacia', ruta: 'C:\\Program Files (x86)\\ManyCam', nombre: 'ManyCam', confianza: 'alta', tamano: 0 },
+  { tipo: 'carpeta', clase: 'vacia', ruta: 'C:\\ProgramData\\FxSound LLC', nombre: 'FxSound LLC', confianza: 'alta', tamano: 0 },
+  { tipo: 'archivo', clase: 'acceso', ruta: 'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\Juego Viejo.lnk', nombre: 'Juego Viejo', confianza: 'alta', tamano: 0 },
+  { tipo: 'carpeta', clase: 'huerfana', ruta: 'C:\\Program Files\\EditorDeFotos', nombre: 'EditorDeFotos', confianza: 'media', tamano: 48234496 },
+  { tipo: 'registro', clase: 'fantasma', ruta: 'HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\ToolbarX', nombre: 'ToolbarX', confianza: 'alta', tamano: 0 }
+];
 function cancel() { token++; }
 async function steps(onProgress, msgs, total = 1200) {
   const my = token;
@@ -123,6 +130,10 @@ async function run(script, p, onProgress) {
       if (p.accion === 'crear') { await steps(onProgress, ['Creando punto de restauración...'], 1200); return { ok: true }; }
       if (p.accion === 'listar') return { puntos: [{ numero: 41, descripcion: 'RetroLimpia - Antes de limpiar', fecha: '2026-11-10' }] };
       return { ok: true };
+    case 'restos': {
+      await steps(onProgress, ['Leyendo qué programas tienes instalados...', 'Buscando carpetas que quedaron de programas viejos...', 'Buscando accesos directos que ya no abren nada...'], 700);
+      return { restos: demoRestos.filter((x) => !x.quitado), total: 0 };
+    }
     case 'privacidad': {
       if (p.accion === 'listar') return { ajustes: ['anuncios_inicio', 'sugerencias_ajustes', 'consejos_windows', 'apps_solas', 'pantalla_bloqueo', 'id_publicidad', 'explorador_anuncios', 'bing_busqueda', 'experiencias_personalizadas', 'telemetria_opcional', 'copilot'].map((id) => ({ id, aplicado: !!demoPriv[id], permitido: true })) };
       await steps(onProgress, ['Aplicando...'], 500);
@@ -188,6 +199,7 @@ async function run(script, p, onProgress) {
         for (const it of p.items) { onProgress({ log: { tipo: 'ok', msg: it.tipo === 'registro' ? 'Entrada del registro copiada a la cuarentena y borrada' : 'Movido a la cuarentena', en: 'Moved to quarantine', ruta: it.ruta } }); await wait(250); }
         onProgress({ log: { tipo: 'info', msg: 'Todo lo quitado está guardado aquí unos días por si quieres restaurarlo', en: 'Kept here for a few days', ruta: 'C:\\ProgramData\\RetroLimpia\\Cuarentena\\20261117-0315' } });
         const lote = { id: String(Date.now()), fecha: new Date().toISOString(), motivo: p.motivo, cantidad: p.items.length, bytes: p.items.reduce((a, i) => a + (i.tamano || 0), 0), items: p.items };
+        for (const it of p.items) { const d = demoRestos.find((x) => x.ruta === it.ruta); if (d) d.quitado = true; }
         cuarentena.unshift(lote); return { id: lote.id, guardados: p.items.length, fallidos: [], bytes: lote.bytes };
       }
       if (p.accion === 'listar') return { lotes: cuarentena };

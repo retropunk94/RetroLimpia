@@ -79,6 +79,8 @@ document.addEventListener('click', async (e) => {
     case 'donateGo': $('#modal').classList.add('hidden'); return rl.open(S.info.paypal);
     case 'modalClose': $('#modal').classList.add('hidden'); S.rep = null; return;
     case 'retroMenu': return retroMenu();
+    case 'restosBuscar': return restosBuscar();
+    case 'restosQuitar': return restosQuitar();
     case 'privRec': { const st = Object.fromEntries(S.privacidad.map((a) => [a.id, a])); return privCambiar(PRIVACIDAD.map((x) => x[0]).filter((id) => st[id] && !st[id].aplicado && st[id].permitido !== false && !PRIV_OPCIONAL.has(id)), true); }
     case 'retroOk': S.settings = await rl.setSettings({ mascotaPresentada: true }); return renderRetro();
     case 'retroActiva': return setMascota('activa');
@@ -142,6 +144,7 @@ document.addEventListener('click', async (e) => {
       return taskC(L('Limpiando', 'Cleaning'), async () => {
         const r = await rl.run('limpieza', { accion: 'limpiar', categorias: [...S.junkSel] });
         toast(L('¡Liberaste ', 'You freed ') + fmtBytes(r.liberado) + '!');
+        RESUMEN.liberado += Number(r.liberado) || 0;
         retroReacciona('guino', L('¡Más limpio! 😉', 'Squeaky clean! 😉'));
         await loadJunk();
       });
@@ -210,6 +213,7 @@ document.addEventListener('change', async (e) => {
   if (t.dataset.sort !== undefined) { S.progSort = t.value; return render(); }
   if (t.dataset.upd) { t.checked ? S.updSel.add(t.dataset.upd) : S.updSel.delete(t.dataset.upd); return render(); }
   if (t.dataset.sel) { t.checked ? S.sel.add(t.dataset.sel) : S.sel.delete(t.dataset.sel); return render(); }
+  if (t.dataset.resto !== undefined) { t.checked ? S.restosSel.add(t.dataset.resto) : S.restosSel.delete(t.dataset.resto); return render(); }
   if (t.dataset.junk) { t.checked ? S.junkSel.add(t.dataset.junk) : S.junkSel.delete(t.dataset.junk); return render(); }
   if (t.dataset.finding) { const f = S.scan.findings.find((x) => x.id === t.dataset.finding); if (f) f.elegido = t.checked; return render(); }
   if (t.dataset.res) { const [g, r] = t.dataset.res.split(':').map(Number); S.pendingResidues[g].restos[r].elegido = t.checked; return; }

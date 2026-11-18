@@ -1,6 +1,7 @@
 'use strict';
 // ============================================================ Vistas
 const ICONS = {
+  privacidad: '<path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
   inicio: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
   programas: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 17.5h7M17.5 14v7"/>',
   limpieza: '<path d="M14 3l7 7M4 20l7-7M9.5 8.5l6 6-2.5 5.5-9-9z"/><path d="M5 4v3M3.5 5.5h3"/>',
@@ -17,6 +18,7 @@ const NAV = [
   ['programas', 'Programas y bloatware', 'Programs & bloatware'],
   ['limpieza', 'Limpieza', 'Cleanup'],
   ['arranque', 'Arranque de Windows', 'Windows startup'],
+  ['privacidad', 'Privacidad', 'Privacy'],
   'sep',
   ['hardware', 'Hardware y salud', 'Hardware & health'],
   ['drivers', 'Drivers', 'Drivers'],

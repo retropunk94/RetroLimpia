@@ -71,7 +71,7 @@ function renderRetro() {
   if (el.dataset.k === clave) return;
   el.dataset.k = clave;
   el.className = 'retro ' + (modo === 'tranquila' ? 'quieto' : 'vivo') + ' a-' + animo;
-  el.innerHTML = globo + `<button class="rt-cara" data-act="retroMenu" title="${L('Retro · clic para opciones', 'Retro · click for options')}" aria-label="${L('Retro, la mascota. Opciones', 'Retro, the mascot. Options')}">${retroSVG(animo)}</button>`;
+  el.innerHTML = `<button class="rt-cara" data-act="retroMenu" title="${L('Retro · clic para opciones', 'Retro · click for options')}" aria-label="${L('Retro, la mascota. Opciones', 'Retro, the mascot. Options')}">${retroSVG(animo)}</button>` + globo;
 }
 
 function retroMenu() {

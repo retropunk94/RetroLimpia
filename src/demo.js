@@ -5,6 +5,7 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 const GB = 1024 ** 3, MB = 1024 ** 2;
 
 let token = 0;
+const demoPriv = { id_publicidad: true };
 function cancel() { token++; }
 async function steps(onProgress, msgs, total = 1200) {
   const my = token;
@@ -122,6 +123,12 @@ async function run(script, p, onProgress) {
       if (p.accion === 'crear') { await steps(onProgress, ['Creando punto de restauración...'], 1200); return { ok: true }; }
       if (p.accion === 'listar') return { puntos: [{ numero: 41, descripcion: 'RetroLimpia - Antes de limpiar', fecha: '2026-11-10' }] };
       return { ok: true };
+    case 'privacidad': {
+      if (p.accion === 'listar') return { ajustes: ['anuncios_inicio', 'sugerencias_ajustes', 'consejos_windows', 'apps_solas', 'pantalla_bloqueo', 'id_publicidad', 'explorador_anuncios', 'bing_busqueda', 'experiencias_personalizadas', 'telemetria_opcional', 'copilot'].map((id) => ({ id, aplicado: !!demoPriv[id], permitido: true })) };
+      await steps(onProgress, ['Aplicando...'], 500);
+      for (const id of p.ids || []) demoPriv[id] = p.accion === 'aplicar';
+      return { resultados: (p.ids || []).map((id) => ({ id, ok: true })) };
+    }
     case 'procesos': {
       if (p.accion === 'terminar') { await wait(300); return { ok: true, terminados: (p.pids || []).length }; }
       await wait(500);

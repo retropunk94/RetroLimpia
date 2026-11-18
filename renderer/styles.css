@@ -470,24 +470,23 @@ select { background: var(--panel-2); border: 1px solid var(--line-2); border-rad
 body.dormido *, body.dormido *::before, body.dormido *::after { animation-play-state: paused !important; }
 
 /* ---------- Retro, la mascota ---------- */
-.retro { position: fixed; right: 18px; bottom: 16px; z-index: 35; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+.retro { position: fixed; right: 150px; top: 5px; z-index: 35; display: flex; flex-direction: column; align-items: flex-end; gap: 10px; pointer-events: none; -webkit-app-region: no-drag; }  /* vive en la barra de título: nunca tapa nada */
 .retro > * { pointer-events: auto; }
-.rt-cara { width: 58px; height: 58px; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 16px; filter: drop-shadow(0 6px 18px rgba(177, 76, 255, .45)); }
+.rt-cara { width: 34px; height: 34px; padding: 0; border: 0; background: none; cursor: pointer; border-radius: 16px; filter: drop-shadow(0 2px 8px rgba(177, 76, 255, .5)); }
 .rt-cara svg { width: 100%; height: 100%; display: block; }
 .rt-cara:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 .retro.vivo .rt-cara { animation: rtFlota 1.4s ease-in-out 1; }  /* una sola vez por cambio: en reposo no gasta nada */
 .retro.vivo.a-piensa .rt-mira { animation: rtMira 1.6s ease-in-out infinite; }
 .retro.vivo.a-normal .rt-pupila { animation: rtParpadeo .5s ease 1.2s 1; transform-origin: 50px 50px; }
 .retro.quieto .rt-cara { filter: none; opacity: .9; }
-.rt-globo { max-width: 300px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 14px 14px 4px 14px; padding: 12px 14px; font-size: 13.5px; line-height: 1.45; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); animation: tin .25s ease; }
+.rt-globo { max-width: 300px; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 14px 4px 14px 14px; padding: 12px 14px; font-size: 13.5px; line-height: 1.45; box-shadow: 0 10px 30px rgba(0, 0, 0, .45); animation: tin .25s ease; }
 .rt-globo b { display: block; margin-bottom: 4px; }
 .rt-globo span { color: var(--muted); }
 .rt-globo.corto { color: var(--text); }
 .rt-btns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .rt-opciones { display: grid; gap: 10px; margin: 6px 0 12px; }
 .rt-opciones .btn { justify-content: flex-start; text-align: left; }
-.main { padding-bottom: 96px; }
-@keyframes rtFlota { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+@keyframes rtFlota { 0%, 100% { transform: scale(1); } 40% { transform: scale(1.18); } }
 @keyframes rtMira { 0%, 100% { transform: translateX(-9px); } 50% { transform: translateX(9px); } }
 @keyframes rtParpadeo { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(.1); } }
 @media (prefers-reduced-motion: reduce) { .retro * { animation: none !important; } }
@@ -497,3 +496,4 @@ body.ligero *, body.ligero *::before, body.ligero *::after { animation: none !im
 body.ligero .modal, body.ligero .toast, body.ligero .rt-globo, body.ligero .monitor { box-shadow: none !important; }
 body.ligero .rt-cara { filter: none; }
 body.ligero .pbar.indet i { width: 100% !important; opacity: .45; }
+.priv-ico { font-size: 22px; width: 34px; text-align: center; flex-shrink: 0; }

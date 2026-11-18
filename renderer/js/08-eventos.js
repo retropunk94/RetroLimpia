@@ -2,7 +2,7 @@
 // ============================================================ Render y eventos
 function render() {
   renderNav();
-  const views = { inicio: viewInicio, programas: viewProgramas, limpieza: viewLimpieza, arranque: viewArranque, hardware: viewHardware, drivers: viewDrivers, actualizaciones: viewActualizaciones, procesos: viewProcesos, deshacer: viewDeshacer, ajustes: viewAjustes };
+  const views = { inicio: viewInicio, programas: viewProgramas, limpieza: viewLimpieza, arranque: viewArranque, privacidad: viewPrivacidad, hardware: viewHardware, drivers: viewDrivers, actualizaciones: viewActualizaciones, procesos: viewProcesos, deshacer: viewDeshacer, ajustes: viewAjustes };
   const focusId = document.activeElement && ['search', 'procSearch'].includes(document.activeElement.id) ? document.activeElement.id : null;
   const caret = focusId ? document.activeElement.selectionStart : 0;
   let html;
@@ -79,6 +79,7 @@ document.addEventListener('click', async (e) => {
     case 'donateGo': $('#modal').classList.add('hidden'); return rl.open(S.info.paypal);
     case 'modalClose': $('#modal').classList.add('hidden'); S.rep = null; return;
     case 'retroMenu': return retroMenu();
+    case 'privRec': { const st = Object.fromEntries(S.privacidad.map((a) => [a.id, a])); return privCambiar(PRIVACIDAD.map((x) => x[0]).filter((id) => st[id] && !st[id].aplicado && st[id].permitido !== false && !PRIV_OPCIONAL.has(id)), true); }
     case 'retroOk': S.settings = await rl.setSettings({ mascotaPresentada: true }); return renderRetro();
     case 'retroActiva': return setMascota('activa');
     case 'retroTranquila': return setMascota('tranquila');
@@ -221,6 +222,7 @@ document.addEventListener('change', async (e) => {
     toast(t.checked ? (r.ok ? L('RetroLimpia arrancará con Windows y te avisará.', 'RetroLimpia will start with Windows and remind you.') : L('No se pudo activar.', 'Could not enable.')) : L('Ya no arrancará con Windows.', 'It will no longer start with Windows.'), r.ok ? 'ok' : 'err');
     return render();
   }
+  if (t.dataset.priv) { if (S.busy) { t.checked = !t.checked; return toast(L('Espera a que termine la tarea actual.', 'Wait for the current task to finish.'), 'err'); } return privCambiar([t.dataset.priv], t.checked); }
   if (t.dataset.setting) {
     const k = t.dataset.setting;
     const v = t.type === 'checkbox' ? t.checked : (['diasCuarentena', 'frecuenciaDias'].includes(k) ? Number(t.value) : t.value);

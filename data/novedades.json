@@ -2,6 +2,36 @@
   "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
   "versiones": [
     {
+      "version": "4.0.0",
+      "fecha": "2026-11-17",
+      "es": [
+        "🎮 Nuevo: Modo Juego. Antes de jugar cierra SOLO lo que tú elijas, pone el PC a máxima potencia y pausa lo que molesta (Suave, Equilibrado o A tope). OBS, Discord, Steam y tus periféricos nunca se tocan. Añade tus juegos o emuladores (cualquier .exe) y se activa solo al abrirlos. Al terminar, todo vuelve a como estaba. ¡Y tiene logros!",
+        "✨ Nuevo: \"Acabo de formatear\". Pasos guiados para dejar un Windows recién instalado listo: drivers, actualizaciones, tus programas de siempre instalados solos (cada uno explicado en palabras sencillas), quitar lo que sobra, apagar anuncios y guardar ese momento.",
+        "🛡️ Nuevo: Privacidad. Apaga los anuncios del menú Inicio, las apps que se instalan solas, la publicidad personalizada y el envío de datos opcional. Cada interruptor está explicado y todo se puede volver a encender.",
+        "📂 Nuevo: Restos de programas antiguos (en Limpieza). Encuentra carpetas vacías, accesos directos rotos y programas \"fantasma\" que dejaron cosas que ya desinstalaste. Todo pasa por la cuarentena.",
+        "🧹 Limpieza gamer: caché de shaders (NVIDIA, AMD, Intel, DirectX) y caché de Steam, Epic, Battle.net, EA y Discord.",
+        "💙 Nuevo: \"¿Por qué se reinició mi PC?\" (en Hardware y salud). Te explica en palabras sencillas cada pantallazo azul, apagado de golpe o reinicio de Windows Update de los últimos 30 días.",
+        "📈 En la pantalla de inicio: tu historial de salud y \"Lo que RetroLimpia hizo por ti\" (espacio liberado, programas quitados, anuncios apagados...).",
+        "🤖 Te presentamos a Retro, la mascota: reacciona a lo que pasa y vive en la barra de título para no tapar nada. Si te molesta, haz clic en él y ponlo tranquilo o apágalo.",
+        "🐢 Modo para PCs modestos: si tu equipo tiene poca memoria o pocos núcleos, RetroLimpia se aligera solo (sin animaciones y trabajando con menos prioridad). Puedes forzarlo en Ajustes.",
+        "⚡ Más ligero que nunca: no gasta nada de procesador en reposo, libera memoria cuando lo cierras a la bandeja y ocupa menos en disco.",
+        "🧭 Tour de bienvenida renovado y un mini tour de lo nuevo (también en Ajustes)."
+      ],
+      "en": [
+        "🎮 New: Game Mode. Before you play it closes ONLY what you choose, sets max power and pauses distractions (Gentle, Balanced or All out). OBS, Discord, Steam and your peripherals are never touched. Add your games or emulators (any .exe) and it turns on by itself. When done, everything goes back. And it has achievements!",
+        "✨ New: \"Fresh install\". Guided steps to get a freshly installed Windows ready: drivers, updates, your usual programs installed by themselves (each one explained simply), remove extras, turn off ads and save that moment.",
+        "🛡️ New: Privacy. Turns off Start menu ads, self-installing apps, personalized ads and optional data sharing. Every switch is explained and can be turned back on.",
+        "📂 New: Leftovers of old programs (in Cleanup). Finds empty folders, broken shortcuts and \"ghost\" programs left by things you already uninstalled. Everything goes through quarantine.",
+        "🧹 Gamer cleanup: shader cache (NVIDIA, AMD, Intel, DirectX) and Steam, Epic, Battle.net, EA and Discord cache.",
+        "💙 New: \"Why did my PC restart?\" (in Hardware & health). Explains every blue screen, sudden shutdown or Windows Update restart of the last 30 days.",
+        "📈 On the home screen: your health history and \"What RetroLimpia did for you\".",
+        "🤖 Meet Retro, the mascot: he reacts to what happens and lives in the title bar so he never covers anything. Click him to make him quiet or turn him off.",
+        "🐢 Mode for modest PCs: on low-memory or low-core machines RetroLimpia lightens itself automatically. You can force it in Settings.",
+        "⚡ Lighter than ever: zero CPU when idle, frees memory when closed to the tray, and smaller on disk.",
+        "🧭 Renewed welcome tour and a mini tour of what's new (also in Settings)."
+      ]
+    },
+    {
       "version": "2.7.1",
       "fecha": "2026-11-17",
       "es": [

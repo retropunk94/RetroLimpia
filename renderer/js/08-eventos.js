@@ -75,6 +75,7 @@ document.addEventListener('click', async (e) => {
     case 'procBack': $('#modal').classList.add('hidden'); S.view = 'inicio'; return render();
     case 'procPause': S.procPaused = !S.procPaused; return render();
     case 'tour': return startTour();
+    case 'miniTour': $('#modal').classList.add('hidden'); return startTour(true);
     case 'monClose': $('#monitor').classList.add('hidden'); S.mon = null; return render();
     case 'monQuar': $('#monitor').classList.add('hidden'); S.mon = null; S.quarantine = null; S.view = 'deshacer'; return render();
     case 'donateAsk': return showDonate();

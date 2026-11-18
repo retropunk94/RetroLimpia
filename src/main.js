@@ -69,7 +69,11 @@ const RL_DATA = path.join(process.env.ProgramData || 'C:\\ProgramData', 'RetroLi
 function candado(dir) {
   try {
     fs.mkdirSync(dir, { recursive: true });
-    execFile(BIN.icacls, [dir, '/inheritance:r', '/grant:r', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-545:(OI)(CI)RX', '/T', '/C', '/Q'], { windowsHide: true }, () => {});
+    // OJO: nunca /T con (OI)(CI) (deja los archivos sin permisos). Primero todo hereda (/reset /T)
+    // y luego el candado solo en la carpeta de arriba: Windows lo pasa a todo lo de dentro.
+    execFile(BIN.icacls, [dir, '/reset', '/T', '/C', '/Q'], { windowsHide: true }, () => {
+      execFile(BIN.icacls, [dir, '/inheritance:r', '/grant:r', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-545:(OI)(CI)RX', '/C', '/Q'], { windowsHide: true }, () => {});
+    });
   } catch { /* sin permisos: no pasa nada, se intenta en el próximo arranque */ }
 }
 const EQUIPO_LIMITADO = os.totalmem() <= 4.5 * 1024 ** 3 || (os.cpus() || []).length <= 2;

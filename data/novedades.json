@@ -2,6 +2,20 @@
   "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
   "versiones": [
     {
+      "version": "4.0.3",
+      "fecha": "2026-11-17",
+      "es": [
+        "Arreglado un fallo grave de la 4.0.2: al actualizar, el programa quedaba sin permisos y parecía que se había borrado. Esta versión lo repara sola al instalarse. Si te pasó, descarga la 4.0.3 desde la web e instálala encima: no pierdes nada.",
+        "Incluye las mejoras de seguridad de la 4.0.2 (candado en las carpetas del programa, desinstalador leído del registro, cuarentena y Modo Juego protegidos), ahora bien hechas.",
+        "Perdón por las molestias: cada versión pasa ahora también una prueba de actualización real antes de publicarse."
+      ],
+      "en": [
+        "Fixed a serious 4.0.2 bug: after updating, the program was left without permissions and seemed deleted. This version repairs it during install. If it happened to you, download 4.0.3 from the website and install it over: you lose nothing.",
+        "Includes the 4.0.2 security improvements, now done right.",
+        "Sorry for the trouble: every version now also passes a real update test before release."
+      ]
+    },
+    {
       "version": "4.0.2",
       "fecha": "2026-11-17",
       "es": [

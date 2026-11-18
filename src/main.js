@@ -281,9 +281,9 @@ ipcMain.handle('rl:checkNow', () => backgroundCheck(true));
 
 // ---------- Comunicación con la interfaz ----------
 ipcMain.handle('rl:run', async (e, script, params) => {
-  return engine.run(script, params || {}, (p) => {
-    if (!e.sender.isDestroyed()) e.sender.send('rl:progress', { script, ...p });
-  });
+  const prog = (p) => { if (!e.sender.isDestroyed()) e.sender.send('rl:progress', { script, ...p }); };
+  if (script === 'modojuego' && params && params.accion !== 'listar' && params.accion !== 'estado') return runJuego(params, prog);
+  return engine.run(script, params || {}, prog);
 });
 ipcMain.handle('rl:cancel', () => engine.cancelAll());
 ipcMain.handle('rl:data', (e, name) => loadData(name));
@@ -474,13 +474,33 @@ ipcMain.handle('rl:report:capture', async () => {
 // ---------- Modo Juego automático ----------
 // Solo si el usuario lo activa y tiene juegos en su lista. Cada 15 s mira la lista de procesos
 // con "tasklist" (unos milisegundos, sin PowerShell) y nada más: casi no gasta.
-let juegoTimer = null, juegoAuto = null, juegoMirando = false;
+let juegoTimer = null, juegoMirando = false, juegoAusente = 0;
+const juegoEstadoFile = () => path.join(process.env.ProgramData || 'C:\\ProgramData', 'RetroLimpia', 'modojuego-estado.json');
+function juegoEstado() { try { return JSON.parse(fs.readFileSync(juegoEstadoFile(), 'utf8').replace(/^\uFEFF/, '')); } catch { return null; } }
 const juegoEnviar = (ev) => { if (win && !win.isDestroyed()) win.webContents.send('rl:juego', ev); };
+// Todo lo del Modo Juego (botón y automático) va en fila: nunca dos a la vez
+let juegoCola = Promise.resolve();
+function runJuego(params, onProgress, opts) {
+  const p = juegoCola.then(() => engine.run('modojuego', params, onProgress || (() => {}), opts));
+  juegoCola = p.catch(() => {});
+  return p;
+}
+async function juegoRestaurarAuto() {
+  const s = loadSettings();
+  const r = await runJuego({ accion: 'restaurar', reabrir: s.juegoReabrir !== false }, null, { sinCancelar: true });
+  const partidas = (Number(s.juegoPartidas) || 0) + (r && r.nada ? 0 : 1);
+  saveSettings({ ...loadSettings(), juegoPartidas: partidas });
+  juegoEnviar({ activo: false, partidas });
+}
 function juegoWatch() {
   if (juegoTimer) { clearInterval(juegoTimer); juegoTimer = null; }
-  const s = loadSettings();
-  if (DEMO || !s.juegoAuto || !Array.isArray(s.misJuegos) || !s.misJuegos.length) return;
-  juegoTimer = setInterval(juegoTick, 15000);
+  if (DEMO) return;
+  const s = loadSettings(), est = juegoEstado();
+  const hayJuegos = Array.isArray(s.misJuegos) && s.misJuegos.length;
+  // Se apagó el automático (o se quitaron los juegos) con una partida automática en marcha: se restaura ya
+  if (est && est.auto && (!s.juegoAuto || !hayJuegos)) { juegoRestaurarAuto().catch((e) => updLog('Modo Juego: ' + e.message)); return; }
+  // El vigilante también corre si quedó una partida automática de antes (p. ej. tras reiniciar RetroLimpia)
+  if ((s.juegoAuto && hayJuegos) || (est && est.auto)) { juegoTimer = setInterval(juegoTick, 15000); setTimeout(juegoTick, 3000); }
 }
 function juegoTick() {
   if (juegoMirando || installing) return;
@@ -489,20 +509,21 @@ function juegoTick() {
     try {
       if (err) return;
       const abiertos = new Set(String(out).split(/\r?\n/).map((l) => (l.match(/^"([^"]+)"/) || [])[1]).filter(Boolean).map((n) => n.toLowerCase()));
-      const s = loadSettings();
-      const juego = (s.misJuegos || []).find((g) => abiertos.has(path.basename(g.ruta).toLowerCase()));
-      if (juego && !juegoAuto) {
-        const r = await engine.run('modojuego', { accion: 'activar', intensidad: s.juegoIntensidad || 'equilibrado', cerrar: s.juegoCerrar || [], juego: path.basename(juego.ruta) });
-        if (r && r.yaActivo) return;               // lo activó el usuario a mano: no se apaga solo
-        juegoAuto = juego.nombre;
-        juegoEnviar({ activo: true, juego: juego.nombre, estado: r && r.estado });
+      const s = loadSettings(), est = juegoEstado();
+      const lista = Array.isArray(s.misJuegos) ? s.misJuegos : [];
+      const juego = lista.find((g) => abiertos.has(path.basename(g.ruta).toLowerCase()));
+      if (juego) juegoAusente = 0;
+      if (juego && !est && s.juegoAuto) {
+        const r = await runJuego({ accion: 'activar', auto: true, intensidad: s.juegoIntensidad || 'equilibrado', cerrar: s.juegoCerrar || [], juego: path.basename(juego.ruta), juegos: lista.map((g) => path.basename(g.ruta)) }, null, { sinCancelar: true });
+        if (!r || r.yaActivo || r.ok === false) return;
+        juegoEnviar({ activo: true, juego: juego.nombre, estado: r.estado });
         notify('RetroLimpia', T(`Modo Juego activo para ${juego.nombre}. Se apagará solo al cerrarlo.`, `Game Mode on for ${juego.nombre}. It turns off when you close it.`));
-      } else if (!juego && juegoAuto) {
-        juegoAuto = null;
-        const r = await engine.run('modojuego', { accion: 'restaurar', reabrir: s.juegoReabrir !== false });
-        const partidas = (Number(s.juegoPartidas) || 0) + (r && r.nada ? 0 : 1);
-        saveSettings({ ...loadSettings(), juegoPartidas: partidas });
-        juegoEnviar({ activo: false, partidas });
+      } else if (!juego && est && est.auto) {
+        // Dos comprobaciones seguidas sin el juego (30 s): así un launcher que abre el juego y se cierra no lo apaga
+        if (++juegoAusente < 2) return;
+        juegoAusente = 0;
+        await juegoRestaurarAuto();
+        if (!s.juegoAuto) juegoWatch();
       }
     } catch (e) { updLog('Modo Juego automático: ' + (e && e.message || e)); }
     finally { juegoMirando = false; }

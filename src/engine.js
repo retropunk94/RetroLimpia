@@ -19,7 +19,7 @@ const running = new Set();
 
 function init(options) { cfg = { ...cfg, ...options }; }
 
-function run(script, params = {}, onProgress = () => {}) {
+function run(script, params = {}, onProgress = () => {}, opts = {}) {
   if (!SCRIPTS.has(script)) return Promise.reject(new Error('Script no permitido: ' + script));
   if (cfg.demo) return demo.run(script, params, onProgress);
 
@@ -29,7 +29,7 @@ function run(script, params = {}, onProgress = () => {}) {
 
   return new Promise((resolve, reject) => {
     const child = spawn('powershell.exe', args, { windowsHide: true });
-    running.add(child);
+    if (!opts.sinCancelar) running.add(child);   // el Modo Juego automático no se corta con el botón Cancelar
     // Modo bajos recursos: el trabajo va con menos prioridad para que el PC siga respondiendo
     if (cfg.ligero && child.pid) { try { require('os').setPriority(child.pid, require('os').constants.priority.PRIORITY_BELOW_NORMAL); } catch { /* sin permiso: sigue normal */ } }
     let buffer = '';

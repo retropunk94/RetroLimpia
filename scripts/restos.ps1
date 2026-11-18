@@ -100,7 +100,9 @@ foreach ($b in $bases) {
         }
         # Un nivel más (solo en carpetas de programas): Editor\ProgramaViejo vacío.
         # En AppData NO: los programas crean ahí subcarpetas vacías a propósito (bios, capturas...).
-        if ($b.prog) {
+        # Y solo si la carpeta de arriba es un "editor" puro: sin archivos propios y sin programa instalado
+        $sinArchivosPropios = $true; try { $sinArchivosPropios = -not ([IO.Directory]::EnumerateFiles($d.FullName) | Select-Object -First 1) } catch { $sinArchivosPropios = $false }
+        if ($b.prog -and $sinArchivosPropios -and -not (Es-Instalado $d.FullName $d.Name)) {
             foreach ($s in (Get-ChildItem -LiteralPath $d.FullName -Directory -Force -ErrorAction SilentlyContinue | Select-Object -First 60)) {
                 if ($s.Name -match $NUNCA -or $s.LastWriteTime -gt $hace7) { continue }
                 if ($s.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
@@ -123,12 +125,17 @@ foreach ($f in $lnks) {
         $t = [string]$shell.CreateShortcut($f.FullName).TargetPath
         if (-not $t -or $t -notmatch '^[A-Za-z]:\\' -or $t -match '%') { continue }   # solo rutas locales normales
         if (-not (Test-Path -LiteralPath $t.Substring(0, 3))) { continue }           # disco desconectado: no es que esté roto
-        if (-not (Test-Path -LiteralPath $t)) { Add-Resto 'archivo' 'acceso' $f.FullName $f.BaseName 'alta' }
+        if (Test-Path -LiteralPath $t) { continue }
+        # Accesos guardados con %ProgramFiles% pueden apuntar en realidad a "Program Files (x86)"
+        $alt = if ($t -match '\\Program Files\\') { $t -replace '\\Program Files\\', '\Program Files (x86)\' } elseif ($t -match '\\Program Files \(x86\)\\') { $t -replace '\\Program Files \(x86\)\\', '\Program Files\' } else { $null }
+        if ($alt -and (Test-Path -LiteralPath $alt)) { continue }
+        Add-Resto 'archivo' 'acceso' $f.FullName $f.BaseName 'alta'
     } catch {}
 }
 # Carpetas vacías del menú Inicio (solo ahí)
 foreach ($ld in $menus) {
     foreach ($sd in (Get-ChildItem -LiteralPath $ld -Directory -Recurse -Force -ErrorAction SilentlyContinue)) {
+        if ($sd.FullName -match '\\Startup(\\|$)' -or $sd.LastWriteTime -gt $hace7) { continue }   # la carpeta Inicio de Windows nunca
         if ((Get-Contenido $sd.FullName) -eq 'vacia') { Add-Resto 'carpeta' 'vacia' $sd.FullName $sd.Name 'alta' }
     }
 }
@@ -138,10 +145,12 @@ Send-Progress 90 'Buscando programas fantasma en la lista de Windows...' 'Lookin
 foreach ($e in $entradas) {
     $v = $e.v
     if (-not $v.DisplayName -or $v.SystemComponent -eq 1 -or $v.WindowsInstaller -eq 1) { continue }
+    if ($v.BundleProviderKey -or $v.BundleVersion -or $v.BundleCachePath) { continue }        # paquetes como Visual C++: su instalador vive en una caché
+    if ($e.k.PSPath -match 'WOW6432Node' -and ([string]$v.UninstallString) -match [regex]::Escape($env:windir)) { continue }   # 32 bits en System32: Windows engaña la ruta
     $us = [string]$v.UninstallString
     if (-not $us -or $us -match 'msiexec') { continue }
     $exe = if ($us -match '^\s*"([^"]+)"') { $Matches[1] } elseif ($us -match '^\s*([A-Za-z]:\\[^"]*?\.exe)') { $Matches[1] } else { '' }
-    if (-not $exe -or $exe -match '%') { continue }
+    if (-not $exe -or $exe -match '%' -or $exe.ToLowerInvariant().StartsWith($env:windir.ToLowerInvariant())) { continue }
     if (-not (Test-Path -LiteralPath $exe.Substring(0, 3))) { continue }
     $loc = ([string]$v.InstallLocation).Trim('" ')
     if ((Test-Path -LiteralPath $exe) -or ($loc -and (Test-Path -LiteralPath $loc))) { continue }

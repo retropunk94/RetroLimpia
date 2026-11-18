@@ -88,10 +88,12 @@ function formInstalar() {
 function formPriv() {
   const ids = PRIVACIDAD.map((x) => x[0]).filter((id) => !PRIV_OPCIONAL.has(id));
   return taskC(L('Apagando anuncios y datos', 'Turning off ads and data'), async () => {
-    await rl.run('privacidad', { accion: 'aplicar', ids });
+    const r = obj(await rl.run('privacidad', { accion: 'aplicar', ids }));
     S.privacidad = null;
-    toast(L('Anuncios y envío de datos apagados. Se notará del todo al reiniciar.', 'Ads and data sharing off. Fully visible after restart.'));
-    ganar('anuncios', ids.length);
+    const ok = arr(r.resultados).filter((x) => x.ok).length;
+    if (ok < ids.length) toast(L(`Apagados ${ok} de ${ids.length}. El resto necesita abrir RetroLimpia como administrador.`, `${ok} of ${ids.length} turned off. The rest need RetroLimpia running as administrator.`), 'err');
+    else toast(L('Anuncios y envío de datos apagados. Se notará del todo al reiniciar.', 'Ads and data sharing off. Fully visible after restart.'));
+    ganar('anuncios', ok);
     await formMarcar('privacidad');
   });
 }

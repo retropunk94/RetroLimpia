@@ -33,7 +33,15 @@ $SUGERIDOS = @{
 $NAVEGADORES = '^(chrome|msedge|brave|firefox|opera|opera_gx|vivaldi)$'
 
 function Leer-Estado { if (Test-Path -LiteralPath $estadoFile) { try { return Get-Content -LiteralPath $estadoFile -Raw -Encoding UTF8 | ConvertFrom-Json } catch {} }; return $null }
-function Guardar-Estado($e) { $e | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $estadoFile -Encoding UTF8 }
+function Guardar-Estado($e) { $e | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $estadoFile -Encoding UTF8 -ErrorAction Stop }
+# Procesos de ESTA sesión con ese nombre exacto (sin comodines y sin tocar otros usuarios)
+function Get-Exactos([string]$n) {
+    $ses = (Get-Process -Id $PID).SessionId
+    return @(Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -eq $n -and $_.SessionId -eq $ses })
+}
+# Un solo Modo Juego a la vez (botón y modo automático nunca se pisan)
+$mutex = New-Object System.Threading.Mutex($false, 'Global\RetroLimpiaModoJuego')
+try { [void]$mutex.WaitOne(90000) } catch [System.Threading.AbandonedMutexException] {}
 
 function Get-Apps {
     $sesion = (Get-Process -Id $PID).SessionId
@@ -77,29 +85,44 @@ switch ($p.accion) {
     }
     'estado' { $e = Leer-Estado; Send-Result @{ activo = [bool]($e -and $e.activo); estado = $e } }
     'activar' {
+        # Si ya hay un estado guardado (activo o a medias) NUNCA se activa encima: se perderían los valores originales
         $previo = Leer-Estado
-        if ($previo -and $previo.activo) { Send-Result @{ ok = $true; yaActivo = $true; estado = $previo }; return }
+        if ($previo -or (Test-Path -LiteralPath $estadoFile)) { Send-Result @{ ok = $true; yaActivo = $true; estado = $previo }; return }
         $int = [string]$p.intensidad; if ($int -notin @('suave', 'equilibrado', 'atope')) { $int = 'equilibrado' }
         $reg = New-Object System.Collections.Generic.List[object]
         $serv = New-Object System.Collections.Generic.List[string]
         $cerrados = New-Object System.Collections.Generic.List[object]
         $hecho = New-Object System.Collections.Generic.List[string]
-        $estado = [ordered]@{ activo = $true; desde = (Get-Date).ToString('o'); intensidad = $int; juego = [string]$p.juego; plan = $null; reg = $reg; servicios = $serv; cerrados = $cerrados }
-        # Se guarda ANTES de tocar nada: si algo se corta, siempre se puede restaurar
-        Guardar-Estado $estado
+        $noCerrados = New-Object System.Collections.Generic.List[string]
+        $estado = [ordered]@{ activo = $true; desde = (Get-Date).ToString('o'); intensidad = $int; juego = [string]$p.juego; auto = [bool]$p.auto; plan = $null; reg = $reg; servicios = $serv; cerrados = $cerrados }
+        # Se guarda ANTES de tocar nada: si algo se corta, siempre se puede restaurar. Si no se puede guardar, no se toca nada.
+        try { Guardar-Estado $estado } catch { Send-Result @{ ok = $false; mensaje = 'No se pudo guardar el estado del Modo Juego: no se cambió nada.' }; return }
 
         # 1) Cerrar lo que el usuario eligió (nunca lo protegido)
-        $pedidos = @($p.cerrar | ForEach-Object { ([string]$_).ToLowerInvariant() } | Where-Object { $_ -and $_ -notmatch $PROTEGIDOS })
+        # Nunca el propio juego ni "Mis juegos"; en automático (sin nadie mirando) solo lo sugerido, que no tiene trabajo sin guardar
+        $excluir = @(@($p.juegos) + @([string]$p.juego) | ForEach-Object { [IO.Path]::GetFileNameWithoutExtension([string]$_).ToLowerInvariant() } | Where-Object { $_ })
+        $pedidos = @($p.cerrar | ForEach-Object { ([string]$_).ToLowerInvariant() } | Where-Object { $_ -and $_ -notmatch '[\*\?\[\]]' -and $_ -notmatch $PROTEGIDOS -and $excluir -notcontains $_ })
+        if ($p.auto) { $pedidos = @($pedidos | Where-Object { $SUGERIDOS.ContainsKey($_) -and $SUGERIDOS[$_] }) }
         $i = 0
         foreach ($n in $pedidos) {
             $i++; Send-Progress ([int](40 * $i / [Math]::Max(1, $pedidos.Count))) ('Cerrando ' + $n + '...') ('Closing ' + $n + '...')
-            $procs = @(Get-Process -Name $n -ErrorAction SilentlyContinue)
+            $procs = Get-Exactos $n
             if (-not $procs.Count) { continue }
             $ruta = $null; foreach ($x in $procs) { try { if ($x.Path) { $ruta = $x.Path; break } } catch {} }
-            foreach ($x in $procs) { try { if ($x.MainWindowHandle -ne 0) { [void]$x.CloseMainWindow() } } catch {} }
-            Start-Sleep -Milliseconds 1500
-            Get-Process -Name $n -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+            $conVentana = @($procs | Where-Object { $_.MainWindowHandle -ne 0 }).Count -gt 0
+            if ($conVentana -and -not $SUGERIDOS.ContainsKey($n)) {
+                # Programa con ventana: se le PIDE cerrar, como al pulsar la X. Si pregunta "¿Guardar cambios?", se respeta
+                foreach ($x in $procs) { try { if ($x.MainWindowHandle -ne 0) { [void]$x.CloseMainWindow() } } catch {} }
+                $t0 = Get-Date
+                while ((Get-Exactos $n).Count -and ((Get-Date) - $t0).TotalSeconds -lt 10) { Start-Sleep -Milliseconds 500 }
+                # Si queda algún proceso suelto sin ventana del mismo programa, se cierra; si la ventana sigue, se deja en paz
+                if (@(Get-Exactos $n | Where-Object { $_.MainWindowHandle -ne 0 }).Count) { $noCerrados.Add($n); Send-Log 'aviso' ('No se cerró ' + $n + ': puede que te esté preguntando si guardar. Ciérralo tú si quieres.') ('Did not close ' + $n); continue }
+                Get-Exactos $n | Stop-Process -Force -ErrorAction SilentlyContinue
+            } else {
+                Get-Exactos $n | Stop-Process -Force -ErrorAction SilentlyContinue
+            }
             $cerrados.Add([pscustomobject]@{ nombre = $n; ruta = $ruta })
+            try { Guardar-Estado $estado } catch {}
             Send-Log 'ok' ('Cerrado: ' + $n) ('Closed: ' + $n)
         }
         if ($cerrados.Count) { $hecho.Add('cerrar') }
@@ -140,17 +163,16 @@ switch ($p.accion) {
             Guardar-Estado $estado
         }
         # 3) A tope: el juego con prioridad alta
-        if ($int -eq 'atope' -and $p.juego) {
-            $jn = [IO.Path]::GetFileNameWithoutExtension([string]$p.juego)
-            Get-Process -Name $jn -ErrorAction SilentlyContinue | ForEach-Object { try { $_.PriorityClass = 'High'; $hecho.Add('prioridad') } catch {} }
+        if ($int -eq 'atope') {
+            foreach ($jn in $excluir) { Get-Exactos $jn | ForEach-Object { try { $_.PriorityClass = 'High'; $hecho.Add('prioridad') } catch {} } }
         }
         Write-RLLog ('Modo Juego activado (' + $int + '): ' + ($hecho -join ', '))
         Send-Progress 100 'Listo' 'Done'
-        Send-Result @{ ok = $true; hecho = @($hecho | Select-Object -Unique); cerrados = $cerrados.Count; estado = $estado }
+        Send-Result @{ ok = $true; hecho = @($hecho | Select-Object -Unique); cerrados = $cerrados.Count; noCerrados = @($noCerrados); estado = $estado }
     }
     'restaurar' {
         $e = Leer-Estado
-        if (-not $e) { Send-Result @{ ok = $true; nada = $true }; return }
+        if (-not $e) { Remove-Item -LiteralPath $estadoFile -Force -ErrorAction SilentlyContinue; Send-Result @{ ok = $true; nada = $true }; return }
         Send-Progress 20 'Devolviendo el PC a como estaba...' 'Putting your PC back as it was...'
         if ($e.plan) { try { & powercfg /setactive $e.plan | Out-Null } catch {} }
         foreach ($r in @($e.reg)) {
@@ -166,7 +188,7 @@ switch ($p.accion) {
             Send-Progress 75 'Volviendo a abrir lo que se cerró...' 'Reopening what was closed...'
             foreach ($c in @($e.cerrados)) {
                 if (-not $c.ruta -or -not (Test-Path -LiteralPath $c.ruta)) { continue }
-                if (Get-Process -Name $c.nombre -ErrorAction SilentlyContinue) { continue }
+                if ((Get-Exactos ([string]$c.nombre)).Count) { continue }
                 # A través del Explorador: así se abre como usuario normal, no como administrador
                 try { Start-Process -FilePath "$env:windir\explorer.exe" -ArgumentList ('"' + $c.ruta + '"'); $reabiertos++ } catch {}
             }

@@ -24,11 +24,10 @@ function Get-BrowserCacheDirs {
 
 # Cachés web de launchers y Discord (solo la caché: nunca juegos, partidas ni sesiones)
 function Get-LauncherCacheDirs {
+    # Solo carpetas que son caché pura. Nada de perfiles de navegador (ahí van las sesiones iniciadas).
     $l = @(
         "$env:LOCALAPPDATA\Steam\htmlcache\Cache", "$env:LOCALAPPDATA\Steam\htmlcache\Code Cache", "$env:LOCALAPPDATA\Steam\htmlcache\GPUCache",
-        "$env:LOCALAPPDATA\EpicGamesLauncher\Saved\webcache", "$env:LOCALAPPDATA\EpicGamesLauncher\Saved\webcache_4147", "$env:LOCALAPPDATA\EpicGamesLauncher\Saved\webcache_4430", "$env:LOCALAPPDATA\EpicGamesLauncher\Saved\webcache_6099",
-        "$env:LOCALAPPDATA\Battle.net\BrowserCaches", "$env:LOCALAPPDATA\Battle.net\Cache",
-        "$env:LOCALAPPDATA\Electronic Arts\EA Desktop\CEF\BrowserCache",
+        "$env:LOCALAPPDATA\Battle.net\Cache",
         "$env:APPDATA\discord\Cache", "$env:APPDATA\discord\Code Cache", "$env:APPDATA\discord\GPUCache"
     )
     $steam = (Get-ItemProperty 'HKCU:\Software\Valve\Steam' -ErrorAction SilentlyContinue).SteamPath

@@ -131,7 +131,7 @@ switch ($p.accion) {
         $items = @($p.items); $n = 0
         foreach ($it in $items) {
             $n++
-            $id = [string]$it.id; $src = if ($it.fuente) { [string]$it.fuente } else { 'winget' }
+            $id = [string]$it.id; $src = if ([string]$it.fuente -eq 'msstore') { 'msstore' } else { 'winget' }
             if ($id -notmatch '^[A-Za-z0-9][A-Za-z0-9.\-_]{1,80}$') { continue }   # solo ids válidos
             Send-Progress ([int](100 * ($n - 1) / [Math]::Max(1, $items.Count))) ("($n/$($items.Count)) Instalando " + $it.nombre + '...') ("($n/$($items.Count)) Installing " + $it.nombre + '...')
             $null = & $wg list --id $id -e -s $src --accept-source-agreements --disable-interactivity 2>&1

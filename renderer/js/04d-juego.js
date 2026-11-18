@@ -70,9 +70,14 @@ function juegoOn(juego) {
   const intensidad = S.settings.juegoIntensidad || 'equilibrado';
   return taskC(L('Preparando el PC para jugar', 'Getting your PC ready to play'), async () => {
     S.settings = await rl.setSettings({ juegoCerrar: cerrar });
-    const r = obj(await rl.run('modojuego', { accion: 'activar', intensidad, cerrar, juego: juego || '' }));
+    const juegos = arr(S.settings.misJuegos).map((g) => g.ruta.split('\\').pop());
+    const r = obj(await rl.run('modojuego', { accion: 'activar', intensidad, cerrar, juego: juego || '', juegos }));
+    if (r.ok === false) return toast(r.mensaje || L('No se pudo activar el Modo Juego.', 'Could not turn on Game Mode.'), 'err');
     S.juego = { ...(S.juego || { apps: [] }), activo: true, estado: r.estado || { desde: new Date().toISOString(), intensidad } };
-    toast(L('🎮 Modo Juego activo. ¡A jugar! Cuando termines, pulsa "Restaurar".', '🎮 Game Mode on. Have fun! When done, press "Restore".'));
+    S.info.juegoActivo = true;
+    const nc = arr(r.noCerrados);
+    if (nc.length) toast(L(`Modo Juego activo. No cerré ${nc.join(', ')}: puede que te pregunte si guardar algo. Ciérralo tú cuando quieras.`, `Game Mode on. I did not close ${nc.join(', ')}: it may be asking to save something. Close it yourself.`), 'err');
+    else toast(L('🎮 Modo Juego activo. ¡A jugar! Cuando termines, pulsa "Restaurar".', '🎮 Game Mode on. Have fun! When done, press "Restore".'));
     retroReacciona('gafas', L('¡A jugar! 😎', 'Game on! 😎'), 5000);
   });
 }

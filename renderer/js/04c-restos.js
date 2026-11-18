@@ -53,7 +53,10 @@ function restosQuitar() {
     ganar('restos', n);
     toast(L(`Listo: ${n} resto(s) quitados. Están en "Deshacer y cuarentena" por si acaso.`, `Done: ${n} leftover(s) removed. They are in "Undo & quarantine" just in case.`) + (fallos ? L(` (${fallos} no se pudieron mover)`, ` (${fallos} could not be moved)`) : ''), fallos ? 'err' : undefined);
     retroReacciona('guino', L('¡Más ordenado que nunca! 😉', 'Tidier than ever! 😉'));
-    await loadRestos();
+    // Sin volver a escanear: se quita de la lista lo que ya se movió
+    const fallidos = new Set(arr(q.fallidos).map((x) => x.ruta || x));
+    const movidos = new Set(items.map((x) => x.ruta).filter((r) => !fallidos.has(r)));
+    S.restos = S.restos.filter((x) => !movidos.has(x.ruta)); movidos.forEach((r) => S.restosSel.delete(r));
     refreshAfter('programas', 'cuarentena');
   });
 }

@@ -42,7 +42,7 @@ $AJUSTES = [ordered]@{
     experiencias_personalizadas = @(
         @{ k = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Privacy'; n = 'TailoredExperiencesWithDiagnosticDataEnabled'; v = 0 })
     telemetria_opcional = @(
-        @{ k = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection'; n = 'AllowTelemetry'; v = 1 })
+        @{ k = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection'; n = 'AllowTelemetry'; v = 1; max = $true })   # max: si ya está más bajo (0), se respeta
     copilot = @(
         @{ k = 'HKCU:\Software\Policies\Microsoft\Windows\WindowsCopilot'; n = 'TurnOffWindowsCopilot'; v = 1 },
         @{ k = $adv; n = 'ShowCopilotButton'; v = 0 })
@@ -73,7 +73,7 @@ function Get-Val($k, $n) {
     try { $it = Get-ItemProperty -LiteralPath $k -Name $n -ErrorAction Stop; return $it.$n } catch { return $null }
 }
 function Test-Ajuste($lista) {
-    foreach ($x in $lista) { $v = Get-Val $x.k $x.n; if ($null -eq $v -or [int]$v -ne [int]$x.v) { return $false } }
+    foreach ($x in $lista) { $v = Get-Val $x.k $x.n; if ($null -eq $v) { return $false }; if ($x.max) { if ([int]$v -gt [int]$x.v) { return $false } } elseif ([int]$v -ne [int]$x.v) { return $false } }
     return $true
 }
 function Test-PuedeEscribir($lista) {
@@ -100,7 +100,10 @@ switch ($p.accion) {
             foreach ($x in $AJUSTES[$id]) {
                 $clave = $x.k + '|' + $x.n
                 # Se guarda el valor original solo la primera vez (así "restaurar" vuelve al de fábrica)
-                if (-not $resp.ContainsKey($clave)) { $orig = Get-Val $x.k $x.n; $resp[$clave] = @{ existe = ($null -ne $orig); valor = $orig } }
+                $actual = Get-Val $x.k $x.n
+                if ($x.max -and $null -ne $actual -and [int]$actual -le [int]$x.v) { continue }   # nunca se sube un valor más privado
+                # El original se guarda en disco ANTES de escribir: si algo se corta, no se pierde
+                if (-not $resp.ContainsKey($clave)) { $resp[$clave] = @{ existe = ($null -ne $actual); valor = $actual }; Save-Respaldo $resp }
                 try {
                     if (-not (Test-Path -LiteralPath $x.k)) { New-Item -Path $x.k -Force -ErrorAction Stop | Out-Null }
                     New-ItemProperty -LiteralPath $x.k -Name $x.n -PropertyType DWord -Value $x.v -Force -ErrorAction Stop | Out-Null

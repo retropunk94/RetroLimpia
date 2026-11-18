@@ -2,33 +2,17 @@
   "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
   "versiones": [
     {
-      "version": "4.0.3",
+      "version": "4.0.4",
       "fecha": "2026-11-17",
       "es": [
-        "Arreglado un fallo grave de la 4.0.2: al actualizar, el programa quedaba sin permisos y parecía que se había borrado. Esta versión lo repara sola al instalarse. Si te pasó, descarga la 4.0.3 desde la web e instálala encima: no pierdes nada.",
-        "Incluye las mejoras de seguridad de la 4.0.2 (candado en las carpetas del programa, desinstalador leído del registro, cuarentena y Modo Juego protegidos), ahora bien hechas.",
-        "Perdón por las molestias: cada versión pasa ahora también una prueba de actualización real antes de publicarse."
+        "Arreglado un fallo de la 4.0.2: al actualizar, RetroLimpia podía quedarse sin permisos y parecer borrado. Esta versión lo repara sola al instalarse. Si te pasó, descarga la última versión desde la web e instálala encima: no pierdes nada.",
+        "Se deshacen los cambios de permisos de la 4.0.2: todo vuelve a funcionar exactamente como en la 4.0.1.",
+        "Perdón por las molestias: a partir de ahora cada versión se prueba instalándola encima de la anterior antes de publicarse."
       ],
       "en": [
-        "Fixed a serious 4.0.2 bug: after updating, the program was left without permissions and seemed deleted. This version repairs it during install. If it happened to you, download 4.0.3 from the website and install it over: you lose nothing.",
-        "Includes the 4.0.2 security improvements, now done right.",
-        "Sorry for the trouble: every version now also passes a real update test before release."
-      ]
-    },
-    {
-      "version": "4.0.2",
-      "fecha": "2026-11-17",
-      "es": [
-        "🔒 Más seguro: la carpeta de RetroLimpia y la de su cuarentena ahora solo las pueden modificar los administradores. Antes, si lo instalabas fuera de \"Archivos de programa\" (por ejemplo en D:\\), otro programa sin permisos podría haberse aprovechado de RetroLimpia para hacer cambios como administrador.",
-        "🔒 Al desinstalar, RetroLimpia ya solo ejecuta el desinstalador que el propio programa dejó registrado en Windows, nunca otra cosa.",
-        "🔒 Restaurar desde la cuarentena o terminar el Modo Juego ya no puede tocar zonas sensibles de Windows, aunque alguien manipulara sus archivos.",
-        "Gracias a la comunidad por las pruebas: cuanto más se prueba, más sólido queda."
-      ],
-      "en": [
-        "🔒 Safer: the RetroLimpia folder and its quarantine can now only be changed by administrators. Before, if installed outside \"Program Files\" (e.g. D:\\), another program without rights could have abused RetroLimpia to make admin changes.",
-        "🔒 When uninstalling, RetroLimpia now only runs the uninstaller the program itself registered in Windows.",
-        "🔒 Restoring from quarantine or ending Game Mode can no longer touch sensitive parts of Windows, even if its files were tampered with.",
-        "Thanks to the community for testing!"
+        "Fixed a 4.0.2 bug: after updating, RetroLimpia could lose its permissions and seem deleted. This version repairs it during install. If it happened to you, download the latest version from the website and install it over: you lose nothing.",
+        "The 4.0.2 permission changes are undone: everything works exactly as in 4.0.1.",
+        "Sorry for the trouble: from now on every version is tested by installing it over the previous one before release."
       ]
     },
     {

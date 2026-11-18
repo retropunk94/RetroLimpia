@@ -8,8 +8,6 @@
 const { spawn, execFile } = require('child_process');
 const path = require('path');
 const demo = require('./demo');
-const SYS32 = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32');
-const PS = path.join(SYS32, 'WindowsPowerShell', 'v1.0', 'powershell.exe');
 
 const SCRIPTS = new Set([
   'programas', 'desinstalar', 'residuos', 'cuarentena', 'restauracion',
@@ -30,7 +28,7 @@ function run(script, params = {}, onProgress = () => {}, opts = {}) {
   const args = ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', file, '-P', b64];
 
   return new Promise((resolve, reject) => {
-    const child = spawn(PS, args, { windowsHide: true });
+    const child = spawn('powershell.exe', args, { windowsHide: true });
     if (!opts.sinCancelar) running.add(child);   // el Modo Juego automático no se corta con el botón Cancelar
     // Modo bajos recursos: el trabajo va con menos prioridad para que el PC siga respondiendo
     if (cfg.ligero && child.pid) { try { require('os').setPriority(child.pid, require('os').constants.priority.PRIORITY_BELOW_NORMAL); } catch { /* sin permiso: sigue normal */ } }
@@ -73,7 +71,7 @@ function cancelAll() {
   for (const c of running) {
     c.cancelado = true;
     try {
-      if (process.platform === 'win32') execFile(path.join(SYS32, 'taskkill.exe'), ['/PID', String(c.pid), '/T', '/F'], { windowsHide: true }, () => {});
+      if (process.platform === 'win32') execFile('taskkill', ['/PID', String(c.pid), '/T', '/F'], { windowsHide: true }, () => {});
       else c.kill();
     } catch { /* ya cerrado */ }
   }
@@ -84,7 +82,7 @@ function cancelAll() {
 function isAdmin() {
   return new Promise((resolve) => {
     if (process.platform !== 'win32') return resolve(false);
-    execFile(path.join(SYS32, 'net.exe'), ['session'], { windowsHide: true }, (err) => resolve(!err));
+    execFile('net', ['session'], { windowsHide: true }, (err) => resolve(!err));
   });
 }
 

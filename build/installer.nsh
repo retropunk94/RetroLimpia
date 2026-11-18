@@ -13,17 +13,9 @@
   !insertmacro MUI_PAGE_FINISH
 !macroend
 
-; SEGURIDAD: RetroLimpia trabaja como administrador. Si su carpeta se puede modificar sin serlo
-; (pasa al instalar fuera de "Archivos de programa", p. ej. en D:\), cualquier programa podría
-; cambiar sus scripts y conseguir permisos de administrador. Se deja solo para administradores.
-; SIDs en vez de nombres para que funcione en Windows en cualquier idioma.
-;
-; LECCIÓN (4.0.2): NUNCA usar /T junto a los permisos con (OI)(CI). En los archivos esas marcas no valen,
-; icacls falla en cada archivo y los deja SIN permisos (el programa "desaparecía").
-; Forma correcta: /reset /T (todo vuelve a heredar) y después el candado SOLO en la carpeta de arriba:
-; Windows lo hereda a todo lo de dentro.
-
-; Antes de copiar nada: si una instalación anterior quedó con archivos sin permisos (4.0.2), se reparan
+; REPARACIÓN de la 4.0.2/4.0.3: aquellas versiones cambiaron los permisos de la carpeta del programa
+; (y en 4.0.2 dejaron los archivos ilegibles). Se vuelve a los permisos normales de Windows,
+; exactamente como estaba en la 4.0.1. /reset hace que todo herede los permisos de la carpeta de arriba.
 !macro customInit
   ReadRegStr $0 HKLM "${INSTALL_REGISTRY_KEY}" InstallLocation
   StrCmp $0 "" rl_sin_reparar
@@ -35,6 +27,9 @@
 !macro customInstall
   nsExec::Exec '"$SYSDIR\icacls.exe" "$INSTDIR" /reset /T /C /Q'
   Pop $0
-  nsExec::Exec '"$SYSDIR\icacls.exe" "$INSTDIR" /inheritance:r /grant:r *S-1-5-32-544:(OI)(CI)F *S-1-5-18:(OI)(CI)F *S-1-5-32-545:(OI)(CI)RX /C /Q'
-  Pop $0
+  ExpandEnvStrings $1 "%ProgramData%\RetroLimpia"
+  IfFileExists "$1\*.*" 0 rl_sin_datos
+    nsExec::Exec '"$SYSDIR\icacls.exe" "$1" /reset /T /C /Q'
+    Pop $0
+  rl_sin_datos:
 !macroend

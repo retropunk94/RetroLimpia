@@ -60,22 +60,6 @@ function dataDir() {
   return app.isPackaged ? path.join(process.resourcesPath, 'data') : path.join(__dirname, '..', 'data');
 }
 // Equipo con pocos recursos: 4 GB de RAM o menos, o 2 núcleos o menos
-// Programas de Windows siempre por su ruta completa: así nadie puede colar uno falso con el mismo nombre
-const SYS32 = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32');
-const BIN = { schtasks: path.join(SYS32, 'schtasks.exe'), tasklist: path.join(SYS32, 'tasklist.exe'), icacls: path.join(SYS32, 'icacls.exe'), powershell: path.join(SYS32, 'WindowsPowerShell', 'v1.0', 'powershell.exe') };
-const RL_DATA = path.join(process.env.ProgramData || 'C:\\ProgramData', 'RetroLimpia');
-// Candado: la carpeta del programa y la de datos (cuarentena, estados) solo las pueden cambiar administradores.
-// Si alguien sin permisos pudiera tocarlas, podría hacer que RetroLimpia (que es administrador) ejecute lo que él quiera.
-function candado(dir) {
-  try {
-    fs.mkdirSync(dir, { recursive: true });
-    // OJO: nunca /T con (OI)(CI) (deja los archivos sin permisos). Primero todo hereda (/reset /T)
-    // y luego el candado solo en la carpeta de arriba: Windows lo pasa a todo lo de dentro.
-    execFile(BIN.icacls, [dir, '/reset', '/T', '/C', '/Q'], { windowsHide: true }, () => {
-      execFile(BIN.icacls, [dir, '/inheritance:r', '/grant:r', '*S-1-5-32-544:(OI)(CI)F', '*S-1-5-18:(OI)(CI)F', '*S-1-5-32-545:(OI)(CI)RX', '/C', '/Q'], { windowsHide: true }, () => {});
-    });
-  } catch { /* sin permisos: no pasa nada, se intenta en el próximo arranque */ }
-}
 const EQUIPO_LIMITADO = os.totalmem() <= 4.5 * 1024 ** 3 || (os.cpus() || []).length <= 2;
 function ligeroActivo(s) { s = s || loadSettings(); return s.modoLigero === 'on' || (s.modoLigero !== 'off' && EQUIPO_LIMITADO); }
 function loadData(name) {
@@ -173,7 +157,7 @@ function exePath() { return process.execPath; }
 function schtasks(args) {
   return new Promise((resolve) => {
     if (DEMO) return resolve(true);
-    execFile(BIN.schtasks, args, { windowsHide: true }, (err) => resolve(!err));
+    execFile('schtasks', args, { windowsHide: true }, (err) => resolve(!err));
   });
 }
 function setAutostart(on) {
@@ -280,12 +264,6 @@ if (!app.requestSingleInstanceLock()) {
     if (!enBandeja) paso('ventana', () => createWindow());
     paso('actualizador', () => initUpdater());
     paso('juego', () => juegoWatch());
-    // Seguridad: candado en la carpeta de datos y en la del programa (por si se instaló fuera de "Archivos de programa")
-    // Una vez por versión (el instalador ya lo hace; esto cubre instalaciones antiguas y carpetas tocadas a mano)
-    if (!DEMO && process.platform === 'win32' && s.candado !== pkg.version) paso('candado', () => {
-      candado(RL_DATA); if (app.isPackaged) candado(path.dirname(process.execPath));
-      saveSettings({ ...loadSettings(), candado: pkg.version });
-    });
     // Mantenimiento silencioso: vacía la cuarentena vieja al arrancar
     paso('cuarentena', () => engine.run('cuarentena', { accion: 'purgar', dias: s.diasCuarentena }).catch(() => {}));
   }).catch((e) => { updLog('Arranque: ' + (e && e.stack || e)); try { if (!win) createWindow(); } catch {} });
@@ -527,7 +505,7 @@ function juegoWatch() {
 function juegoTick() {
   if (juegoMirando || installing) return;
   juegoMirando = true;
-  execFile(BIN.tasklist, ['/FO', 'CSV', '/NH'], { windowsHide: true, maxBuffer: 8 * 1024 * 1024 }, async (err, out) => {
+  execFile('tasklist', ['/FO', 'CSV', '/NH'], { windowsHide: true, maxBuffer: 8 * 1024 * 1024 }, async (err, out) => {
     try {
       if (err) return;
       const abiertos = new Set(String(out).split(/\r?\n/).map((l) => (l.match(/^"([^"]+)"/) || [])[1]).filter(Boolean).map((n) => n.toLowerCase()));
@@ -658,8 +636,7 @@ function relaunchHelper(extraWait) {
   // Antes era un proceso "hijo" del programa, y el instalador lo cerraba junto con RetroLimpia
   // (por eso no se volvía a abrir). Ahora es una tarea programada de Windows, independiente,
   // con permisos de administrador (sin aviso escondido) y con su propio registro: relanzar.log
-  // En la carpeta protegida (no en AppData): la tarea corre como administrador y nadie debe poder cambiar el script
-  const dir = RL_DATA; try { fs.mkdirSync(dir, { recursive: true }); } catch {}
+  const dir = app.getPath('userData');
   const script = path.join(dir, 'relanzar.ps1');
   const log = path.join(dir, 'relanzar.log');
   const q = (x) => String(x).replace(/'/g, "''");
@@ -692,16 +669,16 @@ function relaunchHelper(extraWait) {
   try {
     fs.writeFileSync(script, '﻿' + ps, 'utf8');
     try { fs.unlinkSync(log); } catch {}
-    const tr = `"${BIN.powershell}" -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${script}"`;
+    const tr = `powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "${script}"`;
     const { execFileSync } = require('child_process');
-    execFileSync(BIN.schtasks, ['/Create', '/F', '/TN', 'RetroLimpia-Reabrir', '/SC', 'ONCE', '/ST', '23:59', '/RL', 'HIGHEST', '/TR', tr], { windowsHide: true });
-    execFileSync(BIN.schtasks, ['/Run', '/TN', 'RetroLimpia-Reabrir'], { windowsHide: true });
+    execFileSync('schtasks', ['/Create', '/F', '/TN', 'RetroLimpia-Reabrir', '/SC', 'ONCE', '/ST', '23:59', '/RL', 'HIGHEST', '/TR', tr], { windowsHide: true });
+    execFileSync('schtasks', ['/Run', '/TN', 'RetroLimpia-Reabrir'], { windowsHide: true });
     updLog('Ayudante de reapertura programado');
     return true;
   } catch (e) {
     updLog('No se pudo programar la reapertura (' + (e && e.message || e) + '); se usa el método directo');
     // Plan B: proceso suelto (sin esperar a que no haya ningún RetroLimpia abierto)
-    spawn(BIN.powershell, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', script], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+    spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', script], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
     return false;
   }
 }

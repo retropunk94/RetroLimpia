@@ -47,9 +47,12 @@ function Resolve-Uninstaller {
     } elseif ($c.exe -and -not (Test-Path -LiteralPath $c.exe)) {
         # ...\Programa\1.2.3\uninstall.exe -> busca ...\Programa\<otra versión>\uninstall.exe
         try {
+            # SOLO si la carpeta es un número de versión (1.2.3): así nunca se confunde con el desinstalador de OTRO programa
+            # (p. ej. "InstallShield Installation Information\{GUID}" guarda los de muchos programas distintos)
+            $verDir = Split-Path (Split-Path $c.exe -Parent) -Leaf
             $padre = Split-Path (Split-Path $c.exe -Parent) -Parent
-            if ($padre -and (Test-Path -LiteralPath $padre) -and -not (Test-ProtectedPath $padre)) {
-                $otro = Get-ChildItem -LiteralPath $padre -Directory -ErrorAction SilentlyContinue | ForEach-Object { Join-Path $_.FullName $leaf } |
+            if ($verDir -match '^v?\d+(\.\d+)+$' -and $padre -and (Test-Path -LiteralPath $padre) -and -not (Test-ProtectedPath $padre)) {
+                $otro = Get-ChildItem -LiteralPath $padre -Directory -ErrorAction SilentlyContinue | Where-Object { $_.Name -match '^v?\d+(\.\d+)+$' } | ForEach-Object { Join-Path $_.FullName $leaf } |
                     Where-Object { Test-Path -LiteralPath $_ } | ForEach-Object { Get-Item -LiteralPath $_ } |
                     Sort-Object LastWriteTime -Descending | Select-Object -First 1
                 if ($otro) { $res.exe = $otro.FullName; $res.cambiado = $true }
@@ -166,6 +169,17 @@ if ($p.cerrarProcesos -ne $false -and ([string]$p.desinstalar) -notmatch 'OneDri
 
 $cmd = [string]$p.desinstalar
 $quiet = [string]$p.desinstalarSilencioso
+# SEGURIDAD: el comando no se toma a ciegas de la interfaz: se vuelve a leer de la ficha del programa
+# en el registro de Windows. Así solo se ejecuta el desinstalador que el propio programa registró.
+if ($key -and $key -notmatch '\\Windows\\CurrentVersion\\Uninstall\\[^\\]+$') {
+    $result.mensaje = 'Petición no válida: no es la ficha de un programa instalado.'
+    Send-Log 'error' $result.mensaje 'Invalid request: not an installed program entry'
+    Send-Result $result; return
+}
+if ($key) {
+    $ficha = Get-ItemProperty -LiteralPath ('Registry::' + $key) -ErrorAction SilentlyContinue
+    if ($ficha) { $cmd = [string]$ficha.UninstallString; $quiet = [string]$ficha.QuietUninstallString }
+}
 
 # ---------------- Juegos de plataformas (Steam, Epic, EA, Ubisoft...) ----------------
 # Estas tiendas desinstalan con su propia ventana y el comando termina al instante:

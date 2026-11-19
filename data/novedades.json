@@ -2,6 +2,32 @@
   "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
   "versiones": [
     {
+      "version": "4.0.5",
+      "fecha": "2026-11-18",
+      "es": [
+        "Desinstalar va mejor: programas como tuxlerVPN, IObit Uninstaller o juegos instalados con \"Inno Setup\" ya se quitan en silencio en vez de quedarse atascados. Arreglado también Far Cry 3 y otros que guardan su desinstalador de forma rara.",
+        "Nuevo: si un programa ya no tiene desinstalador (pasa con copias \"repack\" o programas borrados a medias), puedes \"Quitarlo a la fuerza\": su carpeta y su entrada van a la cuarentena y se pueden restaurar.",
+        "La tarjeta gráfica muestra su memoria real (antes las de más de 4 GB salían con 4 GB).",
+        "Los drivers que trae Windows de serie ya no salen \"instalados en 1968\": se marcan como \"De Windows\" y no cuentan como antiguos.",
+        "Si el PC se reinicia (por ejemplo, porque un instalador de drivers lo pidió), RetroLimpia ya no dice que se cerró de forma inesperada. En Actualizaciones verás un aviso para guardar tu trabajo antes de actualizar.",
+        "Nuevo en Ajustes: guarda tu configuración en un archivo y cárgala en otro PC (ajustes, juegos del Modo Juego y privacidad).",
+        "Más seguro: antes de instalar una actualización, RetroLimpia la copia a una carpeta protegida, comprueba su huella digital y solo entonces la instala. Así nadie puede cambiarla por el camino.",
+        "Los reportes ya no estropean palabras al ocultar el nombre de tu PC.",
+        "Gracias a todos los que reportaron con 🐞 y comentaron: cada arreglo de esta versión sale de vosotros."
+      ],
+      "en": [
+        "Better uninstalling: programs like tuxlerVPN, IObit Uninstaller or games installed with \"Inno Setup\" now uninstall silently instead of getting stuck. Far Cry 3 and others with oddly stored uninstallers are fixed too.",
+        "New: if a program has no uninstaller anymore, you can \"Force remove\" it: its folder and entry go to quarantine and can be restored.",
+        "Graphics cards show their real memory (cards over 4 GB showed 4 GB).",
+        "Built-in Windows drivers no longer show as \"installed in 1968\": they are marked \"Built-in\" and not counted as old.",
+        "If the PC restarts (e.g. a driver installer asked for it), RetroLimpia no longer says it closed unexpectedly. Updates shows a reminder to save your work first.",
+        "New in Settings: save your settings to a file and load them on another PC.",
+        "Safer: before installing an update, RetroLimpia copies it to a protected folder, checks its digital fingerprint and only then installs it.",
+        "Reports no longer mangle words when hiding your PC name.",
+        "Thanks to everyone who reported with 🐞 and commented!"
+      ]
+    },
+    {
       "version": "4.0.4",
       "fecha": "2026-11-17",
       "es": [

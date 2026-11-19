@@ -12,6 +12,10 @@ const MAX_IMG = 7 * 1024 * 1024;
 const MAX_POR_HORA = 5;
 const IMG_OK = ['image/png', 'image/jpeg', 'image/webp', 'image/gif'];
 
+// El canal de Discord es un FORO: cada reporte es una publicación con etiqueta.
+// Etiquetas del foro 📋・reportes: los reportes nuevos entran como "🆕 Pendiente".
+const TAG_PENDIENTE = '1572807440863596585';
+
 const vistos = new Map(); // ip -> [marcas de tiempo] (memoria del Worker: límite aproximado)
 
 function json(obj, status = 200) {
@@ -83,7 +87,9 @@ export default {
       fd.append('files[' + n + ']', captura, nombre); adjuntos.push({ id: n++, filename: nombre });
       embed.image = { url: 'attachment://' + nombre };
     }
-    fd.append('payload_json', JSON.stringify({ username: 'RetroLimpia Reportes', embeds: [embed], attachments: adjuntos, allowed_mentions: { parse: [] } }));
+    // Título de la publicación: qué pasó y en qué versión, para ver la lista de un vistazo
+    const titulo = corta((d.seccion || 'Reporte') + ' · v' + (d.version || '?') + ' · ' + id, 95);
+    fd.append('payload_json', JSON.stringify({ username: 'RetroLimpia Reportes', thread_name: titulo, applied_tags: [TAG_PENDIENTE], embeds: [embed], attachments: adjuntos, allowed_mentions: { parse: [] } }));
 
     const r = await fetch(env.WEBHOOK_URL + '?wait=true', { method: 'POST', body: fd });
     if (!r.ok) return json({ ok: false, error: 'Discord respondió ' + r.status }, 502);

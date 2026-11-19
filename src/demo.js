@@ -79,7 +79,8 @@ const drivers = {
 const updates = {
   windows: [
     { id: 'u1', titulo: 'Actualización acumulativa de seguridad para Windows 11 (KB5068861)', tipo: 'seguridad', opcional: false, grande: false, tamano: 820 * MB, kb: '5068861', reinicio: true },
-    { id: 'u2', titulo: 'Realtek Semiconductor Corp. - Extension - 6.0.9800.1', tipo: 'driver', opcional: true, grande: false, tamano: 3 * MB, kb: '', reinicio: false },
+    { id: 'u2', titulo: 'Realtek Semiconductor Corp. - Extension - 6.0.9800.1', tipo: 'driver', opcional: true, grande: false, tamano: 3 * MB, kb: '', reinicio: false, driver: { clase: 'Extension', fabricante: 'Realtek', modelo: 'Realtek Audio', dispositivo: 'Realtek High Definition Audio' } },
+    { id: 'u3', titulo: 'Intel - Net - 23.60.0.10', tipo: 'driver', opcional: true, grande: false, tamano: 18 * MB, kb: '', reinicio: false, driver: { clase: 'Net', fabricante: 'Intel', modelo: 'Intel(R) Wi-Fi 6 AX201', dispositivo: 'Intel(R) Wi-Fi 6 AX201 160MHz' } },
     { id: 'u3', titulo: 'Inteligencia de seguridad de Microsoft Defender (KB2267602)', tipo: 'seguridad', opcional: false, grande: false, tamano: 90 * MB, kb: '2267602', reinicio: false }
   ],
   apps: [

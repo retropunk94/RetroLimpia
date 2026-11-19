@@ -7,6 +7,7 @@
 
 const { spawn, execFile } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 const demo = require('./demo');
 
 const SCRIPTS = new Set([
@@ -19,11 +20,28 @@ const running = new Set();
 
 function init(options) { cfg = { ...cfg, ...options }; }
 
+// Algunos antivirus (p. ej. AVG/Avast) mandan a cuarentena los scripts de RetroLimpia por error.
+// Lista los que faltan para avisar claro en vez de dar un error raro.
+function faltantes() {
+  if (cfg.demo || !cfg.scriptsDir) return [];
+  const todos = ['common', ...SCRIPTS];
+  return todos.filter((n) => { try { return !fs.existsSync(path.join(cfg.scriptsDir, n + '.ps1')); } catch { return false; } });
+}
+function errorAntivirus(nombre) {
+  const e = new Error('Tu antivirus bloqueó o borró un archivo de RetroLimpia (' + nombre + '.ps1), así que esta parte no puede funcionar. ' +
+    'Añade la carpeta de RetroLimpia a las excepciones de tu antivirus (o restaura el archivo desde su cuarentena) y vuelve a instalar RetroLimpia desde la web. El resto del programa sigue funcionando.');
+  e.antivirus = true;
+  return e;
+}
+
 function run(script, params = {}, onProgress = () => {}, opts = {}) {
   if (!SCRIPTS.has(script)) return Promise.reject(new Error('Script no permitido: ' + script));
   if (cfg.demo) return demo.run(script, params, onProgress);
 
   const file = path.join(cfg.scriptsDir, script + '.ps1');
+  for (const n of [script, 'common']) {
+    try { if (!fs.existsSync(path.join(cfg.scriptsDir, n + '.ps1'))) return Promise.reject(errorAntivirus(n)); } catch { /* seguimos */ }
+  }
   const b64 = Buffer.from(JSON.stringify(params), 'utf8').toString('base64');
   const args = ['-NoLogo', '-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-File', file, '-P', b64];
 
@@ -59,6 +77,10 @@ function run(script, params = {}, onProgress = () => {}, opts = {}) {
       running.delete(child);
       if (buffer.startsWith('@@RESULT ')) { try { result = JSON.parse(buffer.slice(9)); } catch { /* nada */ } }
       if (child.cancelado) return reject(new Error('CANCELADO'));
+      if (!result && /-File|no existe|does not exist|CommandNotFound/i.test(errText)) {
+        const falta = faltantes()[0];
+        if (falta) return reject(errorAntivirus(falta));
+      }
       if (result) resolve(result);
       else reject(new Error(`El motor terminó sin respuesta (código ${code}). ${errText.slice(0, 600)}`));
     });
@@ -86,4 +108,4 @@ function isAdmin() {
   });
 }
 
-module.exports = { init, run, cancelAll, isAdmin };
+module.exports = { init, run, cancelAll, isAdmin, faltantes };

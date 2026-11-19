@@ -2,6 +2,24 @@
   "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
   "versiones": [
     {
+      "version": "4.0.6",
+      "fecha": "2026-11-19",
+      "es": [
+        "Drivers más claros: cada driver de Windows Update dice para qué aparato es (gráfica, Wi-Fi, sonido, Bluetooth…), de qué marca y qué dispositivo de tu PC lo usa. Gracias a DRAKEN22 por la idea.",
+        "Actualizar programas explica qué pasó cuando algo no se actualiza, en palabras normales (por ejemplo: \"está abierto, ciérralo y vuelve a intentar\") en vez de un código raro.",
+        "Los programas que se actualizan solos (como Roblox o Logitech G HUB) ya no aparecen una y otra vez en la lista: RetroLimpia los reconoce y los aparta. Puedes volver a mostrarlos cuando quieras.",
+        "Si tu antivirus (por ejemplo AVG o Avast) bloquea por error un archivo de RetroLimpia, ahora te lo dice claro y te explica cómo arreglarlo. El resto del programa sigue funcionando.",
+        "Si un paso tarda mucho sin dar noticias, verás \"Sigue trabajando…\" con la opción de cancelar sin romper nada. Y si la ventana se llega a congelar, RetroLimpia apunta qué estaba haciendo para que el reporte nos diga exactamente dónde arreglarlo."
+      ],
+      "en": [
+        "Clearer drivers: every Windows Update driver now says what device it is for (graphics, Wi-Fi, audio, Bluetooth…), its brand and which device in your PC uses it. Thanks to DRAKEN22 for the idea.",
+        "Updating programs now explains in plain words why something did not update (for example: \"it is open, close it and try again\") instead of a cryptic code.",
+        "Programs that update themselves (like Roblox or Logitech G HUB) no longer show up again and again: RetroLimpia recognises them and sets them aside. You can show them again any time.",
+        "If your antivirus (for example AVG or Avast) blocks a RetroLimpia file by mistake, it now tells you clearly and how to fix it. The rest of the program keeps working.",
+        "If a step takes long without news, you will see \"Still working…\" with a safe option to cancel. And if the window ever freezes, RetroLimpia notes what it was doing so reports tell us exactly where to fix it."
+      ]
+    },
+    {
       "version": "4.0.5",
       "fecha": "2026-11-18",
       "es": [

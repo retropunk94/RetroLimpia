@@ -54,7 +54,21 @@ switch ($p.accion) {
                 $s = Get-WUSession
                 $searcher = $s.CreateUpdateSearcher()
                 $res = $searcher.Search('IsInstalled=0 and IsHidden=0')
+                $pnp = $null
                 foreach ($u in $res.Updates) {
+                    # Drivers: a qué aparato corresponden (clase, fabricante y el dispositivo del PC que lo usa)
+                    $drv = @{ clase = ''; fabricante = ''; modelo = ''; dispositivo = '' }
+                    if ($u.Type -eq 2) {
+                        try {
+                            $drv.clase = [string]$u.DriverClass; $drv.fabricante = [string]$u.DriverManufacturer; $drv.modelo = [string]$u.DriverModel
+                            $hw = [string]$u.DriverHardwareID
+                            if ($hw) {
+                                if ($null -eq $pnp) { $pnp = @(Get-CimInstance Win32_PnPEntity -ErrorAction SilentlyContinue | Select-Object Name, HardwareID, CompatibleID) }
+                                $m = $pnp | Where-Object { (@($_.HardwareID) + @($_.CompatibleID)) -contains $hw } | Select-Object -First 1
+                                if ($m) { $drv.dispositivo = [string]$m.Name }
+                            }
+                        } catch { }
+                    }
                     $cats = @($u.Categories | ForEach-Object { $_.Name })
                     $isDriver = ($u.Type -eq 2)
                     $isUpgrade = ($cats -match 'Upgrades|Actualizaciones de características')
@@ -68,6 +82,7 @@ switch ($p.accion) {
                         kb          = (@($u.KBArticleIDs) -join ',')
                         reinicio    = ($u.InstallationBehavior.RebootBehavior -ne 0)
                         descripcion = [string]$u.Description
+                        driver      = $drv
                     })
                 }
             } catch { $wuError = $_.Exception.Message }
@@ -152,7 +167,10 @@ switch ($p.accion) {
         $common = @('--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity')
         $results = New-Object System.Collections.Generic.List[object]
         $ids = @($p.ids)
-        if ($p.todos) { $ids = @(Get-WingetUpgrades $wg | ForEach-Object { $_.id }) }
+        if ($p.todos) {
+            $omitir = @($p.omitir | ForEach-Object { [string]$_ })
+            $ids = @(Get-WingetUpgrades $wg | ForEach-Object { $_.id } | Where-Object { $omitir -notcontains $_ })
+        }
         $n = 0
         foreach ($id in $ids) {
             $n++

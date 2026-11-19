@@ -45,10 +45,14 @@ function fmtEta(start, pct) {
 function progressHTML() {
   if (!S.busy) return '';
   const pct = Math.min(99, Math.round(S.busy.pct || 0));
+  if (!S.busy.ultimo) S.busy.ultimo = Date.now();
+  const quieto = Math.round((Date.now() - S.busy.ultimo) / 1000);
+  const aviso = quieto >= 60 && !S.cancelRequested ? `<div class="meta" style="margin-top:6px">⏳ ${L(`Sigue trabajando (lleva ${fmtQuieto(quieto)} sin novedades). Algunos pasos de Windows tardan; si crees que se trabó, pulsa Cancelar: no se rompe nada.`, `Still working (${fmtQuieto(quieto)} without news). Some Windows steps are slow; if you think it is stuck, press Cancel: nothing breaks.`)}</div>` : '';
   return `<div class="progress-card"><div class="msg"><span><b>${esc(S.busy.label)}</b>${S.busy.msg ? ' · ' + esc(S.busy.msg) : ''}</span><span class="eta">${pct ? pct + '% · ' + fmtEta(S.busy.start, pct) : ''}</span></div>
   <div class="prow"><div class="pbar ${pct ? '' : 'indet'}"><i style="width:${pct}%"></i></div>
-  <button class="btn small danger" data-act="cancel" ${S.cancelRequested ? 'disabled' : ''}>${S.cancelRequested ? L('Cancelando...', 'Cancelling...') : L('Cancelar', 'Cancel')}</button></div></div>`;
+  <button class="btn small danger" data-act="cancel" ${S.cancelRequested ? 'disabled' : ''}>${S.cancelRequested ? L('Cancelando...', 'Cancelling...') : L('Cancelar', 'Cancel')}</button></div>${aviso}</div>`;
 }
+const fmtQuieto = (s) => s < 120 ? s + ' s' : Math.round(s / 60) + ' min';
 function updateProgressOnly() {
   const card = document.querySelector('.progress-card');
   if (card && S.busy) card.outerHTML = progressHTML();
@@ -108,7 +112,76 @@ async function loadHardware() {
   S.hardware = { ...r, equipo: obj(r.equipo), sistema: obj(r.sistema), cpu: obj(r.cpu), ram: obj(r.ram), placa: obj(r.placa), bios: obj(r.bios), gpus: arr(r.gpus), discos: arr(r.discos), unidades: arr(r.unidades), bateria: r.bateria || null };
 }
 async function loadDrivers() { const r = obj(await rl.run('drivers', { accion: 'revisar' })); S.drivers = { drivers: arr(r.drivers), problemas: arr(r.problemas), respaldos: arr(r.respaldos) }; }
-async function loadUpdates() { const r = obj(await rl.run('actualizaciones', { accion: 'buscar' })); S.updates = { windows: arr(r.windows), apps: arr(r.apps), wingetDisponible: !!r.wingetDisponible, error: r.error || '' }; }
+async function loadUpdates() {
+  const r = obj(await rl.run('actualizaciones', { accion: 'buscar' }));
+  const solos = { ...(S.settings.wgSolos || {}) }, okAntes = S.settings.wgOk || {};
+  let cambio = false;
+  // Si winget ya dijo "actualizado" a esa misma versión y vuelve a ofrecerla, es que el programa se actualiza solo (p. ej. G HUB)
+  for (const a of arr(r.apps)) if (!solos[a.id] && okAntes[a.id] && okAntes[a.id] === a.nueva) { solos[a.id] = a.nombre || a.id; cambio = true; }
+  if (cambio) S.settings = await rl.setSettings({ wgSolos: solos });
+  const apps = arr(r.apps);
+  S.updates = { windows: arr(r.windows), apps: apps.filter((a) => !solos[a.id]), solos: apps.filter((a) => solos[a.id]), wingetDisponible: !!r.wingetDisponible, error: r.error || '' };
+}
+// Drivers de Windows Update: explica para qué aparato es cada uno
+const DRV_CLASE = {
+  display: ['🎮', 'Tarjeta gráfica', 'Graphics card'], net: ['📶', 'Red / Wi-Fi', 'Network / Wi-Fi'], media: ['🔊', 'Sonido', 'Audio'],
+  audioendpoint: ['🔊', 'Sonido', 'Audio'], bluetooth: ['🔵', 'Bluetooth', 'Bluetooth'], system: ['🧩', 'Chipset / placa base', 'Chipset / motherboard'],
+  hidclass: ['🖱️', 'Teclado, ratón o mando', 'Keyboard, mouse or controller'], keyboard: ['⌨️', 'Teclado', 'Keyboard'], mouse: ['🖱️', 'Ratón / touchpad', 'Mouse / touchpad'],
+  usb: ['🔌', 'Puertos USB', 'USB ports'], scsiadapter: ['💽', 'Controlador de discos', 'Storage controller'], hdc: ['💽', 'Controlador de discos', 'Storage controller'],
+  diskdrive: ['💽', 'Disco', 'Drive'], camera: ['📷', 'Cámara', 'Camera'], image: ['📷', 'Cámara / escáner', 'Camera / scanner'], printer: ['🖨️', 'Impresora', 'Printer'],
+  firmware: ['⚙️', 'Firmware (BIOS / UEFI)', 'Firmware (BIOS / UEFI)'], extension: ['🧩', 'Complemento de un driver', 'Driver add-on'], softwarecomponent: ['🧩', 'Componente de software de un driver', 'Driver software component'],
+  biometric: ['👆', 'Lector de huella / cara', 'Fingerprint / face reader'], sensor: ['🧭', 'Sensores', 'Sensors'], battery: ['🔋', 'Batería', 'Battery'], monitor: ['🖥️', 'Monitor', 'Monitor'],
+  otherhardware: ['🔧', 'Otro aparato', 'Other device'],
+  securitydevices: ['🔐', 'Chip de seguridad (TPM)', 'Security chip (TPM)'], ports: ['🔌', 'Puertos', 'Ports'], mtd: ['💾', 'Memoria', 'Memory']
+};
+function driverQueEs(u) {
+  const d = u && u.driver; if (!d) return '';
+  const c = DRV_CLASE[String(d.clase || '').toLowerCase()];
+  const partes = [];
+  partes.push(c ? c[0] + ' ' + L(c[1], c[2]) : (d.clase ? '🧩 ' + d.clase : ''));
+  if (d.fabricante) partes.push(d.fabricante);
+  const txt = partes.filter(Boolean).join(' · ');
+  const para = d.dispositivo || d.modelo;
+  return txt + (para ? (txt ? ' · ' : '') + L('para: ', 'for: ') + para : '');
+}
+// Códigos de winget más comunes, explicados en cristiano
+function wingetMotivo(code) {
+  const c = (Number(code) >>> 0).toString(16).toUpperCase();
+  const M = {
+    '8A15002B': ['Se actualiza solo desde su propio programa: no hace falta hacer nada.', 'It updates itself from its own app: nothing to do.'],
+    '8A150006': ['Su instalador falló. Suele pasar si el programa está abierto: ciérralo y vuelve a intentar.', 'Its installer failed. Usually because the program is open: close it and try again.'],
+    '8A150101': ['Está abierto. Ciérralo y vuelve a intentar.', 'It is open. Close it and try again.'],
+    '8A150102': ['Hay otra instalación en marcha. Espera a que termine y vuelve a intentar.', 'Another installation is running. Wait for it and try again.'],
+    '8A150109': ['Se terminará de actualizar al reiniciar el PC.', 'It will finish updating after restarting the PC.'],
+    '8A15010A': ['Pide reiniciar el PC antes de actualizarse.', 'It needs a PC restart before updating.'],
+    '8A15010C': ['Se canceló la instalación.', 'The installation was cancelled.']
+  };
+  return M[c] ? L(...M[c]) : L('El instalador devolvió el código ', 'The installer returned code ') + '0x' + c;
+}
+// Apunta cada resultado de winget: recuerda lo que se actualiza solo y devuelve el motivo si falló
+async function wingetResultados(resultados) {
+  const solos = { ...(S.settings.wgSolos || {}) }, okv = { ...(S.settings.wgOk || {}) };
+  const fallos = [];
+  for (const x of arr(resultados)) {
+    const app = (S.updates && [...S.updates.apps, ...(S.updates.solos || [])].find((a) => a.id === x.id)) || { nombre: x.id, nueva: '' };
+    if (x.ok) { if (app.nueva) okv[x.id] = app.nueva; continue; }
+    if (((Number(x.codigo) >>> 0) === 0x8A15002B)) solos[x.id] = app.nombre || x.id;
+    fallos.push({ id: x.id, nombre: app.nombre || x.id, motivo: wingetMotivo(x.codigo), solo: !!solos[x.id] });
+  }
+  S.settings = await rl.setSettings({ wgSolos: solos, wgOk: okv });
+  if (S.updates) {
+    const quitar = (a) => solos[a.id];
+    S.updates.solos = [...(S.updates.solos || []), ...S.updates.apps.filter(quitar)];
+    S.updates.apps = S.updates.apps.filter((a) => !quitar(a));
+  }
+  return fallos;
+}
+function wingetAvisar(fallos) {
+  const reales = fallos.filter((f) => !f.solo);
+  const solos = fallos.filter((f) => f.solo);
+  if (solos.length) toast(L('Se actualizan solos (ya no te los mostraré): ', 'They update themselves (won\'t show them again): ') + solos.map((f) => f.nombre).join(', '));
+  for (const f of reales) toast(f.nombre + ': ' + f.motivo, 'err');
+}
 async function loadJunk() {
   const r = obj(await rl.run('limpieza', { accion: 'analizar' }));
   S.junk = { categorias: arr(r.categorias) };

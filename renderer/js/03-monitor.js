@@ -165,13 +165,14 @@ async function updateSelected() {
         S.busy.msg = app ? app.nombre : id; S.busy.pct = Math.round(((i - 1) / wgIds.length) * 100); render();
         const r = await rl.run('actualizaciones', { accion: 'winget', ids: [id] });
         const x = arr(r.resultados)[0];
+        if (x) bad.push(...await wingetResultados([x]));   // antes de quitarlo de la lista: así recuerda su versión
         if (x && x.ok) { ok++; S.updSel.delete('wg:' + id); S.updates.apps = S.updates.apps.filter((a) => a.id !== id); }
-        else bad.push(app ? app.nombre : id);
+        else bad.push({ nombre: app ? app.nombre : id, motivo: L('No respondió.', 'No response.') });
       }
     }
     toast(L(`${ok} actualizado(s) correctamente.`, `${ok} updated successfully.`));
     refreshAfter('actualizaciones', 'drivers', 'hardware', 'programas');
-    if (bad.length) toast(L('No se pudieron actualizar (quizá estaban abiertos): ', 'Could not update (maybe they were open): ') + bad.join(', '), 'err');
+    if (bad.length) wingetAvisar(bad);
   });
 }
 
@@ -210,8 +211,9 @@ async function fixAll() {
             st.extra = L(`${ok} de ${r.resultados.length} instaladas`, `${ok} of ${r.resultados.length} installed`);
             if (r.reinicio) S.needsReboot = true;
           } else if (st.id === 'apps') {
-            const r = await rl.run('actualizaciones', { accion: 'winget', todos: true });
-            st.extra = L(`${r.resultados.filter((x) => x.ok).length} actualizados`, `${r.resultados.filter((x) => x.ok).length} updated`);
+            const r = await rl.run('actualizaciones', { accion: 'winget', todos: true, omitir: Object.keys(S.settings.wgSolos || {}) });
+            const fallos = (await wingetResultados(r.resultados)).filter((f) => !f.solo);
+            st.extra = L(`${arr(r.resultados).filter((x) => x.ok).length} actualizados`, `${arr(r.resultados).filter((x) => x.ok).length} updated`) + (fallos.length ? ' · ' + fallos.map((f) => f.nombre + ': ' + f.motivo).join(' · ') : '');
           }
           st.state = 'ok';
         } catch (e) { console.error(e); st.state = 'err'; st.extra = String(e.message || e).slice(0, 80); }

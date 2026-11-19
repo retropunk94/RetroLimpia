@@ -63,14 +63,21 @@ document.addEventListener('click', async (e) => {
   if (t.dataset.wg) {
     return taskC(L('Actualizando programa', 'Updating program'), async () => {
       const r = await rl.run('actualizaciones', { accion: 'winget', ids: [t.dataset.wg] });
-      const ok = r.resultados.every((x) => x.ok);
-      toast(ok ? L('Programa actualizado.', 'Program updated.') : L('No se pudo actualizar (quizá está abierto).', 'Could not update (it may be open).'), ok ? 'ok' : 'err');
+      const ok = arr(r.resultados).length && arr(r.resultados).every((x) => x.ok);
+      const fallos = await wingetResultados(r.resultados);
+      if (ok) toast(L('Programa actualizado.', 'Program updated.'));
+      else if (fallos.length) wingetAvisar(fallos);
+      else toast(L('No se pudo actualizar.', 'Could not update.'), 'err');
       if (ok) S.updates.apps = S.updates.apps.filter((a) => a.id !== t.dataset.wg);
       refreshAfter('actualizaciones', 'programas');
     });
   }
   switch (t.dataset.act) {
     case 'cancel': return cancelTask();
+    case 'wgSolosReset':
+      S.settings = await rl.setSettings({ wgSolos: {}, wgOk: {} });
+      if (S.updates) { S.updates.apps = [...S.updates.apps, ...(S.updates.solos || [])]; S.updates.solos = []; }
+      return render();
     case 'procOk': S.settings = await rl.setSettings({ procesosAviso: true }); $('#modal').classList.add('hidden'); return render();
     case 'procBack': $('#modal').classList.add('hidden'); S.view = 'inicio'; return render();
     case 'procPause': S.procPaused = !S.procPaused; return render();
@@ -180,8 +187,9 @@ document.addEventListener('click', async (e) => {
           const r = await rl.run('actualizaciones', { accion: 'instalarWU', todos: true });
           if (r.reinicio) S.needsReboot = true;
         }
-        if (S.updates.apps.length) { S.busy.label = L('Programas', 'Programs'); await rl.run('actualizaciones', { accion: 'winget', todos: true }); }
-        toast(L('Todo actualizado.', 'Everything updated.'));
+        let fallos = [];
+        if (S.updates.apps.length) { S.busy.label = L('Programas', 'Programs'); const r = await rl.run('actualizaciones', { accion: 'winget', todos: true, omitir: Object.keys(S.settings.wgSolos || {}) }); fallos = await wingetResultados(r.resultados); }
+        if (fallos.some((f) => !f.solo)) wingetAvisar(fallos); else toast(L('Todo actualizado.', 'Everything updated.'));
         await loadUpdates();
         refreshAfter('drivers', 'hardware', 'programas');
       });
@@ -269,6 +277,7 @@ rl.onProgress((p) => {
   S.sp = S.sp || {}; S.sp[p.script] = { pct: p.pct, msg: S.settings.idioma === 'en' ? p.en : p.msg };
   if (bgScriptActive(p.script) && !(S.scan && S.scan.state === 'running')) { updateLoadCard(); if (!S.busy || !S.busy.script || S.busy.script !== p.script) return; }
   if (!S.busy) return;
+  S.busy.ultimo = Date.now();
   const msg = S.settings.idioma === 'en' ? p.en : p.msg;
   if (S.scan.state === 'running') {
     S.scan.pct[p.script] = p.pct;

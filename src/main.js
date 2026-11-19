@@ -42,7 +42,8 @@ const defaultSettings = {
   modoLigero: 'auto',      // auto | on | off  (bajos recursos)
   mascota: 'activa',       // activa | tranquila | off
   mascotaPresentada: false,
-  misJuegos: [], juegoAuto: false, juegoIntensidad: 'equilibrado', juegoCerrar: [], juegoReabrir: true, juegoPartidas: 0, formateoPasos: {}
+  misJuegos: [], juegoAuto: false, juegoIntensidad: 'equilibrado', juegoCerrar: [], juegoReabrir: true, juegoPartidas: 0, formateoPasos: {},
+  wgSolos: {}, wgOk: {}   // programas que se actualizan solos (winget no puede) · última versión que winget dijo instalar
 };
 function loadSettings() {
   try { return { ...defaultSettings, ...JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) }; }
@@ -109,6 +110,9 @@ function createWindow() {
   win.once('ready-to-show', () => win.show());
   win.webContents.on('did-finish-load', ajustarZoom);
   win.on('resize', ajustarZoom);
+  let congelada = 0;
+  win.on('unresponsive', () => { congelada = Date.now(); diag('La ventana dejó de responder · en marcha: ' + queHace()); });
+  win.on('responsive', () => { if (congelada) diag('La ventana volvió a responder tras ' + Math.round((Date.now() - congelada) / 1000) + ' s'); congelada = 0; });
   win.on('maximize', ajustarZoom); win.on('unmaximize', ajustarZoom);
   // Si la ventana quedó fuera de la pantalla (p. ej. al desconectar un monitor), se recoloca
   if (!global.__rlPantalla) { global.__rlPantalla = true; screen.on('display-removed', () => { try { if (win && !win.isDestroyed()) win.center(); } catch {} }); }
@@ -289,10 +293,33 @@ ipcMain.handle('rl:autostart', async (e, on, dias) => {
 ipcMain.handle('rl:checkNow', () => backgroundCheck(true));
 
 // ---------- Comunicación con la interfaz ----------
+// ---- Diagnóstico de cuelgues: qué estaba haciendo el programa si la ventana se congela o un paso tarda demasiado.
+// Se guarda en %APPDATA%\RetroLimpia\diagnostico.log (pequeño) y va dentro de los reportes.
+const enMarcha = new Map(); let nRun = 0;
+function diag(msg) {
+  try {
+    const f = path.join(app.getPath('userData'), 'diagnostico.log');
+    try { if (fs.statSync(f).size > 200 * 1024) fs.writeFileSync(f, fs.readFileSync(f, 'utf8').slice(-60 * 1024)); } catch { /* aún no existe */ }
+    fs.appendFileSync(f, '[' + new Date().toISOString().replace('T', ' ').slice(0, 19) + '] ' + msg + '\n');
+  } catch { /* sin disco: no pasa nada */ }
+}
+function queHace() {
+  if (!enMarcha.size) return 'nada en marcha';
+  return [...enMarcha.values()].map((r) => r.script + (r.accion ? '/' + r.accion : '') + ' hace ' + Math.round((Date.now() - r.inicio) / 1000) + ' s' + (r.msg ? ' · "' + r.msg + '"' : '')).join(' | ');
+}
 ipcMain.handle('rl:run', async (e, script, params) => {
-  const prog = (p) => { if (!e.sender.isDestroyed()) e.sender.send('rl:progress', { script, ...p }); };
-  if (script === 'modojuego' && params && params.accion !== 'listar' && params.accion !== 'estado') return runJuego(params, prog);
-  return engine.run(script, params || {}, prog);
+  const id = ++nRun;
+  const info = { script, accion: params && params.accion ? String(params.accion) : '', inicio: Date.now(), msg: '' };
+  enMarcha.set(id, info);
+  const prog = (p) => { if (p && p.msg) info.msg = String(p.msg).slice(0, 120); if (!e.sender.isDestroyed()) e.sender.send('rl:progress', { script, ...p }); };
+  try {
+    if (script === 'modojuego' && params && params.accion !== 'listar' && params.accion !== 'estado') return await runJuego(params, prog);
+    return await engine.run(script, params || {}, prog);
+  } finally {
+    enMarcha.delete(id);
+    const s = Math.round((Date.now() - info.inicio) / 1000);
+    if (s >= 120) diag('Paso lento: ' + script + (info.accion ? '/' + info.accion : '') + ' tardó ' + s + ' s' + (info.msg ? ' · último aviso: "' + info.msg + '"' : ''));
+  }
 });
 ipcMain.handle('rl:cancel', () => engine.cancelAll());
 ipcMain.handle('rl:data', (e, name) => loadData(name));
@@ -315,6 +342,7 @@ ipcMain.handle('rl:info', async () => ({
   demo: DEMO,
   plataforma: process.platform,
   esAdmin: DEMO ? true : await engine.isAdmin(),
+  faltan: engine.faltantes(),
   equipo: os.hostname()
 }));
 ipcMain.handle('rl:open', (e, url) => {
@@ -495,6 +523,9 @@ ipcMain.handle('rl:report:prepare', async () => {
   partes.push('Actualizador: ' + JSON.stringify(updateState));
   const upd = cola(path.join(app.getPath('userData'), 'actualizador.log'), 120);
   if (upd) partes.push('\n===== actualizador.log (últimas líneas) =====\n' + upd);
+  const dg = cola(path.join(app.getPath('userData'), 'diagnostico.log'), 40);
+  if (dg) partes.push('\n===== diagnostico.log (cuelgues y pasos lentos) =====\n' + dg);
+  if (enMarcha.size) partes.push('En marcha ahora: ' + queHace());
   try {
     const dir = path.join(process.env.ProgramData || os.tmpdir(), 'RetroLimpia', 'logs');
     const files = fs.readdirSync(dir).filter((f) => f.endsWith('.log')).sort().slice(-2);

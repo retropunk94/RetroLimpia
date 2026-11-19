@@ -18,11 +18,25 @@ $osName = [string]$osI.Caption
 $displayVer = [string]$ntVer.DisplayVersion
 
 Send-Progress 30 'Leyendo la tarjeta gráfica...' 'Reading graphics card...'
+# Windows guarda la memoria de la gráfica en un número que no pasa de 4 GB (AdapterRAM).
+# La cifra real está en el registro del driver (qwMemorySize): se usa esa si existe.
+$vramReal = @{}
+try {
+    Get-ChildItem 'HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}' -ErrorAction SilentlyContinue | ForEach-Object {
+        $pr = Get-ItemProperty -LiteralPath $_.PSPath -ErrorAction SilentlyContinue
+        if ($pr -and $pr.DriverDesc) {
+            $q = $pr.'HardwareInformation.qwMemorySize'
+            if (-not $q) { $m = $pr.'HardwareInformation.MemorySize'; if ($m -is [byte[]] -and $m.Length -ge 4) { $q = [BitConverter]::ToUInt32($m, 0) } elseif ($m) { $q = $m } }
+            if ($q -and [int64]$q -gt 0) { $vramReal[[string]$pr.DriverDesc] = [int64]$q }
+        }
+    }
+} catch {}
 $gpus = @(Get-CimInstance Win32_VideoController -ErrorAction SilentlyContinue | Where-Object {
     $_.Name -and $_.Name -notmatch 'Basic Display|Remote|Virtual|Parsec|Meta|Mirage|DisplayLink|Indirect'
 } | ForEach-Object {
     $vram = [int64]0
     try { if ($_.AdapterRAM -gt 0) { $vram = [int64][uint32]$_.AdapterRAM } } catch {}
+    if ($vramReal.ContainsKey([string]$_.Name) -and $vramReal[[string]$_.Name] -gt $vram) { $vram = $vramReal[[string]$_.Name] }
     $vendor = 'otro'
     if ($_.Name -match 'NVIDIA|GeForce|RTX|GTX|Quadro') { $vendor = 'nvidia' }
     elseif ($_.Name -match 'AMD|Radeon') { $vendor = 'amd' }

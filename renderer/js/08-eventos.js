@@ -83,6 +83,9 @@ document.addEventListener('click', async (e) => {
     case 'modalClose': $('#modal').classList.add('hidden'); S.rep = null; return;
     case 'retroMenu': return retroMenu();
     case 'restosBuscar': return restosBuscar();
+    case 'cfgExport': return cfgExport();
+    case 'cfgImport': return cfgImport();
+    case 'monForzar': return monForzar(Number(t.dataset.i));
     case 'juegoOn': return juegoOn();
     case 'reinicios': return reinicios();
     case 'formInstalar': return formInstalar();

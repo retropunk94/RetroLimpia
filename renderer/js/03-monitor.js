@@ -22,6 +22,7 @@ function monSummary(it) {
   const r = it.res;
   if (!r) return '';
   if (!r.ok && r.cancelado) return `<div class="mon-sum info">ℹ ${esc(r.mensaje || L('No se desinstaló. No se tocó nada.', 'Not uninstalled. Nothing was touched.'))}</div>`;
+  if (!r.ok && r.puedeForzar) return `<div class="mon-sum warn">⚠ ${esc(r.mensaje || '')}<div style="margin-top:10px"><button class="btn small primary" data-act="monForzar" data-i="${S.mon.items.indexOf(it)}" ${S.busy ? 'disabled' : ''}>${L('Quitarlo a la fuerza (va a la cuarentena)', 'Force remove (goes to quarantine)')}</button></div></div>`;
   if (!r.ok) return `<div class="mon-sum bad">✖ ${L('No se pudo desinstalar', 'Could not uninstall')}${r.mensaje ? ': ' + esc(r.mensaje) : ''}${S.info.reportes ? ` <button class="link" data-act="reportOpen" data-ctx="${esc(L('Desinstalar ', 'Uninstall ') + it.nombre)}">🐞 ${L('Reportar este problema', 'Report this problem')}</button>` : ''}</div>`;
   const reg = r.regRestos || [];
   const regAllMoved = reg.length && reg.every((x) => x.movido) && r.registroLimpio;
@@ -106,7 +107,8 @@ async function uninstallPrograms(list, motivo) {
         ? { ok: false, cancelado: true, mensaje: L('Detenido por ti. Si su tienda o su asistente seguía abierto, ciérralo; RetroLimpia no tocó nada más.', 'Stopped by you. If its store or wizard was still open, close it; RetroLimpia touched nothing else.') }
         : { ok: false, mensaje: String(e.message || e) }));
     if (r.reinicio) res.reinicio = true;
-    it.res = { ok: !!r.ok, metodo: r.metodo, plataforma: r.plataforma, cancelado: !!r.cancelado, registroLimpio: r.registroLimpio !== false, clave: p.clave, mensaje: r.mensaje, regRestos: [], archivos: [] };
+    it.prog = p;
+    it.res = { ok: !!r.ok, metodo: r.metodo, plataforma: r.plataforma, cancelado: !!r.cancelado, registroLimpio: r.registroLimpio !== false, clave: p.clave, mensaje: r.mensaje, puedeForzar: !!r.puedeForzar, regRestos: [], archivos: [] };
     if (!r.ok && r.cancelado) { it.estado = 'cancel'; (res.saltados = res.saltados || []).push(p.cls.nombre); renderMonitor(); continue; }
     if (!r.ok) { it.estado = 'err'; res.fail.push(p.cls.nombre); renderMonitor(); continue; }
     res.ok++; ganar('desinstalados', 1);
@@ -299,4 +301,28 @@ function renderUpdWin() {
     <div class="upw-btns">${btns}</div>
   </div>`;
   box.classList.remove('hidden');
+}
+
+// Programa sin desinstalador (copias "repack", borrados a medias): se quita a la fuerza.
+// Su carpeta y su entrada van a la cuarentena (se pueden restaurar). Siempre con confirmación.
+async function monForzar(i) {
+  const it = S.mon && S.mon.items[i]; const p = it && it.prog;
+  if (!p || S.busy) return;
+  if (!confirm(L(`¿Quitar "${it.nombre}" a la fuerza?\n\nSu carpeta y su entrada en la lista de Windows se moverán a la cuarentena. Si algo falla, lo restauras desde "Deshacer y cuarentena".`, `Force remove "${it.nombre}"?\n\nIts folder and its Windows entry go to quarantine. You can restore them from "Undo & quarantine".`))) return;
+  return taskC(L('Quitando a la fuerza', 'Force removing'), async () => {
+    S.mon.cur = i; it.estado = 'run'; renderMonitor();
+    monLog({ tipo: 'paso', msg: 'Buscando todo lo que dejó el programa...', en: 'Finding everything the program left...' });
+    const rr = obj(await rl.run('residuos', { nombre: p.nombre, editor: p.editor, carpeta: p.carpeta, clave: p.clave, juego: false }));
+    const items = arr(rr.restos).filter((x) => x.confianza === 'alta');
+    if (!items.length) { it.estado = 'err'; it.res.mensaje = L('No encontré nada que quitar.', 'Nothing found to remove.'); it.res.puedeForzar = false; return renderMonitor(); }
+    const q = obj(await rl.run('cuarentena', { accion: 'mover', items, motivo: L('Quitado a la fuerza: ', 'Force removed: ') + p.nombre }));
+    const fallidos = arr(q.fallidos).map((f) => f.ruta);
+    const mark = (x) => ({ ...x, movido: !fallidos.includes(x.ruta) });
+    it.res = { ...it.res, ok: !fallidos.includes(p.clave), metodo: 'forzado', puedeForzar: false, regRestos: items.filter((x) => x.tipo === 'registro').map(mark), archivos: items.filter((x) => x.tipo !== 'registro').map(mark), registroLimpio: !fallidos.includes(p.clave) };
+    if (q.id) it.res.cuarentena = 'C:\\ProgramData\\RetroLimpia\\Cuarentena\\' + q.id;
+    it.estado = it.res.ok ? 'ok' : 'err';
+    if (it.res.ok) { ganar('desinstalados', 1); toast(L(`${it.nombre} quitado. Está en la cuarentena por si acaso.`, `${it.nombre} removed. It is in quarantine just in case.`)); }
+    renderMonitor();
+    refreshAfter('programas', 'cuarentena');
+  });
 }

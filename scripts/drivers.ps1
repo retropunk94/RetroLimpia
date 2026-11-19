@@ -24,16 +24,21 @@ Send-Progress 10 'Leyendo los drivers instalados...' 'Reading installed drivers.
 $important = 'DISPLAY|NET|MEDIA|SYSTEM|HDC|SCSIADAPTER|BLUETOOTH|USB|AUDIOENDPOINT|CAMERA|BIOMETRIC|MOUSE|KEYBOARD|HIDCLASS'
 $drivers = @(Get-CimInstance Win32_PnPSignedDriver -ErrorAction SilentlyContinue | Where-Object { $_.DeviceName -and $_.DriverVersion } | ForEach-Object {
     $prov = [string]$_.DriverProviderName
+    # Los drivers que trae Windows de serie llevan fechas de relleno (1968, 2006...): no son fechas reales
+    $f = Format-WmiDate $_.DriverDate
+    $gen = ($prov -match '^Microsoft' -or [string]$_.Manufacturer -match '^\(Standard|^Microsoft|^Generic|^\(Estándar')
+    $sinFecha = (-not $f) -or ($f -lt '2000') -or ($gen -and $f -le '2006-06-21')
     @{
         dispositivo = $_.DeviceName
         clase       = [string]$_.DeviceClass
         fabricante  = [string]$_.Manufacturer
         proveedor   = $prov
         version     = $_.DriverVersion
-        fecha       = (Format-WmiDate $_.DriverDate)
+        fecha       = $(if ($sinFecha) { '' } else { $f })
+        deWindows   = [bool]($gen -and $sinFecha)
         inf         = $_.InfName
         firmado     = [bool]$_.IsSigned
-        generico    = ($prov -match '^Microsoft' -or [string]$_.Manufacturer -match '^\(Standard|^Microsoft|^Generic|^\(Estándar')
+        generico    = $gen
         importante  = ([string]$_.DeviceClass -match $important)
     }
 })

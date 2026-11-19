@@ -260,7 +260,7 @@ function viewDrivers() {
   const imp = d.drivers.filter((x) => x.importante && !x.generico);
   const wuDrv = (S.updates?.windows || []).filter((u) => u.tipo === 'driver');
   const gpus = (S.hardware?.gpus || []).filter((g) => GPU_LINKS[g.fabricante]);
-  imp.sort((a, b) => (a.fecha || '').localeCompare(b.fecha || ''));
+  imp.sort((a, b) => (a.fecha || '9999').localeCompare(b.fecha || '9999'));
   return `<div class="view">${banners()}${head(L('Drivers', 'Drivers'), L('Los drivers son los "traductores" entre Windows y tu hardware. RetroLimpia solo usa fuentes oficiales: Windows Update y las apps de cada fabricante. Nunca webs de "drivers gratis".', 'Drivers are the "translators" between Windows and your hardware. RetroLimpia only uses official sources: Windows Update and each manufacturer\'s app. Never "free driver" websites.'), `<button class="btn" data-act="backupDrivers" ${S.busy ? 'disabled' : ''}>${L('Hacer copia de mis drivers', 'Back up my drivers')}</button>`)}
     ${progressHTML()}
     ${prob.length ? `<div class="card" style="border-color:rgba(255,84,112,.5);margin-bottom:14px"><h3 style="color:var(--rojo)">${L('Dispositivos con problemas', 'Devices with problems')}</h3>
@@ -273,7 +273,7 @@ function viewDrivers() {
     ${S.updates ? (wuDrv.length ? `<div class="list">${wuDrv.map((u) => `<div class="row"><div class="grow"><div class="name">${esc(u.titulo)}</div><div class="sub">${fmtBytes(u.tamano)}${u.opcional ? ' · ' + L('opcional', 'optional') : ''}</div></div><button class="btn small" data-wu="${esc(u.id)}" ${S.busy ? 'disabled' : ''}>${L('Instalar', 'Install')}</button></div>`).join('')}</div>` : `<div class="card meta">${L('Windows Update no tiene drivers nuevos para ti.', 'Windows Update has no new drivers for you.')}</div>`) : ''}
     <h2>${L('Drivers importantes instalados', 'Important installed drivers')}<span class="sub">${L('ordenados del más antiguo al más nuevo', 'oldest first')}</span></h2>
     <div class="list">${imp.map((x) => { const y = yearsSince(x.fecha); return `<div class="row"><div class="grow"><div class="name">${esc(x.dispositivo)}</div><div class="sub">${esc(x.proveedor)} · ${esc(x.version)}</div>${S.settings.modoExperto ? `<div class="tech">${esc(x.inf)} · ${esc(x.clase)}</div>` : ''}</div>
-      ${y != null && y > 3 ? `<span class="badge amarillo">${L('Antiguo', 'Old')}</span>` : `<span class="badge verde">OK</span>`}<div class="size">${esc(x.fecha)}</div></div>`; }).join('') || `<div class="empty">—</div>`}</div>
+      ${x.deWindows ? `<span class="badge gris" title="${L('Driver que trae Windows de serie: Windows no guarda su fecha real.', 'Built-in Windows driver: Windows does not store its real date.')}">${L('De Windows', 'Built-in')}</span>` : y != null && y > 3 ? `<span class="badge amarillo">${L('Antiguo', 'Old')}</span>` : `<span class="badge verde">OK</span>`}<div class="size">${x.fecha ? esc(x.fecha) : L('Sin fecha', 'No date')}</div></div>`; }).join('') || `<div class="empty">—</div>`}</div>
     ${d.respaldos.length ? `<p class="meta" style="margin-top:14px">${L('Copias de drivers guardadas', 'Saved driver backups')}: ${d.respaldos.length} · <button class="link" data-folder="drivers">${L('Abrir carpeta', 'Open folder')}</button></p>` : ''}</div>`;
 }
 
@@ -292,6 +292,7 @@ function viewActualizaciones() {
   const chk = (key) => `<input type="checkbox" class="check" data-upd="${esc(key)}" ${S.updSel.has(key) ? 'checked' : ''} ${S.busy ? 'disabled' : ''}>`;
   return `<div class="view">${banners()}${head(L('Actualizaciones', 'Updates'), L('Marca lo que quieras actualizar y hazlo de una vez, o actualízalo todo. Solo fuentes oficiales: Windows Update y winget (el gestor de apps de Microsoft).', 'Tick what you want to update and do it in one go, or update everything. Official sources only: Windows Update and winget (Microsoft\'s app manager).'), `<button class="btn ghost" data-act="loadUpdates" ${S.busy ? 'disabled' : ''}>${L('Buscar de nuevo', 'Search again')}</button>`)}
     ${progressHTML()}
+    ${(wu.length || u.apps.length) ? `<div class="banner info"><div class="grow">💾 <b>${L('Guarda lo que estés haciendo antes de actualizar.', 'Save your work before updating.')}</b> ${L('Algunos instaladores, sobre todo los de drivers, reinician el PC sin preguntar. No es un fallo de RetroLimpia.', 'Some installers, especially drivers, restart the PC without asking. It is not a RetroLimpia bug.')}</div></div>` : ''}
     ${u.error ? `<div class="banner warn"><div class="grow">${L('Windows Update no respondió', 'Windows Update did not respond')}: ${esc(u.error)}</div></div>` : ''}
     <h2>${L('Windows y drivers', 'Windows & drivers')}<span class="sub">${normal.length} ${L('disponibles', 'available')}</span>${selAll('wu', keysWu)}</h2>
     ${normal.length ? `<div class="list">${normal.map((x) => `<label class="row">${chk('wu:' + x.id)}<div class="grow"><div class="name">${esc(x.titulo)}</div><div class="sub">${tipoTxt[x.tipo]} · ${fmtBytes(x.tamano)}${x.reinicio ? ' · ' + L('pide reiniciar', 'needs restart') : ''}${x.opcional ? ' · ' + L('opcional', 'optional') : ''}</div></div>

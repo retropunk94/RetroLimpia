@@ -250,7 +250,16 @@ if (!app.requestSingleInstanceLock()) {
     // Cada paso va protegido: si uno falla, la ventana y el actualizador arrancan igual.
     // (Antes, un fallo aquí dejaba el programa abierto pero sin ventana y sin actualizarse.)
     // Marca de sesión: si al arrancar sigue ahí, la vez anterior se cerró de golpe (fallo)
-    try { cierreRaro = fs.existsSync(sesionFlag()); fs.writeFileSync(sesionFlag(), String(Date.now())); } catch {}
+    // Si el PC se reinició o apagó después de abrir RetroLimpia, no fue un cierre inesperado del programa
+    try {
+      if (fs.existsSync(sesionFlag())) {
+        const marca = fs.statSync(sesionFlag()).mtimeMs, arranquePC = Date.now() - os.uptime() * 1000;
+        cierreRaro = arranquePC < marca;   // el PC no se reinició desde entonces: sí fue un cierre del programa
+      }
+      fs.writeFileSync(sesionFlag(), String(Date.now()));
+    } catch {}
+    // Al apagar o reiniciar Windows se quita la marca: no cuenta como cierre inesperado
+    try { require('electron').powerMonitor.on('shutdown', () => { try { fs.unlinkSync(sesionFlag()); } catch {} }); } catch {}
     const paso = (nombre, fn) => { try { return fn(); } catch (e) { updLog('Arranque, fallo en ' + nombre + ': ' + (e && e.stack || e)); } };
     paso('motor', () => engine.init({ ligero: ligeroActivo(), demo: DEMO, scriptsDir: app.isPackaged ? path.join(process.resourcesPath, 'scripts') : path.join(__dirname, '..', 'scripts') }));
     // OJO: el instalador quita la sección "build" de package.json, así que el id va escrito aquí
@@ -359,31 +368,56 @@ function installWhenIdle() {
   saveSettings({ ...loadSettings(), relanzarEnBandeja: tray ? Date.now() : false });
   doInstall();
 }
+// ---------- Instalar la actualización de forma segura ----------
+// La descarga queda en una carpeta en la que cualquier programa puede escribir. Para que nadie pueda
+// cambiar el instalador justo antes de ejecutarlo como administrador: se copia a una carpeta nueva de
+// RetroLimpia en ProgramData (creada por el administrador: otros usuarios no pueden tocar lo que hay dentro),
+// se comprueba la huella (SHA-512) DE ESA COPIA y se ejecuta exactamente esa copia.
+// (No se cambian permisos de ninguna carpeta: solo se usa lo que Windows ya protege.)
+const RL_DATA = path.join(process.env.ProgramData || 'C:\\ProgramData', 'RetroLimpia');
+function carpetaSegura(prefijo) {
+  fs.mkdirSync(RL_DATA, { recursive: true });
+  for (const d of fs.readdirSync(RL_DATA)) if (d.startsWith(prefijo + '-')) { try { fs.rmSync(path.join(RL_DATA, d), { recursive: true, force: true }); } catch {} }
+  return fs.mkdtempSync(path.join(RL_DATA, prefijo + '-'));
+}
+function sha512Archivo(f) {
+  const h = require('crypto').createHash('sha512'); const fd = fs.openSync(f, 'r'); const buf = Buffer.alloc(1024 * 1024);
+  try { let n; while ((n = fs.readSync(fd, buf, 0, buf.length, null)) > 0) h.update(buf.subarray(0, n)); } finally { fs.closeSync(fd); }
+  return h.digest('base64');
+}
+function instaladorSeguro(origen, huella) {
+  if (!origen || !huella || !fs.existsSync(origen)) throw new Error('no hay instalador o huella para comprobar');
+  const dir = carpetaSegura('actualizacion');
+  const copia = path.join(dir, path.basename(origen).replace(/[^\w.\-]/g, '_'));
+  fs.copyFileSync(origen, copia);
+  if (sha512Archivo(copia) !== huella) { try { fs.rmSync(dir, { recursive: true, force: true }); } catch {} throw new Error('la huella del instalador no coincide: descartado por seguridad'); }
+  return copia;
+}
+let descargaOficial = null;   // { archivo, huella } que deja electron-updater
+
 function doInstall() {
   try { fs.unlinkSync(sesionFlag()); } catch {}
   // Plan B: instalador descargado por nosotros
-  if (fallbackFile && fs.existsSync(fallbackFile)) {
-    quitting = true; installing = true;
-    updLog('Instalando (plan B) ' + fallbackFile);
-    try {
-      relaunchHelper(4);
-      // /S = silencioso; --updated = es una actualización (conserva accesos directos)
-      spawn(fallbackFile, ['/S', '--updated'], { detached: true, stdio: 'ignore' }).unref();
-      setTimeout(() => app.exit(0), 500);
-      return true;
-    } catch (e) { updLog('No se pudo lanzar el instalador: ' + e); quitting = false; installing = false; return false; }
+  // Plan B (descargado por nosotros) u oficial (electron-updater): los dos se instalan desde una copia comprobada
+  const fuente = fallbackFile && fs.existsSync(fallbackFile.archivo || '') ? fallbackFile : descargaOficial;
+  if (!fuente) { updLog('No hay instalador descargado'); return false; }
+  let copia;
+  try { copia = instaladorSeguro(fuente.archivo, fuente.huella); }
+  catch (e) {
+    updLog('Instalación cancelada: ' + (e && e.message || e));
+    sendUpdate({ estado: 'error', mensaje: 'La actualización no pasó la comprobación de seguridad y no se instaló. Se volverá a descargar.' });
+    fallbackFile = null; descargaOficial = null;
+    return false;
   }
-  if (!autoUpdater) return false;
   quitting = true; installing = true;
-  if (app.isPackaged && process.platform === 'win32') {
-    try {
-      relaunchHelper(2);
-      autoUpdater.quitAndInstall(true, false);   // silencioso; el ayudante lo vuelve a abrir
-      return true;
-    } catch (e) { updLog('quitAndInstall: ' + e); }
-  }
-  autoUpdater.quitAndInstall(true, true);   // silencioso y vuelve a abrirse
-  return true;
+  updLog('Instalando copia comprobada ' + copia);
+  try {
+    relaunchHelper(4);
+    // /S = silencioso; --updated = es una actualización (conserva accesos directos y ajustes)
+    spawn(copia, ['/S', '--updated'], { detached: true, stdio: 'ignore' }).unref();
+    setTimeout(() => app.exit(0), 500);
+    return true;
+  } catch (e) { updLog('No se pudo lanzar el instalador: ' + e); quitting = false; installing = false; return false; }
 }
 
 // Registro del actualizador: si algo falla queda escrito en %APPDATA%\RetroLimpia\actualizador.log
@@ -409,7 +443,11 @@ function initUpdater() {
   autoUpdater.on('update-not-available', () => sendUpdate({ estado: 'al-dia', revisado: Date.now() }));
   autoUpdater.on('update-available', (i) => sendUpdate({ estado: 'descargando', version: i.version, pct: 0 }));
   autoUpdater.on('download-progress', (p) => sendUpdate({ estado: 'descargando', pct: Math.round(p.percent || 0) }));
-  autoUpdater.on('update-downloaded', (i) => { sendUpdate({ estado: 'lista', version: i.version }); installWhenIdle(); });
+  autoUpdater.on('update-downloaded', (i) => {
+    const f = (i.files || []).find((x) => /\.exe$/i.test(x.url)) || {};
+    descargaOficial = { archivo: i.downloadedFile, huella: f.sha512 || i.sha512 };
+    sendUpdate({ estado: 'lista', version: i.version }); installWhenIdle();
+  });
   autoUpdater.on('error', (e) => {
     updLog('error del actualizador: ' + (e && e.message || e));
     if (updateState.estado !== 'lista') sendUpdate({ estado: 'error', mensaje: String(e && e.message || e).slice(0, 200) });
@@ -430,9 +468,11 @@ function anonimizar(txt) {
   const reemplazos = [];
   try { const u = os.userInfo().username; if (u && u.length > 1) reemplazos.push([u, '<usuario>']); } catch {}
   try { const h = os.hostname(); if (h && h.length > 1) reemplazos.push([h, '<equipo>']); } catch {}
-  for (const [a, b] of reemplazos) t = t.split(a).join(b);
-  // correos y direcciones IP
-  t = t.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '<correo>').replace(/\b\d{1,3}(\.\d{1,3}){3}\b/g, '<ip>');
+  // Solo la palabra completa: si el PC se llama "SA", no se debe estropear "Assassin's" ni "revisado"
+  const escRe = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  for (const [a, b] of reemplazos) t = t.replace(new RegExp('(^|[^A-Za-z0-9_])' + escRe(a) + '(?=$|[^A-Za-z0-9_])', 'gi'), '$1' + b);
+  // correos (las IP no: confundía números de versión como 14.1.0.3 con direcciones)
+  t = t.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '<correo>');
   return t;
 }
 function cola(file, lineas) {
@@ -529,6 +569,34 @@ function juegoTick() {
     finally { juegoMirando = false; }
   });
 }
+// ---------- Exportar / importar la configuración (para llevarla a otro PC) ----------
+// Solo se guardan preferencias: nada de rutas privadas, historial ni datos del equipo.
+const CONFIG_CLAVES = ['idioma', 'modoExperto', 'restosAutomaticos', 'puntoRestauracion', 'diasCuarentena', 'frecuenciaDias', 'modoLigero', 'mascota', 'misJuegos', 'juegoAuto', 'juegoIntensidad', 'juegoCerrar', 'juegoReabrir'];
+ipcMain.handle('rl:config:export', async (e, extra) => {
+  const s = loadSettings();
+  const datos = { app: 'RetroLimpia', tipo: 'configuracion', version: pkg.version, fecha: new Date().toISOString(), ajustes: {}, privacidad: Array.isArray(extra && extra.privacidad) ? extra.privacidad.filter((x) => typeof x === 'string').slice(0, 50) : [] };
+  for (const k of CONFIG_CLAVES) if (k in s) datos.ajustes[k] = s[k];
+  const r = await dialog.showSaveDialog(win, { title: T('Guardar mi configuración', 'Save my settings'), defaultPath: path.join(app.getPath('documents'), 'RetroLimpia-configuracion.json'), filters: [{ name: 'RetroLimpia', extensions: ['json'] }] });
+  if (r.canceled || !r.filePath) return null;
+  fs.writeFileSync(r.filePath, JSON.stringify(datos, null, 2), 'utf8');
+  return { ruta: r.filePath };
+});
+ipcMain.handle('rl:config:import', async () => {
+  const r = await dialog.showOpenDialog(win, { title: T('Cargar una configuración', 'Load settings'), properties: ['openFile'], filters: [{ name: 'RetroLimpia', extensions: ['json'] }] });
+  if (r.canceled || !r.filePaths[0]) return null;
+  let d;
+  try { if (fs.statSync(r.filePaths[0]).size > 512 * 1024) throw 0; d = JSON.parse(fs.readFileSync(r.filePaths[0], 'utf8').replace(/^\uFEFF/, '')); } catch { return { error: T('Ese archivo no es una configuración de RetroLimpia.', 'That file is not a RetroLimpia settings file.') }; }
+  if (!d || d.app !== 'RetroLimpia' || d.tipo !== 'configuracion' || typeof d.ajustes !== 'object') return { error: T('Ese archivo no es una configuración de RetroLimpia.', 'That file is not a RetroLimpia settings file.') };
+  const nuevos = {};
+  for (const k of CONFIG_CLAVES) if (k in d.ajustes) nuevos[k] = d.ajustes[k];
+  // Juegos: solo los que existen en este PC
+  if (Array.isArray(nuevos.misJuegos)) nuevos.misJuegos = nuevos.misJuegos.filter((g) => g && typeof g.ruta === 'string' && /\.exe$/i.test(g.ruta) && fs.existsSync(g.ruta)).map((g) => ({ ruta: g.ruta, nombre: String(g.nombre || path.basename(g.ruta)).slice(0, 80) }));
+  if (Array.isArray(nuevos.juegoCerrar)) nuevos.juegoCerrar = nuevos.juegoCerrar.filter((x) => typeof x === 'string' && /^[\w .\-]{1,60}$/.test(x));
+  const s = saveSettings({ ...loadSettings(), ...nuevos });
+  if ('modoLigero' in nuevos) engine.init({ ligero: ligeroActivo(s) });
+  juegoWatch();
+  return { ajustes: s, privacidad: Array.isArray(d.privacidad) ? d.privacidad.filter((x) => typeof x === 'string' && /^[a-z_]{2,40}$/.test(x)) : [], juegosQuitados: (Array.isArray(d.ajustes.misJuegos) ? d.ajustes.misJuegos.length : 0) - (nuevos.misJuegos || []).length };
+});
 ipcMain.handle('rl:pickExe', async () => {
   const r = await dialog.showOpenDialog(win, {
     title: T('Elige el juego o emulador (.exe)', 'Choose the game or emulator (.exe)'),
@@ -620,7 +688,7 @@ async function fallbackCheck() {
     }
     await new Promise((res, rej) => out.end((e) => (e ? rej(e) : res())));
     if (hash.digest('base64') !== m[1]) { try { fs.unlinkSync(file); } catch {} throw new Error('la huella no coincide: descarga descartada'); }
-    fallbackFile = file;
+    fallbackFile = { archivo: file, huella: m[1] };
     updLog('Plan B listo: ' + file);
     sendUpdate({ estado: 'lista', version: v });
     installWhenIdle();
@@ -636,9 +704,11 @@ function relaunchHelper(extraWait) {
   // Antes era un proceso "hijo" del programa, y el instalador lo cerraba junto con RetroLimpia
   // (por eso no se volvía a abrir). Ahora es una tarea programada de Windows, independiente,
   // con permisos de administrador (sin aviso escondido) y con su propio registro: relanzar.log
-  const dir = app.getPath('userData');
+  // El script corre como administrador: va en una carpeta nueva que otros programas no pueden tocar.
+  // El registro (relanzar.log) sigue en AppData para poder leerlo fácil.
+  let dir; try { dir = carpetaSegura('reabrir'); } catch { dir = app.getPath('userData'); }
   const script = path.join(dir, 'relanzar.ps1');
-  const log = path.join(dir, 'relanzar.log');
+  const log = path.join(app.getPath('userData'), 'relanzar.log');
   const q = (x) => String(x).replace(/'/g, "''");
   const ps = [
     "$ErrorActionPreference = 'SilentlyContinue'",

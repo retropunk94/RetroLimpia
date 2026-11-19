@@ -45,7 +45,7 @@ function fmtBytes(b) {
   return (b >= 100 ? b.toFixed(0) : b.toFixed(1)).replace('.', S.settings.idioma === 'en' ? '.' : ',') + ' ' + u[i];
 }
 function globRe(p) { return new RegExp('^' + p.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*').replace(/\?/g, '.') + '$', 'i'); }
-function yearsSince(dateStr) { if (!dateStr) return null; const d = new Date(dateStr); if (isNaN(d)) return null; return (Date.now() - d.getTime()) / (365.25 * 864e5); }
+function yearsSince(dateStr) { if (!dateStr) return null; const d = new Date(dateStr); if (isNaN(d) || d.getFullYear() < 2000) return null; return (Date.now() - d.getTime()) / (365.25 * 864e5); }   // < 2000: fechas de relleno de Windows (1968...)
 function prettyAppx(n) {
   let s = n.includes('.') ? n.split('.').slice(1).join(' ') : n;
   return s.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\s+/g, ' ').trim() || n;

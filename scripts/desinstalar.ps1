@@ -14,6 +14,7 @@ function Test-Gone {
 function Split-Command {
     param([string]$Cmd)
     $Cmd = [Environment]::ExpandEnvironmentVariables($Cmd.Trim())
+    $Cmd = $Cmd -replace '\\"', '"'   # algunos programas guardan \"ruta\" (Far Cry 3): se limpia
     if ($Cmd.StartsWith('"')) {
         $end = $Cmd.IndexOf('"', 1)
         if ($end -gt 1) { return @{ exe = $Cmd.Substring(1, $end - 1); args = $Cmd.Substring($end + 1).Trim() } }
@@ -266,56 +267,65 @@ if ($plat) {
 
 Send-Progress 15 ('Desinstalando ' + $label + ' en silencio...') ('Silently uninstalling ' + $label + '...')
 
+# Cierra restos de un intento anterior (un desinstalador que se quedó esperando)
+function Stop-Desinstaladores {
+    Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match '^(_iu14D2N|unins\d+|Au_|Un_A)$' } |
+        ForEach-Object { try { $_ | Stop-Process -Force -ErrorAction SilentlyContinue } catch {} }
+}
+$keyLeaf = if ($key) { Split-Path $key -Leaf } else { '' }
+$esInno = ($keyLeaf -match '_is1$') -or ($cmd -match 'unins\d+\.exe')
+$guidKey = if ($keyLeaf -match '^\{[0-9A-Fa-f\-]{36}\}$') { $keyLeaf } else { $null }
+
 try {
-    if ($cmd -match 'msiexec' -and $cmd -match '(\{[0-9A-Fa-f\-]{36}\})') {
-        $guid = $Matches[1]
+    # 1) Windows Installer (MSI): el más fiable. También para programas tipo InstallShield cuya ficha es un {GUID}
+    $guid = $null
+    if ($cmd -match 'msiexec' -and $cmd -match '(\{[0-9A-Fa-f\-]{36}\})') { $guid = $Matches[1] }
+    elseif ($guidKey -and -not $esInno) { $guid = $guidKey }
+    if ($guid) {
         Send-Log 'paso' 'Ejecutando su desinstalador (Windows Installer) en silencio' 'Running its uninstaller (Windows Installer) silently' "msiexec.exe /x $guid /qn"
-        $proc = Start-Process -FilePath 'msiexec.exe' -ArgumentList "/x $guid /qn /norestart" -PassThru -WindowStyle Hidden
+        $proc = Start-Process -FilePath "$env:windir\System32\msiexec.exe" -ArgumentList "/x $guid /qn /norestart" -PassThru -WindowStyle Hidden
         $proc.WaitForExit()
         $code = $proc.ExitCode
         if ($code -eq 3010 -or $code -eq 1641) { $result.reinicio = $true }
-        $result.metodo = 'msi'
-        if ($code -in 0, 1605, 1614, 3010, 1641) { $result.ok = $true }
+        if ($code -in 0, 3010, 1641) { $result.ok = $true; $result.metodo = 'msi' }
+        elseif ($code -in 1605, 1614 -and $cmd -match 'msiexec') { $result.ok = $true; $result.metodo = 'msi' }   # ya no estaba
+        else { Send-Log 'info' ('Windows Installer no pudo (código ' + $code + '): pruebo con su desinstalador') ('Windows Installer could not (code ' + $code + ')') }
     }
-    elseif ($quiet) {
-        $c = Split-Command $quiet
-        Send-Log 'paso' 'Ejecutando su desinstalador silencioso oficial' 'Running its official silent uninstaller' ($c.exe + ' ' + $c.args)
-        $proc = Start-Cmd $c.exe $c.args -Hidden
-        Wait-Uninstall $proc $key
-        $result.metodo = 'silencioso-oficial'
-        $result.ok = Test-Gone $key
-    }
-    elseif ($cmd) {
-        $c = Resolve-Uninstaller $cmd
+
+    if (-not $result.ok -and -not ($cmd -match 'msiexec')) {
+        $c = Resolve-Uninstaller $(if ($quiet) { $quiet } else { $cmd })
         if ($c.cambiado) { Send-Log 'info' 'Su desinstalador cambió de sitio (el programa se actualizó): uso el actual' 'Its uninstaller moved (program was updated): using the current one' $c.exe }
+        if (-not $c.existe -and $quiet -and $cmd) { $c = Resolve-Uninstaller $cmd }
         if (-not $c.existe) {
             Send-Log 'aviso' 'Su desinstalador ya no está en el PC' 'Its uninstaller is no longer on this PC' $c.exe
             $loc1 = ([string]$p.carpeta).Trim('"')
             $quedaPrograma = $loc1 -and (Test-Path -LiteralPath $loc1) -and @(Get-ChildItem -LiteralPath $loc1 -Filter *.exe -Recurse -Depth 2 -ErrorAction SilentlyContinue | Select-Object -First 1).Count
             if (-not $quedaPrograma) {
-                # El programa ya no existe: solo quedaba su entrada en la lista. Se limpia como resto (con copia).
                 Send-Log 'ok' 'El programa ya no estaba instalado: solo quedaba su nombre en la lista de Windows. Se limpia como resto.' 'The program was already gone: only its entry remained. Cleaned as leftover.'
                 $result.ok = $true; $result.metodo = 'ya-no-estaba'
             } else {
-                $result.mensaje = 'El desinstalador de este programa ya no está, pero sus archivos sí. Vuelve a instalarlo (para reparar su desinstalador) y desinstálalo después.'
+                $result.puedeForzar = $true
+                $result.mensaje = 'Su desinstalador ya no existe (pasa con copias "repack" o programas borrados a medias), pero sus archivos siguen ahí. Puedes quitarlo a la fuerza: su carpeta y su entrada van a la cuarentena y se pueden restaurar.'
             }
             $cmd = $null   # no tiene sentido abrir un asistente que no existe
-        }
-        $kind = if (-not $c.existe) { 'desconocido' } elseif ($c.silencioso) { 'oficial' } else { Get-InstallerKind $c.exe }
-        $silentArgs = switch ($kind) {
-            'oficial'       { ' ' }
-            'inno'          { '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' }
-            'nsis'          { '/S' }
-            'installshield' { '-s' }
-            default         { $null }
-        }
-        if ($silentArgs) {
-            $args2 = ($c.args + ' ' + $silentArgs.Trim()).Trim()
-            Send-Log 'paso' ('Ejecutando su desinstalador en silencio (tipo ' + $kind + ')') ('Running its uninstaller silently (' + $kind + ')') ($c.exe + ' ' + $args2)
-            $proc = Start-Cmd $c.exe $args2 -Hidden
-            Wait-Uninstall $proc $key
-            $result.metodo = 'silencioso-' + $kind
-            $result.ok = Test-Gone $key
+        } else {
+            $kind = if ($esInno -or [IO.Path]::GetFileName($c.exe) -match '^unins\d+\.exe$') { 'inno' } elseif ($c.silencioso) { 'oficial' } elseif ($quiet) { 'oficial' } else { Get-InstallerKind $c.exe }
+            $args2 = $c.args
+            switch ($kind) {
+                'inno'          { $args2 = (($c.args -replace '(?i)/(VERY)?SILENT|/SUPPRESSMSGBOXES|/NORESTART', '') + ' /VERYSILENT /SUPPRESSMSGBOXES /NORESTART').Trim() }
+                'nsis'          { $args2 = ($c.args + ' /S').Trim() }
+                'installshield' { $args2 = ($c.args + ' -s').Trim() }
+                'oficial'       { }
+                default         { $kind = $null }
+            }
+            if ($kind) {
+                Send-Log 'paso' ('Ejecutando su desinstalador en silencio (tipo ' + $kind + ')') ('Running its uninstaller silently (' + $kind + ')') ($c.exe + ' ' + $args2)
+                # Inno: sin ocultar la ventana. Si el programa hace una pregunta propia, tiene que verse (si no, se queda esperando para siempre)
+                if ($kind -eq 'inno') { $proc = Start-Cmd $c.exe $args2 } else { $proc = Start-Cmd $c.exe $args2 -Hidden }
+                Wait-Uninstall $proc $key 600
+                $result.metodo = 'silencioso-' + $kind
+                $result.ok = Test-Gone $key
+            }
         }
     }
 } catch {
@@ -324,11 +334,12 @@ try {
 
 # Último recurso: el desinstalador normal del programa (una ventana, inevitable)
 if (-not $result.ok -and $cmd -and $p.permitirVentana -ne $false) {
+    Stop-Desinstaladores   # que no choque con un intento silencioso que se quedó colgado
     Send-Progress 50 ('Este programa necesita su propio asistente. Sigue sus pasos en la ventana que se abre.') ('This program needs its own uninstaller. Follow the window that opens.')
-    Send-Log 'aviso' 'No admite modo silencioso: se abre su propio asistente. Sigue sus pasos.' 'No silent mode: its own wizard opens. Follow its steps.' $cmd
+    Send-Log 'aviso' 'No se pudo en silencio: se abre su propio asistente. Sigue sus pasos.' 'Silent mode failed: its own wizard opens. Follow its steps.' $cmd
     try {
         if ($cmd -match 'msiexec' -and $cmd -match '(\{[0-9A-Fa-f\-]{36}\})') {
-            $proc = Start-Process -FilePath 'msiexec.exe' -ArgumentList ('/x ' + $Matches[1]) -PassThru
+            $proc = Start-Process -FilePath "$env:windir\System32\msiexec.exe" -ArgumentList ('/x ' + $Matches[1]) -PassThru
         } else {
             $c = Resolve-Uninstaller $cmd
             $proc = Start-Cmd $c.exe $c.args
@@ -336,6 +347,7 @@ if (-not $result.ok -and $cmd -and $p.permitirVentana -ne $false) {
         Wait-Uninstall $proc $key 1800
         $result.metodo = 'asistente'
         $result.ok = Test-Gone $key
+        if (-not $result.ok -and -not $result.mensaje) { $result.mensaje = 'El asistente del programa se cerró sin desinstalarlo (¿lo cancelaste?). No se tocó nada.' }
     } catch {
         $result.mensaje = Get-MensajeClaro $_.Exception.Message
     }

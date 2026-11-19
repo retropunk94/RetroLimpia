@@ -160,7 +160,7 @@ switch ($p.accion) {
             $null = & $wg upgrade --id $id -e @common 2>&1
             $results.Add(@{ id = $id; ok = ($LASTEXITCODE -eq 0); codigo = $LASTEXITCODE })
         }
-        Write-RLLog ('winget: ' + $ids.Count + ' actualizados')
+        Write-RLLog ('winget: ' + $ids.Count + ' actualizados: ' + (@($results | ForEach-Object { $_.id + '=' + $(if ($_.ok) { 'ok' } else { 'código ' + $_.codigo }) }) -join ', '))
         Send-Progress 100 'Listo' 'Done'
         Send-Result @{ resultados = $results.ToArray() }
     }

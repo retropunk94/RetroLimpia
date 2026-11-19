@@ -137,6 +137,9 @@ function viewAjustes() {
       <div class="setting"><div class="grow"><b>${L('Retro, la mascota', 'Retro, the mascot')}</b><span>${L('El ojo de RetroLimpia que reacciona a lo que pasa y te da consejos. Si te molesta, déjalo quieto o escóndelo.', 'The RetroLimpia eye that reacts to what happens and gives tips. If it bothers you, keep it still or hide it.')}</span></div><select data-setting="mascota"><option value="activa" ${(s.mascota || 'activa') === 'activa' ? 'selected' : ''}>${L('Activa', 'Active')}</option><option value="tranquila" ${s.mascota === 'tranquila' ? 'selected' : ''}>${L('Tranquila (quieta)', 'Calm (still)')}</option><option value="off" ${s.mascota === 'off' ? 'selected' : ''}>${L('Escondida', 'Hidden')}</option></select></div>
       ${sw('modoExperto', L('Modo experto', 'Expert mode'), L('Muestra detalles técnicos y permite quitar elementos marcados en rojo. Solo si sabes lo que haces.', 'Shows technical details and allows removing red items. Only if you know what you are doing.'))}
     </div>
+    <h2>${L('Llevar mi configuración a otro PC', 'Take my settings to another PC')}</h2>
+    <div class="card"><p class="meta" style="margin-top:0">${L('Guarda en un archivo tus ajustes, tus juegos del Modo Juego y lo que apagaste en Privacidad. En el otro PC, instala RetroLimpia y pulsa "Cargar configuración". No guarda nada personal.', 'Save your settings, your Game Mode games and what you turned off in Privacy to a file. On the other PC, install RetroLimpia and press "Load settings". Nothing personal is saved.')}</p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn" data-act="cfgExport" ${S.busy ? 'disabled' : ''}>💾 ${L('Guardar configuración', 'Save settings')}</button><button class="btn" data-act="cfgImport" ${S.busy ? 'disabled' : ''}>📂 ${L('Cargar configuración', 'Load settings')}</button></div></div>
     <h2>${L('Acerca de RetroLimpia', 'About RetroLimpia')}</h2>
     <div class="card"><div class="kv"><span>${L('Versión', 'Version')}</span><span>${esc(S.info.version)}</span><span>${L('Licencia', 'License')}</span><span>MIT (${L('código abierto', 'open source')})</span><span>${L('Privacidad', 'Privacy')}</span><span>${L('Sin telemetría. Solo envía un reporte si tú lo pides, después de ver qué se manda.', 'No telemetry. It only sends a report if you ask, after showing you what is sent.')}</span></div>
       <div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap"><button class="btn" data-act="tour">🧭 ${L('Ver el tour de bienvenida', 'Watch the welcome tour')}</button><button class="btn" data-act="miniTour">✨ ${L('Tour de lo nuevo en la 4.0', '4.0 what is new tour')}</button><button class="btn" data-act="news">📰 ${L('Ver novedades', "What's new")}</button><button class="btn" data-act="trust">${L('¿Por qué Windows o mi antivirus avisan?', 'Why does Windows or my antivirus warn me?')}</button>${S.info.reportes ? `<button class="btn" data-act="reportOpen">🐞 ${L('Reportar un problema', 'Report a problem')}</button>` : ''}${S.info.discord ? `<button class="btn ghost" data-open="${S.info.discord}">💬 ${L('Comunidad en Discord', 'Discord community')}</button>` : ''}
@@ -180,4 +183,24 @@ function loadingView(title, loader, msg) {
 function updateLoadCard() {
   const c = document.getElementById('loadCard');
   if (c) c.outerHTML = loadCardHTML(c.dataset.title);
+}
+
+// ============================================================ Exportar / importar configuración
+async function cfgExport() {
+  let privacidad = [];
+  try { const r = obj(await rl.run('privacidad', { accion: 'listar' })); privacidad = arr(r.ajustes).filter((a) => a.aplicado).map((a) => a.id); } catch { /* sin privacidad: se guarda el resto */ }
+  const r = await rl.configExport({ privacidad });
+  if (r && r.ruta) toast(L('Configuración guardada en: ', 'Settings saved to: ') + r.ruta);
+}
+async function cfgImport() {
+  const r = await rl.configImport();
+  if (!r) return;
+  if (r.error) return toast(r.error, 'err');
+  S.settings = r.ajustes;
+  const priv = arr(r.privacidad).filter((id) => PRIVACIDAD.some((x) => x[0] === id) || ['ver_extensiones', 'explorador_este_equipo'].includes(id));
+  if (priv.length && confirm(L(`La configuración trae ${priv.length} ajuste(s) de privacidad (anuncios y datos apagados). ¿Aplicarlos también en este PC?`, `The settings include ${priv.length} privacy change(s). Apply them on this PC too?`))) {
+    await taskC(L('Aplicando privacidad', 'Applying privacy'), async () => { await rl.run('privacidad', { accion: 'aplicar', ids: priv }); S.privacidad = null; });
+  }
+  aplicarModoLigero(); render();
+  toast(L('Configuración cargada.', 'Settings loaded.') + (r.juegosQuitados > 0 ? L(` ${r.juegosQuitados} juego(s) no están en este PC y no se añadieron.`, ` ${r.juegosQuitados} game(s) are not on this PC and were skipped.`) : ''));
 }

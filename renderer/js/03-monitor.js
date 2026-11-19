@@ -254,8 +254,13 @@ function updBannerHTML() {
 setInterval(() => {
   const up = S.upd || {};
   if (up.estado !== 'lista' || S.updLater || S.updInstalling) return;
-  const modalOpen = !$('#tour').classList.contains('hidden') || !$('#modal').classList.contains('hidden') || !$('#monitor').classList.contains('hidden');
+  // Se pausa solo con cosas en las que estás actuando (tour, desinstalación, ventanas con preguntas).
+  // Las notas de novedades NO la pausan: antes la cuenta atrás se quedaba parada para siempre detrás de ellas.
+  const m = $('#modal'); const soloNovedades = m && m.querySelector('.news-modal');
+  const modalOpen = !$('#tour').classList.contains('hidden') || (!m.classList.contains('hidden') && !soloNovedades) || !$('#monitor').classList.contains('hidden');
+  S.updPausa = !!(S.busy || modalOpen);
   if (S.updHide && !modalOpen && !S.busy) S.updHide = false;   // al terminar la descarga vuelve a mostrarse la ventana
+  if (S.updPausa !== S.updPausaAntes) { S.updPausaAntes = S.updPausa; renderUpdWin(); }
   if (S.busy || modalOpen) { S.updCount = null; return; }
   S.updCount = S.updCount == null ? 15 : S.updCount - 1;
   if (S.updCount <= 0) { S.updInstalling = true; render(); rl.installUpdate(); return; }
@@ -282,6 +287,7 @@ function renderUpdWin() {
   let estado;
   if (fase === 1) estado = L('Descargando en segundo plano', 'Downloading in the background') + ` · ${pct}%`;
   else if (fase === 2 && S.busy) estado = L('Esperando a que termine la tarea actual', 'Waiting for the current task to finish');
+  else if (fase === 2 && S.updPausa) estado = L('En pausa mientras terminas lo que estás haciendo. Luego sigue sola (o pulsa "Actualizar ya").', 'Paused while you finish what you are doing. Then it continues by itself (or press "Update now").');
   else if (fase === 2) estado = L('Se cerrará y volverá a abrir en ' + n + ' s', 'It will close and reopen in ' + n + ' s');
   else estado = L('Instalando… no apagues el PC', 'Installing… do not turn off the PC');
   const barra = fase === 1 ? pct : fase === 2 ? Math.round(((15 - n) / 15) * 100) : 100;

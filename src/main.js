@@ -292,7 +292,7 @@ if (!app.requestSingleInstanceLock()) {
       pm.on('suspend', () => diag('El PC se suspende · en marcha: ' + queHace()));
       pm.on('resume', () => diag('El PC vuelve de la suspensión'));
     } catch {}
-    if (cierreRaro) diag('Al abrir: la vez anterior RetroLimpia se cerró de golpe');
+    diag('Abierto v' + pkg.version + ' (proceso ' + process.pid + (BACKGROUND ? ', en segundo plano' : '') + ')' + (cierreRaro ? ' · la vez anterior se cerró de golpe' : ''));
     const paso = (nombre, fn) => { try { return fn(); } catch (e) { updLog('Arranque, fallo en ' + nombre + ': ' + (e && e.stack || e)); } };
     paso('disco', () => revisarDisco());
     paso('motor', () => engine.init({ ligero: ligeroActivo(), demo: DEMO, scriptsDir: app.isPackaged ? path.join(process.resourcesPath, 'scripts') : path.join(__dirname, '..', 'scripts') }));
@@ -338,7 +338,21 @@ function queHace() {
   if (!enMarcha.size) return 'nada en marcha';
   return [...enMarcha.values()].map((r) => r.script + (r.accion ? '/' + r.accion : '') + ' hace ' + Math.round((Date.now() - r.inicio) / 1000) + ' s' + (r.msg ? ' · "' + r.msg + '"' : '')).join(' | ');
 }
-ipcMain.handle('rl:run', async (e, script, params) => {
+// Lecturas idénticas pedidas a la vez (p. ej. el análisis y la pestaña que se abre) se hacen UNA sola vez y se comparte
+// el resultado: en PCs lentos lanzar dos veces lo mismo duplicaba el trabajo y el tiempo.
+const LECTURAS = { programas: '', hardware: '', reinicios: '', restos: '', drivers: 'revisar', inicio: 'listar', limpieza: 'analizar', actualizaciones: 'buscar', privacidad: 'listar', cuarentena: 'listar', restauracion: 'listar', procesos: 'listar' };
+const enVuelo = new Map();
+ipcMain.handle('rl:run', (e, script, params) => {
+  const accion = params && params.accion ? String(params.accion) : '';
+  const esLectura = Object.prototype.hasOwnProperty.call(LECTURAS, script) && (LECTURAS[script] === accion || (LECTURAS[script] === '' && !accion));
+  if (!esLectura) return ejecutar(e, script, params);
+  const clave = script + '|' + JSON.stringify(params || {});
+  if (enVuelo.has(clave)) return enVuelo.get(clave);
+  const pr = ejecutar(e, script, params).finally(() => enVuelo.delete(clave));
+  enVuelo.set(clave, pr);
+  return pr;
+});
+async function ejecutar(e, script, params) {
   const id = ++nRun;
   const info = { script, accion: params && params.accion ? String(params.accion) : '', inicio: Date.now(), msg: '' };
   enMarcha.set(id, info);
@@ -351,7 +365,7 @@ ipcMain.handle('rl:run', async (e, script, params) => {
     const s = Math.round((Date.now() - info.inicio) / 1000);
     if (s >= 120) diag('Paso lento: ' + script + (info.accion ? '/' + info.accion : '') + ' tardó ' + s + ' s' + (info.msg ? ' · último aviso: "' + info.msg + '"' : ''));
   }
-});
+}
 ipcMain.handle('rl:cancel', () => engine.cancelAll());
 ipcMain.handle('rl:data', (e, name) => loadData(name));
 ipcMain.handle('rl:settings:get', () => loadSettings());
@@ -556,6 +570,8 @@ ipcMain.handle('rl:report:prepare', async () => {
   partes.push('Actualizador: ' + JSON.stringify(updateState));
   const upd = cola(path.join(app.getPath('userData'), 'actualizador.log'), 120);
   if (upd) partes.push('\n===== actualizador.log (últimas líneas) =====\n' + upd);
+  const rl = cola(path.join(app.getPath('userData'), 'relanzar.log'), 30);
+  if (rl) partes.push('\n===== relanzar.log (reapertura tras actualizar) =====\n' + rl);
   const dg = cola(path.join(app.getPath('userData'), 'diagnostico.log'), 40);
   if (dg) partes.push('\n===== diagnostico.log (cuelgues y pasos lentos) =====\n' + dg);
   if (enMarcha.size) partes.push('En marcha ahora: ' + queHace());
@@ -793,10 +809,17 @@ function relaunchHelper(extraWait) {
     "$ok = $false",
     "for ($i = 1; $i -le 5 -and -not $ok; $i++) {",
     "  if (Test-Path -LiteralPath $exe) {",
-    "    try { Start-Process -FilePath $exe -ErrorAction Stop; $ok = $true; L ('RetroLimpia abierto (intento ' + $i + ')') }",
-    "    catch { L ('No se pudo abrir (intento ' + $i + '): ' + $_.Exception.Message) }",
-    "  } else { L 'Todavía no existe el programa, esperando...' }",
-    "  if (-not $ok) { Start-Sleep -Seconds 3 }",
+    "    try {",
+    "      $p = Start-Process -FilePath $exe -PassThru -ErrorAction Stop; L ('RetroLimpia abierto (intento ' + $i + ', proceso ' + $p.Id + ')')",
+    // Se vigila 40 s: si algo lo cierra nada más abrir (antivirus, otro programa...), se apunta y se vuelve a abrir
+    "      if ($p.WaitForExit(40000)) {",
+    "        L ('Se cerró a los pocos segundos (código ' + $p.ExitCode + ')')",
+    "        if ($p.ExitCode -eq 0) { L 'Se cerró con normalidad (lo cerró la persona): no se reabre'; $ok = $true }",
+    "        elseif (Get-Process | Where-Object { $_.Path -eq $exe }) { L 'Pero ya hay otro RetroLimpia abierto: todo bien'; $ok = $true }",
+    "        else { Start-Sleep -Seconds 3 }",
+    "      } else { L 'Sigue abierto tras 40 s: todo bien'; $ok = $true }",
+    "    } catch { L ('No se pudo abrir (intento ' + $i + '): ' + $_.Exception.Message); Start-Sleep -Seconds 3 }",
+    "  } else { L 'Todavía no existe el programa, esperando...'; Start-Sleep -Seconds 3 }",
     "}",
     "schtasks.exe /Delete /F /TN 'RetroLimpia-Reabrir' | Out-Null"
   ].join('\r\n');

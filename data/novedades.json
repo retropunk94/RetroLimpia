@@ -2,6 +2,20 @@
   "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
   "versiones": [
     {
+      "version": "4.0.9",
+      "fecha": "2026-11-21",
+      "es": [
+        "Más seguro al actualizarse: cuando RetroLimpia se reabre después de instalar una versión nueva, ahora comprueba que de verdad se quedó abierto. Si algo lo cierra justo al arrancar, lo vuelve a abrir solo y apunta qué pasó.",
+        "Más ligero en PCs lentos: si dos partes del programa piden el mismo análisis a la vez (por ejemplo, Revisar mi PC y la pestaña que abres), ahora se hace una sola vez y se comparte el resultado.",
+        "Los reportes incluyen más información útil (cada vez que se abre el programa y cómo fue la reapertura tras actualizar) para encontrar más rápido la causa de los cierres inesperados."
+      ],
+      "en": [
+        "Safer updates: when RetroLimpia reopens after installing a new version, it now checks that it really stayed open. If something closes it right at startup, it reopens it by itself and notes what happened.",
+        "Lighter on slow PCs: if two parts of the program ask for the same check at the same time (for example, Check my PC and the tab you open), it now runs once and the result is shared.",
+        "Reports include more useful information (each time the program opens and how the reopen after an update went) to find the cause of unexpected closes faster."
+      ]
+    },
+    {
       "version": "4.0.8",
       "fecha": "2026-11-21",
       "es": [

@@ -17,6 +17,14 @@ const SCRIPTS = new Set([
 
 let cfg = { demo: false, scriptsDir: '', ligero: false };
 const running = new Set();
+// Fila: nunca más de 3 análisis de PowerShell a la vez (1 en modo bajos recursos). Lanzarlos todos juntos
+// dejaba el disco al 100 % durante minutos en PCs con disco lento. El Modo Juego no hace fila.
+let activos = 0;
+const fila = [];
+const limite = () => (cfg.ligero ? 1 : 3);
+function siguiente() {
+  while (fila.length && activos < limite()) { const t = fila.shift(); activos++; t.empezar(); }
+}
 
 function init(options) { cfg = { ...cfg, ...options }; }
 
@@ -37,6 +45,18 @@ function errorAntivirus(nombre) {
 function run(script, params = {}, onProgress = () => {}, opts = {}) {
   if (!SCRIPTS.has(script)) return Promise.reject(new Error('Script no permitido: ' + script));
   if (cfg.demo) return demo.run(script, params, onProgress);
+  if (opts.sinCancelar || script === 'modojuego') return lanzar(script, params, onProgress, opts);
+  return new Promise((resolve, reject) => {
+    const t = {
+      empezar: () => lanzar(script, params, onProgress, opts).then(resolve, reject).finally(() => { activos--; siguiente(); }),
+      cancelar: () => reject(new Error('CANCELADO'))
+    };
+    fila.push(t);
+    siguiente();
+  });
+}
+
+function lanzar(script, params, onProgress, opts) {
 
   const file = path.join(cfg.scriptsDir, script + '.ps1');
   for (const n of [script, 'common']) {
@@ -103,6 +123,8 @@ function run(script, params = {}, onProgress = () => {}, opts = {}) {
 // Detiene todo lo que esté en marcha, incluidos los procesos que lanzó cada script.
 function cancelAll() {
   if (cfg.demo) { demo.cancel && demo.cancel(); return true; }
+  // Lo que aún esperaba turno en la fila también se cancela
+  for (const t of fila.splice(0)) { try { t.cancelar(); } catch { /* nada */ } }
   for (const c of running) {
     c.cancelado = true;
     try {

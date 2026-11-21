@@ -110,7 +110,7 @@ function scanPct() {
   return Math.round((done / total) * 100);
 }
 
-// Todos los análisis son de solo lectura, así que corren a la vez (mucho más rápido).
+// Todos los análisis son de solo lectura: se piden a la vez y el motor los reparte (máx. 3 a la vez, 1 en bajos recursos).
 async function scanAll() {
   S.view = 'inicio'; S.fix = null;
   S.scan = { state: 'running', steps: {}, pct: {}, findings: [], score: null };

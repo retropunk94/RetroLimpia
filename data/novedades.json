@@ -2,6 +2,18 @@
   "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
   "versiones": [
     {
+      "version": "4.0.8",
+      "fecha": "2026-11-21",
+      "es": [
+        "Más amable con tu PC: \"Revisar mi PC\" ya no lanza todos los análisis a la vez. Hace como mucho 3 al mismo tiempo (y de uno en uno en el modo bajos recursos), así el disco no se queda al 100 % y los procesos de PowerShell no se amontonan. En PCs con disco lento incluso termina antes.",
+        "Si el disco de Windows es un disco duro mecánico (HDD), RetroLimpia lo detecta y activa solo el modo bajos recursos (puedes cambiarlo en Ajustes)."
+      ],
+      "en": [
+        "Gentler on your PC: \"Check my PC\" no longer launches every check at once. It runs at most 3 at a time (one by one in low-resource mode), so the disk does not get stuck at 100% and PowerShell processes don't pile up. On PCs with a slow disk it even finishes sooner.",
+        "If your Windows drive is a mechanical hard drive (HDD), RetroLimpia detects it and turns on low-resource mode automatically (you can change it in Settings)."
+      ]
+    },
+    {
       "version": "4.0.7",
       "fecha": "2026-11-20",
       "es": [

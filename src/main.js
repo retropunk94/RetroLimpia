@@ -65,7 +65,26 @@ function dataDir() {
 }
 // Equipo con pocos recursos: 4 GB de RAM o menos, o 2 núcleos o menos
 const EQUIPO_LIMITADO = os.totalmem() <= 4.5 * 1024 ** 3 || (os.cpus() || []).length <= 2;
-function ligeroActivo(s) { s = s || loadSettings(); return s.modoLigero === 'on' || (s.modoLigero !== 'off' && EQUIPO_LIMITADO); }
+// Disco de Windows mecánico (HDD): también cuenta como equipo con pocos recursos (se averigua una vez y se guarda)
+let discoLento = false;
+const equipoLimitado = () => EQUIPO_LIMITADO || discoLento;
+function ligeroActivo(s) { s = s || loadSettings(); return s.modoLigero === 'on' || (s.modoLigero !== 'off' && equipoLimitado()); }
+function revisarDisco() {
+  if (DEMO || process.platform !== 'win32') return;
+  const s = loadSettings();
+  if (s.discoTipo) { discoLento = s.discoTipo === 'HDD'; return; }
+  // Una sola vez, un rato después de abrir, para no sumar trabajo al arranque
+  setTimeout(() => {
+    const cmd = "$n=(Get-Partition -DriveLetter $env:SystemDrive.Substring(0,1) -ErrorAction Stop).DiskNumber; $d=Get-PhysicalDisk -ErrorAction Stop | Where-Object { $_.DeviceId -eq [string]$n } | Select-Object -First 1; if ($d) { [string]$d.MediaType } else { 'Unspecified' }";
+    execFile('powershell.exe', ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', cmd], { windowsHide: true, timeout: 30000 }, (err, out) => {
+      const tipo = err ? '' : String(out || '').trim();
+      if (!/^(HDD|SSD|SCM|Unspecified)$/.test(tipo)) return;   // si falla, se vuelve a intentar en el próximo arranque
+      saveSettings({ ...loadSettings(), discoTipo: tipo });
+      discoLento = tipo === 'HDD';
+      if (discoLento) { diag('Disco de Windows mecánico (HDD): se usa el modo bajos recursos en automático'); engine.init({ ligero: ligeroActivo() }); }
+    });
+  }, 45000);
+}
 function loadData(name) {
   const safe = path.basename(name).replace(/[^a-z0-9_-]/gi, '');
   return JSON.parse(fs.readFileSync(path.join(dataDir(), safe + '.json'), 'utf8'));
@@ -275,6 +294,7 @@ if (!app.requestSingleInstanceLock()) {
     } catch {}
     if (cierreRaro) diag('Al abrir: la vez anterior RetroLimpia se cerró de golpe');
     const paso = (nombre, fn) => { try { return fn(); } catch (e) { updLog('Arranque, fallo en ' + nombre + ': ' + (e && e.stack || e)); } };
+    paso('disco', () => revisarDisco());
     paso('motor', () => engine.init({ ligero: ligeroActivo(), demo: DEMO, scriptsDir: app.isPackaged ? path.join(process.resourcesPath, 'scripts') : path.join(__dirname, '..', 'scripts') }));
     // OJO: el instalador quita la sección "build" de package.json, así que el id va escrito aquí
     paso('appId', () => { if (process.platform === 'win32') app.setAppUserModelId('com.retropunk94.retrolimpia'); });
@@ -349,7 +369,8 @@ ipcMain.handle('rl:info', async () => ({
   reportes: !!pkg.retrolimpia.reportes,
   cierreRaro: cierreRaro,
   juegoActivo: !DEMO && fs.existsSync(path.join(process.env.ProgramData || 'C:\\ProgramData', 'RetroLimpia', 'modojuego-estado.json')),
-  equipoLimitado: EQUIPO_LIMITADO,
+  equipoLimitado: equipoLimitado(),
+  discoLento,
   demo: DEMO,
   plataforma: process.platform,
   esAdmin: DEMO ? true : await engine.isAdmin(),

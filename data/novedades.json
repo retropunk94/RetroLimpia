@@ -2,6 +2,28 @@
   "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
   "versiones": [
     {
+      "version": "4.0.7",
+      "fecha": "2026-11-20",
+      "es": [
+        "Nuevo botón \"Intentar arreglar\" para los dispositivos que no funcionan (por ejemplo, el Código 10 de un mando o adaptador de Xbox). RetroLimpia lo apaga y lo enciende, reinstala su driver si es un aparato externo y vuelve a detectar el hardware, siempre con un punto de restauración antes. También entra en \"Arreglar todo\" de Revisar mi PC. Las piezas delicadas (disco, procesador, placa, gráfica, red) nunca se reinstalan solas.",
+        "Drivers antiguos: si Windows Update trae uno más nuevo para ese aparato, lo actualizas desde la misma fila. Si no, el botón \"Buscar uno nuevo\" te lleva a buscar el oficial de la marca.",
+        "El botón Cancelar ahora responde al momento, aunque un instalador grande (como Visual Studio) siga trabajando.",
+        "Más rápido: cuando un paso termina, RetroLimpia sigue enseguida en vez de quedarse esperando minutos a que algunos instaladores suelten el control.",
+        "\"Actualizar todo\" va programa por programa: ves cuál se está actualizando y cuántos faltan, y puedes cancelar entre uno y otro.",
+        "Más avisos claros al actualizar programas (\"está abierto, ciérralo\", \"hay que reinstalarlo desde su web\"…). Y programas como .NET ya no se marcan por error como \"se actualizan solos\".",
+        "Si RetroLimpia se cierra de golpe (por ejemplo al cerrar la tapa del portátil), ahora apunta qué pasó para que el próximo reporte nos diga la causa exacta."
+      ],
+      "en": [
+        "New \"Try to fix\" button for devices that are not working (for example Code 10 on an Xbox controller or adapter). RetroLimpia turns it off and on, reinstalls its driver if it is an external device and rescans the hardware, always with a restore point first. It is also part of \"Fix all\" in Check my PC. Delicate parts (disk, CPU, motherboard, graphics, network) are never reinstalled automatically.",
+        "Old drivers: if Windows Update has a newer one for that device, update it right from the same row. If not, \"Find a newer one\" helps you look for the official one from the brand.",
+        "The Cancel button now responds immediately, even if a big installer (like Visual Studio) keeps working.",
+        "Faster: when a step finishes, RetroLimpia moves on right away instead of waiting minutes for some installers to let go.",
+        "\"Update all\" goes program by program: you see which one is updating and how many are left, and you can cancel between them.",
+        "Clearer messages when updating programs (\"it is open, close it\", \"reinstall it from its website\"…). And programs like .NET are no longer wrongly marked as \"self-updating\".",
+        "If RetroLimpia closes suddenly (for example when closing the laptop lid), it now notes what happened so the next report tells us the exact cause."
+      ]
+    },
+    {
       "version": "4.0.6",
       "fecha": "2026-11-19",
       "es": [

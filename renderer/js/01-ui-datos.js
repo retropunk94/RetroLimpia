@@ -148,27 +148,44 @@ function driverQueEs(u) {
 function wingetMotivo(code) {
   const c = (Number(code) >>> 0).toString(16).toUpperCase();
   const M = {
-    '8A15002B': ['Se actualiza solo desde su propio programa: no hace falta hacer nada.', 'It updates itself from its own app: nothing to do.'],
+    '8A15002B': ['Windows dice que esta versión nueva no se puede aplicar a la que tienes instalada (pasa con programas que se actualizan solos o que tienen varias versiones). No hace falta hacer nada.', 'Windows says this new version cannot be applied to the one you have (common with self-updating apps or apps with several versions installed). Nothing to do.'],
     '8A150006': ['Su instalador falló. Suele pasar si el programa está abierto: ciérralo y vuelve a intentar.', 'Its installer failed. Usually because the program is open: close it and try again.'],
     '8A150101': ['Está abierto. Ciérralo y vuelve a intentar.', 'It is open. Close it and try again.'],
     '8A150102': ['Hay otra instalación en marcha. Espera a que termine y vuelve a intentar.', 'Another installation is running. Wait for it and try again.'],
     '8A150109': ['Se terminará de actualizar al reiniciar el PC.', 'It will finish updating after restarting the PC.'],
     '8A15010A': ['Pide reiniciar el PC antes de actualizarse.', 'It needs a PC restart before updating.'],
-    '8A15010C': ['Se canceló la instalación.', 'The installation was cancelled.']
+    '8A15010C': ['Se canceló la instalación.', 'The installation was cancelled.'],
+    '8A150103': ['Un archivo del programa está en uso. Ciérralo y vuelve a intentar.', 'A program file is in use. Close it and try again.'],
+    '8A150104': ['Le falta otro programa que necesita para instalarse.', 'It is missing another program it needs.'],
+    '8A150105': ['No hay espacio suficiente en el disco.', 'Not enough disk space.'],
+    '8A150106': ['No hay memoria suficiente. Cierra programas y vuelve a intentar.', 'Not enough memory. Close programs and try again.'],
+    '8A150107': ['No hay conexión a internet.', 'No internet connection.'],
+    '8A15010B': ['El instalador está reiniciando el PC.', 'The installer is restarting the PC.'],
+    '8A15010D': ['Ya estaba instalado.', 'It was already installed.'],
+    '8A15010E': ['Ya tienes una versión más nueva.', 'You already have a newer version.'],
+    '8A15010F': ['Una política de Windows o de tu empresa bloquea esta instalación.', 'A Windows or company policy blocks this installation.'],
+    '8A150110': ['Falló al instalar algo que necesita.', 'Failed to install something it needs.'],
+    '8A150111': ['El programa está abierto. Ciérralo y vuelve a intentar.', 'The program is open. Close it and try again.'],
+    '8A150113': ['Esta versión nueva no es compatible con tu Windows.', 'This new version is not compatible with your Windows.'],
+    '8A150114': ['Este programa no se puede actualizar encima: hay que desinstalarlo e instalar la versión nueva desde su web.', 'This program cannot be updated in place: uninstall it and install the new version from its website.']
   };
   return M[c] ? L(...M[c]) : L('El instalador devolvió el código ', 'The installer returned code ') + '0x' + c;
 }
 // Apunta cada resultado de winget: recuerda lo que se actualiza solo y devuelve el motivo si falló
 async function wingetResultados(resultados) {
-  const solos = { ...(S.settings.wgSolos || {}) }, okv = { ...(S.settings.wgOk || {}) };
+  const solos = { ...(S.settings.wgSolos || {}) }, okv = { ...(S.settings.wgOk || {}) }, noAplica = { ...(S.settings.wgNoAplica || {}) };
   const fallos = [];
   for (const x of arr(resultados)) {
     const app = (S.updates && [...S.updates.apps, ...(S.updates.solos || [])].find((a) => a.id === x.id)) || { nombre: x.id, nueva: '' };
     if (x.ok) { if (app.nueva) okv[x.id] = app.nueva; continue; }
-    if (((Number(x.codigo) >>> 0) === 0x8A15002B)) solos[x.id] = app.nombre || x.id;
-    fallos.push({ id: x.id, nombre: app.nombre || x.id, motivo: wingetMotivo(x.codigo), solo: !!solos[x.id] });
+    // "No aplica" una vez puede ser casualidad (p. ej. .NET); si se repite con la misma versión, ya no se ofrece más
+    if (((Number(x.codigo) >>> 0) === 0x8A15002B)) {
+      if (app.nueva && noAplica[x.id] === app.nueva) solos[x.id] = app.nombre || x.id;
+      else noAplica[x.id] = app.nueva || '?';
+    }
+    fallos.push({ id: x.id, nombre: app.nombre || x.id, motivo: wingetMotivo(x.codigo), solo: !!solos[x.id], info: (Number(x.codigo) >>> 0) === 0x8A15002B });
   }
-  S.settings = await rl.setSettings({ wgSolos: solos, wgOk: okv });
+  S.settings = await rl.setSettings({ wgSolos: solos, wgOk: okv, wgNoAplica: noAplica });
   if (S.updates) {
     const quitar = (a) => solos[a.id];
     S.updates.solos = [...(S.updates.solos || []), ...S.updates.apps.filter(quitar)];
@@ -180,7 +197,7 @@ function wingetAvisar(fallos) {
   const reales = fallos.filter((f) => !f.solo);
   const solos = fallos.filter((f) => f.solo);
   if (solos.length) toast(L('Se actualizan solos (ya no te los mostraré): ', 'They update themselves (won\'t show them again): ') + solos.map((f) => f.nombre).join(', '));
-  for (const f of reales) toast(f.nombre + ': ' + f.motivo, 'err');
+  for (const f of reales) toast(f.nombre + ': ' + f.motivo, f.info ? undefined : 'err');
 }
 async function loadJunk() {
   const r = obj(await rl.run('limpieza', { accion: 'analizar' }));
@@ -206,4 +223,17 @@ async function restorePoint(motivo) {
   const r = await rl.run('restauracion', { accion: 'crear', motivo });
   if (!r.ok) toast(L('No se pudo crear el punto de restauración (puede que esté desactivado en Windows). Seguimos: todo va a la cuarentena igualmente.', 'Could not create a restore point (it may be disabled). Continuing: everything still goes to quarantine.'), 'err');
   return true;
+}
+
+// Intenta arreglar un dispositivo con error (apagar/encender, reinstalar driver, volver a detectar). Devuelve un texto claro.
+async function arreglarDispositivo(id) {
+  const p = (S.drivers?.problemas || []).find((x) => x.id === id) || { dispositivo: id };
+  if (S.busy) { S.busy.msg = p.dispositivo; render(); }
+  const r = obj(await rl.run('drivers', { accion: 'reparar', id }));
+  const nombre = r.nombre || p.dispositivo;
+  if (r.ok) return { ok: true, texto: '✅ ' + nombre + ': ' + L('ya funciona.', 'works now.') };
+  if (r.mensaje) return { ok: false, texto: nombre + ': ' + r.mensaje };
+  if (r.despues === 14 || r.antes === 14) return { ok: false, texto: nombre + ': ' + L('reinicia el PC para terminar de arreglarlo.', 'restart the PC to finish fixing it.') };
+  if (r.critico) return { ok: false, texto: nombre + ': ' + L('por seguridad, este tipo de pieza no se reinstala sola. Instala su driver desde Windows Update (abajo) o desde la web de la marca.', 'for safety, this kind of part is not reinstalled automatically. Install its driver from Windows Update (below) or the brand website.') };
+  return { ok: false, texto: nombre + ': ' + L('no se arregló solo. Reinicia el PC; si sigue, desconéctalo y vuelve a conectarlo o instala su driver desde la web de la marca.', 'it did not fix itself. Restart the PC; if it persists, unplug and replug it or install its driver from the brand website.') };
 }

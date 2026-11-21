@@ -72,7 +72,7 @@ const drivers = {
     { dispositivo: 'AMD GPIO Controller', clase: 'SYSTEM', fabricante: 'Advanced Micro Devices, Inc', proveedor: 'AMD', version: '2.2.0.130', fecha: '2023-03-02', inf: 'oem3.inf', firmado: true, generico: false, importante: true },
     { dispositivo: 'Controladora de almacenamiento NVM Express', clase: 'SCSIADAPTER', fabricante: 'Microsoft', proveedor: 'Microsoft', version: '10.0.26100.1', fecha: '2006-06-21', inf: 'stornvme.inf', firmado: true, generico: true, importante: true }
   ],
-  problemas: [{ dispositivo: 'Dispositivo desconocido', codigo: 28, clase: '', id: 'ACPI\\VEN_XXXX' }],
+  problemas: [{ dispositivo: 'Dispositivo desconocido', codigo: 28, clase: '', id: 'ACPI\\VEN_XXXX' }, { dispositivo: 'Xbox Wireless Adapter for Windows', codigo: 10, clase: 'XnaComposite', id: 'USB\\VID_045E&PID_02FE\\1' }],
   respaldos: []
 };
 
@@ -113,6 +113,7 @@ async function run(script, p, onProgress) {
     case 'programas': await steps(onProgress, ['Buscando programas instalados...', 'Revisando apps de Microsoft Store...'], 900); return { programas, apps };
     case 'hardware': await steps(onProgress, ['Leyendo el procesador...', 'Leyendo la tarjeta gráfica...', 'Revisando discos...'], 1000); return hardware;
     case 'drivers':
+      if (p.accion === 'reparar') { await steps(onProgress, ['Apagando y encendiendo...', 'Reinstalando el driver...'], 1200); drivers.problemas = drivers.problemas.filter((x) => x.id !== p.id); return { ok: true, antes: 28, despues: 0, pasos: ['reiniciar', 'reinstalar'], nombre: 'Dispositivo desconocido', clase: '' }; }
       if (p.accion === 'respaldar') { await steps(onProgress, ['Haciendo copia de tus drivers...'], 1500); return { ok: true, carpeta: 'C:\\ProgramData\\RetroLimpia\\RespaldoDrivers\\2026-11-16_2130', tamano: 1.2 * GB }; }
       await steps(onProgress, ['Leyendo drivers...', 'Buscando dispositivos con problemas...'], 900); return drivers;
     case 'actualizaciones':

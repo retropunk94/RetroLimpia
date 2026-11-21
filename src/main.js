@@ -9,6 +9,9 @@ const fs = require('fs');
 const os = require('os');
 const engine = require('./engine');
 const pkg = require('../package.json');
+// Errores no previstos del proceso principal: se apuntan (diagnostico.log) en vez de perderse
+process.on('uncaughtException', (e) => { try { diag('Error no previsto: ' + String(e && e.stack || e).slice(0, 400)); } catch {} });
+process.on('unhandledRejection', (e) => { try { diag('Promesa sin control: ' + String(e && e.stack || e).slice(0, 300)); } catch {} });
 
 const DEMO = process.argv.includes('--demo') || process.platform !== 'win32';
 const BACKGROUND = process.argv.includes('--background');   // arrancado con Windows: sin ventana
@@ -43,7 +46,7 @@ const defaultSettings = {
   mascota: 'activa',       // activa | tranquila | off
   mascotaPresentada: false,
   misJuegos: [], juegoAuto: false, juegoIntensidad: 'equilibrado', juegoCerrar: [], juegoReabrir: true, juegoPartidas: 0, formateoPasos: {},
-  wgSolos: {}, wgOk: {}   // programas que se actualizan solos (winget no puede) · última versión que winget dijo instalar
+  wgSolos: {}, wgOk: {}, wgNoAplica: {}   // programas que se actualizan solos (winget no puede) · última versión que winget dijo instalar
 };
 function loadSettings() {
   try { return { ...defaultSettings, ...JSON.parse(fs.readFileSync(settingsFile(), 'utf8')) }; }
@@ -118,7 +121,7 @@ function createWindow() {
   if (!global.__rlPantalla) { global.__rlPantalla = true; screen.on('display-removed', () => { try { if (win && !win.isDestroyed()) win.center(); } catch {} }); }
   // Red de seguridad: si Windows no avisa de que la ventana está lista, se muestra igual
   setTimeout(() => { if (win && !win.isDestroyed() && !win.isVisible() && !BACKGROUND_HIDDEN()) win.show(); }, 3000);
-  win.webContents.on('render-process-gone', () => { if (win && !win.isDestroyed()) win.reload(); });
+  win.webContents.on('render-process-gone', (e, d) => { diag('La ventana se cayó (' + (d && d.reason) + ', código ' + (d && d.exitCode) + ') y se recarga · en marcha: ' + queHace()); if (win && !win.isDestroyed()) win.reload(); });
   // Ningún enlace abre ventanas nuevas dentro de la app
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\//i.test(url)) shell.openExternal(url);
@@ -263,7 +266,14 @@ if (!app.requestSingleInstanceLock()) {
       fs.writeFileSync(sesionFlag(), String(Date.now()));
     } catch {}
     // Al apagar o reiniciar Windows se quita la marca: no cuenta como cierre inesperado
-    try { require('electron').powerMonitor.on('shutdown', () => { try { fs.unlinkSync(sesionFlag()); } catch {} }); } catch {}
+    try { require('electron').powerMonitor.on('shutdown', () => { diag('Windows se apaga o reinicia'); try { fs.unlinkSync(sesionFlag()); } catch {} }); } catch {}
+    // Diagnóstico de cierres: suspensión (tapa del portátil), procesos internos caídos y errores no previstos
+    try {
+      const pm = require('electron').powerMonitor;
+      pm.on('suspend', () => diag('El PC se suspende · en marcha: ' + queHace()));
+      pm.on('resume', () => diag('El PC vuelve de la suspensión'));
+    } catch {}
+    if (cierreRaro) diag('Al abrir: la vez anterior RetroLimpia se cerró de golpe');
     const paso = (nombre, fn) => { try { return fn(); } catch (e) { updLog('Arranque, fallo en ' + nombre + ': ' + (e && e.stack || e)); } };
     paso('motor', () => engine.init({ ligero: ligeroActivo(), demo: DEMO, scriptsDir: app.isPackaged ? path.join(process.resourcesPath, 'scripts') : path.join(__dirname, '..', 'scripts') }));
     // OJO: el instalador quita la sección "build" de package.json, así que el id va escrito aquí
@@ -280,7 +290,8 @@ if (!app.requestSingleInstanceLock()) {
     // Mantenimiento silencioso: vacía la cuarentena vieja al arrancar
     paso('cuarentena', () => engine.run('cuarentena', { accion: 'purgar', dias: s.diasCuarentena }).catch(() => {}));
   }).catch((e) => { updLog('Arranque: ' + (e && e.stack || e)); try { if (!win) createWindow(); } catch {} });
-  app.on('before-quit', () => { quitting = true; try { fs.unlinkSync(sesionFlag()); } catch {} });
+  app.on('before-quit', () => { quitting = true; diag('RetroLimpia se cierra con normalidad'); try { fs.unlinkSync(sesionFlag()); } catch {} });
+  app.on('child-process-gone', (e, d) => { if (d && d.reason !== 'clean-exit') diag('Proceso interno caído: ' + d.type + ' (' + d.reason + ', código ' + d.exitCode + ')'); });
   app.on('window-all-closed', () => { if (!tray) app.quit(); });
 }
 
@@ -424,6 +435,7 @@ function instaladorSeguro(origen, huella) {
 let descargaOficial = null;   // { archivo, huella } que deja electron-updater
 
 function doInstall() {
+  diag('Se cierra para instalar la actualización');
   try { fs.unlinkSync(sesionFlag()); } catch {}
   // Plan B: instalador descargado por nosotros
   // Plan B (descargado por nosotros) u oficial (electron-updater): los dos se instalan desde una copia comprobada

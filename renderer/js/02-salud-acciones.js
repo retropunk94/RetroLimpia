@@ -39,7 +39,7 @@ function buildFindings() {
   for (const a of hardwareAdvice(S.hardware)) add({ id: 'hw' + f.length, nivel: a.nivel, titulo: a.t, detalle: '', accion: null, ir: 'hardware' });
   // Drivers con problemas
   const prob = (S.drivers?.problemas || []).filter((p) => p.codigo !== 45);
-  if (prob.length) add({ id: 'pnp', nivel: 'importante', titulo: L(`${prob.length} dispositivo(s) no funcionan bien`, `${prob.length} device(s) are not working properly`), detalle: prob.map((p) => p.dispositivo).join(', '), accion: null, ir: 'drivers' });
+  if (prob.length) add({ id: 'pnp', nivel: 'importante', titulo: L(`${prob.length} dispositivo(s) no funcionan bien`, `${prob.length} device(s) are not working properly`), detalle: prob.map((p) => p.dispositivo).join(', ') + ' · ' + L('Se intentará arreglarlos (apagar y encender, reinstalar su driver).', 'Will try to fix them (turn off and on, reinstall their driver).'), accion: 'pnp', ir: 'drivers' });
   // Actualizaciones
   const wu = S.updates?.windows || [];
   const wuImp = wu.filter((u) => !u.opcional && !u.grande);

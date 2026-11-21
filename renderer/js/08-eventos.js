@@ -17,7 +17,7 @@ function render() {
 }
 
 document.addEventListener('click', async (e) => {
-  const t = e.target.closest('[data-reveal],[data-copy],[data-monview],[data-psort],[data-pask],[data-pkill],[data-updall],[data-retry],[data-nav],[data-act],[data-win],[data-open],[data-filter],[data-folder],[data-restore],[data-wu],[data-wg],[data-juego-quitar],[data-form-ir]');
+  const t = e.target.closest('[data-reveal],[data-copy],[data-monview],[data-psort],[data-pask],[data-pkill],[data-updall],[data-retry],[data-nav],[data-act],[data-win],[data-open],[data-filter],[data-folder],[data-restore],[data-wu],[data-wg],[data-pnpfix],[data-juego-quitar],[data-form-ir]');
   if (!t) return;
   if (t.dataset.formIr) { const paso = { drivers: 'drivers', actualizaciones: 'windows', programas: 'bloatware' }[t.dataset.formIr]; formMarcar(paso); S.view = t.dataset.formIr; if (S.view === 'programas') S.progFilter = 'verde'; render(); $('#main').scrollTop = 0; return; }
   if (t.dataset.juegoQuitar !== undefined) { const l = arr(S.settings.misJuegos).filter((_, i) => i !== Number(t.dataset.juegoQuitar)); S.settings = await rl.setSettings({ misJuegos: l, ...(l.length ? {} : { juegoAuto: false }) }); return render(); }
@@ -49,6 +49,15 @@ document.addEventListener('click', async (e) => {
       refreshAfter('programas', 'inicio', 'limpieza');
     });
   }
+  if (t.dataset.pnpfix) {
+    const id = t.dataset.pnpfix;
+    return taskC(L('Arreglando dispositivo', 'Fixing device'), async () => {
+      await restorePoint(L('Antes de arreglar un dispositivo', 'Before fixing a device'));
+      const r = await arreglarDispositivo(id);
+      toast(r.texto, r.ok ? 'ok' : 'err');
+      refreshAfter('drivers', 'hardware');
+    });
+  }
   if (t.dataset.wu) {
     return taskC(L('Instalando actualización', 'Installing update'), async () => {
       await restorePoint(L('Antes de actualizar', 'Before updating'));
@@ -75,7 +84,7 @@ document.addEventListener('click', async (e) => {
   switch (t.dataset.act) {
     case 'cancel': return cancelTask();
     case 'wgSolosReset':
-      S.settings = await rl.setSettings({ wgSolos: {}, wgOk: {} });
+      S.settings = await rl.setSettings({ wgSolos: {}, wgOk: {}, wgNoAplica: {} });
       if (S.updates) { S.updates.apps = [...S.updates.apps, ...(S.updates.solos || [])]; S.updates.solos = []; }
       return render();
     case 'procOk': S.settings = await rl.setSettings({ procesosAviso: true }); $('#modal').classList.add('hidden'); return render();
@@ -188,7 +197,17 @@ document.addEventListener('click', async (e) => {
           if (r.reinicio) S.needsReboot = true;
         }
         let fallos = [];
-        if (S.updates.apps.length) { S.busy.label = L('Programas', 'Programs'); const r = await rl.run('actualizaciones', { accion: 'winget', todos: true, omitir: Object.keys(S.settings.wgSolos || {}) }); fallos = await wingetResultados(r.resultados); }
+        // Programa por programa: se ve cuál va, cuántos faltan, y Cancelar para entre uno y otro
+        const apps = [...S.updates.apps];
+        let i = 0;
+        for (const app of apps) {
+          if (S.cancelRequested) break;
+          S.busy.label = L(`Actualizando programas (${++i}/${apps.length})`, `Updating programs (${i}/${apps.length})`);
+          S.busy.msg = app.nombre || app.id; S.busy.pct = Math.round(((i - 1) / apps.length) * 100); render();
+          const r = await rl.run('actualizaciones', { accion: 'winget', ids: [app.id] });
+          fallos.push(...await wingetResultados(r.resultados));
+        }
+        checkCancel();
         if (fallos.some((f) => !f.solo)) wingetAvisar(fallos); else toast(L('Todo actualizado.', 'Everything updated.'));
         await loadUpdates();
         refreshAfter('drivers', 'hardware', 'programas');

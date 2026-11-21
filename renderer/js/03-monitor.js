@@ -210,13 +210,34 @@ async function fixAll() {
             const ok = r.resultados.filter((x) => x.ok).length;
             st.extra = L(`${ok} de ${r.resultados.length} instaladas`, `${ok} of ${r.resultados.length} installed`);
             if (r.reinicio) S.needsReboot = true;
+          } else if (st.id === 'pnp') {
+            const lista = (S.drivers?.problemas || []).filter((p) => p.codigo !== 45);
+            let bien = 0; const notas = [];
+            for (const p of lista) {
+              if (S.cancelRequested) break;
+              const r = await arreglarDispositivo(p.id);
+              if (r.ok) bien++; else notas.push(r.texto);
+            }
+            checkCancel();
+            st.extra = L(`${bien} de ${lista.length} arreglados`, `${bien} of ${lista.length} fixed`) + (notas.length ? ' · ' + notas.join(' · ') : '');
           } else if (st.id === 'apps') {
-            const r = await rl.run('actualizaciones', { accion: 'winget', todos: true, omitir: Object.keys(S.settings.wgSolos || {}) });
-            const fallos = (await wingetResultados(r.resultados)).filter((f) => !f.solo);
-            st.extra = L(`${arr(r.resultados).filter((x) => x.ok).length} actualizados`, `${arr(r.resultados).filter((x) => x.ok).length} updated`) + (fallos.length ? ' · ' + fallos.map((f) => f.nombre + ': ' + f.motivo).join(' · ') : '');
+            const apps = S.updates ? [...S.updates.apps] : [];
+            let hechos = 0, k = 0; const fallos = [];
+            for (const app of apps) {
+              if (S.cancelRequested) break;
+              S.busy.msg = st.titulo + ' · ' + (app.nombre || app.id) + ` (${++k}/${apps.length})`; render();
+              const r = await rl.run('actualizaciones', { accion: 'winget', ids: [app.id] });
+              hechos += arr(r.resultados).filter((x) => x.ok).length;
+              fallos.push(...(await wingetResultados(r.resultados)).filter((f) => !f.solo));
+            }
+            checkCancel();
+            st.extra = L(`${hechos} actualizados`, `${hechos} updated`) + (fallos.length ? ' · ' + fallos.map((f) => f.nombre + ': ' + f.motivo).join(' · ') : '');
           }
           st.state = 'ok';
-        } catch (e) { console.error(e); st.state = 'err'; st.extra = String(e.message || e).slice(0, 80); }
+        } catch (e) {
+          if (isCancel(e)) { st.state = 'cancel'; st.extra = L('Cancelado', 'Cancelled'); }
+          else { console.error(e); st.state = 'err'; st.extra = String(e.message || e).slice(0, 80); }
+        }
         render();
       }
     } finally { S.settings.puntoRestauracion = saved; }

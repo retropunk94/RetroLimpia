@@ -53,6 +53,11 @@ function run(script, params = {}, onProgress = () => {}, opts = {}) {
     let buffer = '';
     let result = null;
     let errText = '';
+    // Se responde en cuanto el script entrega su resultado (o al cancelar), sin esperar a que se cierre:
+    // algunos instaladores que lanza el script heredan su salida y la mantienen abierta muchos minutos.
+    let listo = false;
+    const fin = (fn, v) => { if (listo) return; listo = true; fn(v); };
+    child.rechazar = (e) => fin(reject, e);
 
     child.stdout.setEncoding('utf8');
     child.stdout.on('data', (chunk) => {
@@ -67,22 +72,30 @@ function run(script, params = {}, onProgress = () => {}, opts = {}) {
           try { onProgress({ log: JSON.parse(line.slice(6)) }); } catch { /* línea incompleta */ }
         } else if (line.startsWith('@@RESULT ')) {
           try { result = JSON.parse(line.slice(9)); } catch (e) { errText += 'Respuesta ilegible del motor. '; }
+          if (result && !child.cancelado && !child.espera) {
+            // Normalmente se cierra al instante. Si algo lanzado por el script sigue enganchado, no esperamos minutos:
+            // margen corto (más largo al desinstalar, para que el desinstalador termine antes de buscar restos).
+            const margen = script === 'desinstalar' ? 45000 : 10000;
+            child.espera = setTimeout(() => { child.terminado = true; running.delete(child); fin(resolve, result); }, margen);
+          }
         }
       }
     });
     child.stderr.setEncoding('utf8');
     child.stderr.on('data', (d) => { errText += d; });
-    child.on('error', (e) => { running.delete(child); reject(e); });
+    child.on('error', (e) => { running.delete(child); fin(reject, e); });
     child.on('close', (code) => {
+      if (child.espera) clearTimeout(child.espera);
       running.delete(child);
+      if (listo) return;
       if (buffer.startsWith('@@RESULT ')) { try { result = JSON.parse(buffer.slice(9)); } catch { /* nada */ } }
-      if (child.cancelado) return reject(new Error('CANCELADO'));
+      if (child.cancelado) return fin(reject, new Error('CANCELADO'));
       if (!result && /-File|no existe|does not exist|CommandNotFound/i.test(errText)) {
         const falta = faltantes()[0];
-        if (falta) return reject(errorAntivirus(falta));
+        if (falta) return fin(reject, errorAntivirus(falta));
       }
-      if (result) resolve(result);
-      else reject(new Error(`El motor terminó sin respuesta (código ${code}). ${errText.slice(0, 600)}`));
+      if (result) fin(resolve, result);
+      else fin(reject, new Error(`El motor terminó sin respuesta (código ${code}). ${errText.slice(0, 600)}`));
     });
   });
 }
@@ -96,6 +109,9 @@ function cancelAll() {
       if (process.platform === 'win32') execFile('taskkill', ['/PID', String(c.pid), '/T', '/F'], { windowsHide: true }, () => {});
       else c.kill();
     } catch { /* ya cerrado */ }
+    // El botón Cancelar responde al momento aunque algún instalador tarde en soltar la salida
+    if (c.espera) clearTimeout(c.espera);
+    try { c.rechazar && c.rechazar(new Error('CANCELADO')); } catch { /* nada */ }
   }
   running.clear();
   return true;

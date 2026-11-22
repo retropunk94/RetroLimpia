@@ -59,6 +59,7 @@ document.addEventListener('click', async (e) => {
     });
   }
   if (t.dataset.wu) {
+    if (!avisoGrafica([t.dataset.wu])) return;
     return taskC(L('Instalando actualización', 'Installing update'), async () => {
       await restorePoint(L('Antes de actualizar', 'Before updating'));
       const r = await rl.run('actualizaciones', { accion: 'instalarWU', ids: [t.dataset.wu] });
@@ -189,6 +190,7 @@ document.addEventListener('click', async (e) => {
         await loadStartup(); toast(L('Listo. El próximo arranque será más rápido.', 'Done. Next startup will be faster.'));
       });
     case 'updateAll':
+      if (!avisoGrafica()) return;
       return taskC(L('Actualizando todo', 'Updating everything'), async () => {
         await restorePoint(L('Antes de actualizar todo', 'Before updating everything'));
         if (S.updates.windows.some((u) => !u.grande)) {

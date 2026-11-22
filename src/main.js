@@ -277,11 +277,15 @@ if (!app.requestSingleInstanceLock()) {
     // (Antes, un fallo aquí dejaba el programa abierto pero sin ventana y sin actualizarse.)
     // Marca de sesión: si al arrancar sigue ahí, la vez anterior se cerró de golpe (fallo)
     // Si el PC se reinició o apagó después de abrir RetroLimpia, no fue un cierre inesperado del programa
+    // Tampoco cuenta el cierre para instalar una actualización (lo marca doInstall con "actualizando").
     try {
-      if (fs.existsSync(sesionFlag())) {
+      let tras = false;
+      try { tras = Date.now() - fs.statSync(marcaActualizando()).mtimeMs < 15 * 60 * 1000; fs.unlinkSync(marcaActualizando()); } catch { /* no hubo actualización */ }
+      if (!tras && fs.existsSync(sesionFlag())) {
         const marca = fs.statSync(sesionFlag()).mtimeMs, arranquePC = Date.now() - os.uptime() * 1000;
         cierreRaro = arranquePC < marca;   // el PC no se reinició desde entonces: sí fue un cierre del programa
       }
+      if (tras) diag('Reabierto después de actualizar');
       fs.writeFileSync(sesionFlag(), String(Date.now()));
     } catch {}
     // Al apagar o reiniciar Windows se quita la marca: no cuenta como cierre inesperado
@@ -439,6 +443,8 @@ function installWhenIdle() {
   const visible = win && !win.isDestroyed() && win.isVisible();
   if (visible) return;               // con ventana abierta decide la cuenta atrás de la interfaz
   if (rendererBusy) return setTimeout(installWhenIdle, 30 * 1000);
+  // Nunca se actualiza en mitad de una partida: espera a que el Modo Juego termine
+  if (juegoEstado()) return setTimeout(installWhenIdle, 60 * 1000);
   saveSettings({ ...loadSettings(), relanzarEnBandeja: tray ? Date.now() : false });
   doInstall();
 }
@@ -486,6 +492,7 @@ function doInstall() {
   }
   quitting = true; installing = true;
   updLog('Instalando copia comprobada ' + copia);
+  try { fs.writeFileSync(marcaActualizando(), pkg.version); } catch {}
   try {
     relaunchHelper(4);
     // /S = silencioso; --updated = es una actualización (conserva accesos directos y ajustes)
@@ -538,6 +545,7 @@ function initUpdater() {
 // El reporte va a un intermediario (Cloudflare) que lo pasa a un canal privado de Discord.
 let cierreRaro = false;
 function sesionFlag() { return path.join(app.getPath('userData'), 'sesion.abierta'); }
+function marcaActualizando() { return path.join(app.getPath('userData'), 'actualizando'); }
 function anonimizar(txt) {
   let t = String(txt || '');
   const reemplazos = [];

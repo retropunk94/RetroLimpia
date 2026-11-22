@@ -237,3 +237,11 @@ async function arreglarDispositivo(id) {
   if (r.critico) return { ok: false, texto: nombre + ': ' + L('por seguridad, este tipo de pieza no se reinstala sola. Instala su driver desde Windows Update (abajo) o desde la web de la marca.', 'for safety, this kind of part is not reinstalled automatically. Install its driver from Windows Update (below) or the brand website.') };
   return { ok: false, texto: nombre + ': ' + L('no se arregló solo. Reinicia el PC; si sigue, desconéctalo y vuelve a conectarlo o instala su driver desde la web de la marca.', 'it did not fix itself. Restart the PC; if it persists, unplug and replug it or install its driver from the brand website.') };
 }
+
+// Antes de instalar un driver de tarjeta gráfica: la pantalla parpadea y suele pedir reiniciar. Se avisa una vez.
+function avisoGrafica(ids) {
+  const lista = (S.updates?.windows || []).filter((u) => u.tipo === 'driver' && (!ids || ids.includes(u.id)));
+  const grafica = lista.find((u) => /^display$/i.test(u.driver?.clase || '') || /display|graphics|radeon|nvidia|geforce|intel.*(uhd|iris|hd graphics)/i.test(u.titulo));
+  if (!grafica) return true;
+  return confirm(L(`Vas a instalar un driver de la tarjeta gráfica:\n${grafica.titulo}\n\nDurante la instalación la pantalla se pondrá negra o parpadeará unos segundos (es normal) y probablemente te pida reiniciar el PC. Guarda lo que estés haciendo antes de seguir.\n\n¿Continuar?`, `You are about to install a graphics card driver:\n${grafica.titulo}\n\nDuring the install the screen will go black or flicker for a few seconds (this is normal) and it will probably ask you to restart. Save your work before continuing.\n\nContinue?`));
+}

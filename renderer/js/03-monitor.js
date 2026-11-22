@@ -144,6 +144,7 @@ async function updateSelected() {
   const wuIds = [...S.updSel].filter((k) => k.startsWith('wu:')).map((k) => k.slice(3));
   const wgIds = [...S.updSel].filter((k) => k.startsWith('wg:')).map((k) => k.slice(3));
   if (!wuIds.length && !wgIds.length) return;
+  if (wuIds.length && !avisoGrafica(wuIds)) return;
   await taskC(L('Actualizando lo seleccionado', 'Updating selection'), async () => {
     await restorePoint(L('Antes de actualizar', 'Before updating'));
     let ok = 0, bad = [];
@@ -179,6 +180,7 @@ async function updateSelected() {
 async function fixAll() {
   const chosen = S.scan.findings.filter((f) => f.elegido && f.accion);
   if (!chosen.length) { toast(L('No hay nada seleccionado para arreglar.', 'Nothing selected to fix.'), 'err'); return; }
+  if (chosen.some((f) => f.accion === 'wu') && !avisoGrafica()) return;
   S.fix = { steps: chosen.map((f) => ({ id: f.accion, titulo: f.titulo, state: 'wait', extra: '' })), done: false, summary: [] };
   await taskC(L('Arreglando tu PC', 'Fixing your PC'), async () => {
     S.busy.msg = L('Creando punto de restauración...', 'Creating restore point...'); render();
@@ -254,6 +256,8 @@ async function fixAll() {
 }
 
 // ---------- Actualización automática con cuenta atrás ----------
+// Con el Modo Juego activo no se interrumpe la partida: ni ventana ni cuenta atrás hasta que termine.
+const jugando = () => !!((S.juego && S.juego.activo) || (!S.juego && S.info.juegoActivo));
 function updBannerHTML() {
   const up = S.upd || {};
   const v = esc(up.version || '');
@@ -263,6 +267,9 @@ function updBannerHTML() {
     btns = '';
   } else if (S.updLater) {
     body = `<b>${L('RetroLimpia ' + v + ' está lista', 'RetroLimpia ' + v + ' is ready')}</b> · ${L('Se instalará sola cuando cierres el programa.', 'It will install by itself when you close the program.')}`;
+    btns = `<button class="btn small" data-act="installUpdate">${L('Actualizar ahora', 'Update now')}</button>`;
+  } else if (jugando()) {
+    body = `<b>${L('RetroLimpia ' + v + ' está lista', 'RetroLimpia ' + v + ' is ready')}</b> · ${L('Se instalará cuando termines de jugar (Modo Juego activo).', 'It will install when you finish playing (Game Mode is on).')}`;
     btns = `<button class="btn small" data-act="installUpdate">${L('Actualizar ahora', 'Update now')}</button>`;
   } else if (S.busy) {
     body = `<b>${L('RetroLimpia ' + v + ' está lista', 'RetroLimpia ' + v + ' is ready')}</b> · ${L('Se instalará sola en cuanto termine la tarea actual.', 'It will install as soon as the current task finishes.')}`;
@@ -281,10 +288,10 @@ setInterval(() => {
   // Las notas de novedades NO la pausan: antes la cuenta atrás se quedaba parada para siempre detrás de ellas.
   const m = $('#modal'); const soloNovedades = m && m.querySelector('.news-modal');
   const modalOpen = !$('#tour').classList.contains('hidden') || (!m.classList.contains('hidden') && !soloNovedades) || !$('#monitor').classList.contains('hidden');
-  S.updPausa = !!(S.busy || modalOpen);
+  S.updPausa = !!(S.busy || modalOpen || jugando());
   if (S.updHide && !modalOpen && !S.busy) S.updHide = false;   // al terminar la descarga vuelve a mostrarse la ventana
   if (S.updPausa !== S.updPausaAntes) { S.updPausaAntes = S.updPausa; renderUpdWin(); }
-  if (S.busy || modalOpen) { S.updCount = null; return; }
+  if (S.busy || modalOpen || jugando()) { S.updCount = null; return; }
   S.updCount = S.updCount == null ? 15 : S.updCount - 1;
   if (S.updCount <= 0) { S.updInstalling = true; render(); rl.installUpdate(); return; }
   const el = document.getElementById('updBanner');
@@ -296,7 +303,7 @@ setInterval(() => {
 function renderUpdWin() {
   const box = $('#updwin'); if (!box) return;
   const up = S.upd || {};
-  const activo = (up.estado === 'descargando' || up.estado === 'lista') && !S.updHide && !S.updLater;
+  const activo = (up.estado === 'descargando' || up.estado === 'lista') && !S.updHide && !S.updLater && !jugando();
   if (!activo) { box.classList.add('hidden'); box.innerHTML = ''; return; }
   const v = esc(up.version || '');
   const pct = up.estado === 'lista' ? 100 : (up.pct || 0);

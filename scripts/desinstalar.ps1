@@ -361,7 +361,10 @@ if (-not $result.ok -and $cmd -and $p.permitirVentana -ne $false) {
         Wait-Uninstall $proc $key 1800
         $result.metodo = 'asistente'
         $result.ok = Test-Gone $key
-        if (-not $result.ok -and -not $result.mensaje) { $result.mensaje = 'El asistente del programa se cerró sin desinstalarlo (¿lo cancelaste?). No se tocó nada.' }
+        if (-not $result.ok) {
+            if (-not $result.mensaje) { $result.mensaje = 'Su propio desinstalador se cerró sin quitarlo (¿lo cancelaste?). No se tocó nada. Si su desinstalador no funciona, puedes quitarlo a la fuerza: todo va a la cuarentena y se puede restaurar.' }
+            $result.puedeForzar = $true   # p. ej. programas que se protegen para no dejarse quitar (IObit Uninstaller)
+        }
     } catch {
         $result.mensaje = Get-MensajeClaro $_.Exception.Message
     }

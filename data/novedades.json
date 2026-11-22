@@ -2,6 +2,24 @@
   "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
   "versiones": [
     {
+      "version": "4.0.10",
+      "fecha": "2026-11-22",
+      "es": [
+        "RetroLimpia ya no se actualiza mientras juegas: con el Modo Juego activo no aparece la ventana de actualización ni la cuenta atrás. Se instala cuando terminas la partida.",
+        "Las actualizaciones \"de prueba\" de Microsoft (las que dicen \"versión preliminar\" o \"Preview\") ya no entran en \"Actualizar todo\" ni en \"Arreglar todo\": son opcionales y pueden tardar mucho. Además, mientras Windows Update instala, se avisa de que puede tardar y que puedes seguir usando el PC.",
+        "Si el desinstalador de un programa no funciona o se cancela (por ejemplo IObit Uninstaller, que se protege para no dejarse quitar), ahora puedes \"Quitarlo a la fuerza\": todo va a la cuarentena y se puede restaurar.",
+        "Antes de instalar un driver de la tarjeta gráfica, RetroLimpia avisa de que la pantalla parpadeará unos segundos y de que probablemente pida reiniciar.",
+        "Arreglado: después de actualizarse, RetroLimpia decía por error que \"la última vez se cerró de forma inesperada\"."
+      ],
+      "en": [
+        "RetroLimpia no longer updates while you play: with Game Mode on, the update window and countdown don't appear. It installs when your session ends.",
+        "Microsoft \"preview\" updates are no longer included in \"Update all\" or \"Fix all\": they are optional and can take a long time. Also, while Windows Update installs, a note says it can take a while and you can keep using the PC.",
+        "If a program's uninstaller fails or is cancelled (for example IObit Uninstaller, which protects itself from removal), you can now \"Force remove\" it: everything goes to quarantine and can be restored.",
+        "Before installing a graphics card driver, RetroLimpia warns that the screen will flicker for a few seconds and will probably ask you to restart.",
+        "Fixed: after updating, RetroLimpia wrongly said that \"it closed unexpectedly last time\"."
+      ]
+    },
+    {
       "version": "4.0.9",
       "fecha": "2026-11-21",
       "es": [

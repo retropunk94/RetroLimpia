@@ -15,6 +15,9 @@ function Get-Winget {
     return $null
 }
 
+# Actualizaciones de prueba de Microsoft ("Preview", "versión preliminar"): siempre opcionales, nunca en "todo"
+function Test-Preliminar($u) { return ([string]$u.Title -match '(?i)preview|vista previa|preliminar') }
+
 # Lee la tabla de "winget upgrade" sin depender del idioma de Windows
 function Get-WingetUpgrades {
     param([string]$Exe)
@@ -76,7 +79,7 @@ switch ($p.accion) {
                         id          = $u.Identity.UpdateID
                         titulo      = $u.Title
                         tipo        = $(if ($isDriver) { 'driver' } elseif ($cats -match 'Security|Seguridad|Critical|Crítica') { 'seguridad' } else { 'windows' })
-                        opcional    = [bool]$u.BrowseOnly
+                        opcional    = [bool]($u.BrowseOnly -or (Test-Preliminar $u))
                         grande      = [bool]$isUpgrade
                         tamano      = [int64]$u.MaxDownloadSize
                         kb          = (@($u.KBArticleIDs) -join ',')
@@ -108,7 +111,7 @@ switch ($p.accion) {
             if ($p.todos) {
                 if ($u.BrowseOnly -and $u.Type -ne 2) { continue }      # opcionales de Windows: no
                 if ($cats -match 'Upgrades') { continue }               # cambio de versión de Windows: solo a mano
-                if ($u.Title -match 'Preview|Vista previa') { continue }
+                if (Test-Preliminar $u) { continue }
                 $sel += $u
             } elseif ($ids -contains $u.Identity.UpdateID) { $sel += $u }
         }
@@ -118,7 +121,7 @@ switch ($p.accion) {
         foreach ($u in $sel) {
             $n++
             $pct = [int](100 * ($n - 1) / [Math]::Max(1, $sel.Count))
-            Send-Progress $pct ("($n/$($sel.Count)) Descargando e instalando: " + $u.Title) ("($n/$($sel.Count)) Downloading and installing: " + $u.Title)
+            Send-Progress $pct ("($n/$($sel.Count)) Descargando e instalando: " + $u.Title + ' · Windows Update puede tardar bastante; puedes seguir usando el PC') ("($n/$($sel.Count)) Downloading and installing: " + $u.Title + ' · Windows Update can take a while; you can keep using the PC')
             try {
                 if (-not $u.EulaAccepted) { $u.AcceptEula() }
                 $coll = New-Object -ComObject Microsoft.Update.UpdateColl

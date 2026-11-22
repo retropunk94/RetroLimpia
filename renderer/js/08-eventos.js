@@ -84,6 +84,7 @@ document.addEventListener('click', async (e) => {
   }
   switch (t.dataset.act) {
     case 'cancel': return cancelTask();
+    case 'drvTodos': S.drvTodos = !S.drvTodos; return render();
     case 'wgSolosReset':
       S.settings = await rl.setSettings({ wgSolos: {}, wgOk: {}, wgNoAplica: {} });
       if (S.updates) { S.updates.apps = [...S.updates.apps, ...(S.updates.solos || [])]; S.updates.solos = []; }

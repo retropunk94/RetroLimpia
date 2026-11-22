@@ -256,26 +256,69 @@ function viewHardware() {
 
 function viewDrivers() {
   if (!S.drivers) return loadingView(L('Drivers', 'Drivers'), async () => { await loadDrivers(); if (!S.hardware) await loadHardware(); });
+  buscarDriversWU();
   const d = S.drivers;
   const prob = d.problemas.filter((p) => p.codigo !== 45);
-  const imp = d.drivers.filter((x) => x.importante && !x.generico);
   const wuDrv = (S.updates?.windows || []).filter((u) => u.tipo === 'driver');
   const gpus = (S.hardware?.gpus || []).filter((g) => GPU_LINKS[g.fabricante]);
-  imp.sort((a, b) => (a.fecha || '9999').localeCompare(b.fecha || '9999'));
-  return `<div class="view">${banners()}${head(L('Drivers', 'Drivers'), L('Los drivers son los "traductores" entre Windows y tu hardware. RetroLimpia solo usa fuentes oficiales: Windows Update y las apps de cada fabricante. Nunca webs de "drivers gratis".', 'Drivers are the "translators" between Windows and your hardware. RetroLimpia only uses official sources: Windows Update and each manufacturer\'s app. Never "free driver" websites.'), `<button class="btn" data-act="backupDrivers" ${S.busy ? 'disabled' : ''}>${L('Hacer copia de mis drivers', 'Back up my drivers')}</button>`)}
-    ${progressHTML()}
-    ${prob.length ? `<div class="card" style="border-color:rgba(255,84,112,.5);margin-bottom:14px"><h3 style="color:var(--rojo)">${L('Dispositivos con problemas', 'Devices with problems')}</h3>
-      ${prob.map((p) => `<div class="advice"><span class="badge rojo">${L('Código', 'Code')} ${p.codigo}</span><div><b>${esc(p.dispositivo)}</b><div class="meta">${L(...(PNP_CODES[p.codigo] || ['Tiene un problema.', 'Has a problem.']))} ${L('Pulsa «Intentar arreglar». Si no se arregla, prueba los drivers de Windows Update de abajo o instala el de la web del fabricante.', 'Press "Try to fix". If that does not work, try the Windows Update drivers below or install the one from the manufacturer website.')}</div>${S.settings.modoExperto ? `<div class="tech">${esc(p.id)}</div>` : ''}<div style="margin-top:8px"><button class="btn small primary" data-pnpfix="${esc(p.id)}" ${S.busy ? 'disabled' : ''}>🔧 ${L('Intentar arreglar', 'Try to fix')}</button></div></div></div>`).join('')}</div>`
-      : `<div class="banner good"><div class="grow"><b>${L('Todos tus dispositivos funcionan', 'All your devices are working')}</b></div></div>`}
-    ${gpus.length ? `<h2>${L('Tu tarjeta gráfica', 'Your graphics card')}</h2><div class="grid c2">${gpus.map((g) => `<div class="card"><div class="big">${esc(g.nombre)}</div><div class="meta">${L('Driver actual', 'Current driver')}: ${esc(g.versionNvidia || g.driver)} (${esc(g.fechaDriver)})</div>
-      <p class="meta">${L('Para gráficas, el driver más nuevo y fiable sale de la app oficial del fabricante. Windows Update suele ir varios meses atrás.', 'For graphics cards, the newest reliable driver comes from the official app. Windows Update is often months behind.')}</p>
-      <button class="btn primary small" data-open="${GPU_LINKS[g.fabricante][1]}">${L('Abrir', 'Open')} ${GPU_LINKS[g.fabricante][0]}</button></div>`).join('')}</div>` : ''}
-    <h2>${L('Drivers oficiales disponibles en Windows Update', 'Official drivers available on Windows Update')}${S.updates ? '' : `<span class="sub"><button class="link" data-act="loadUpdates">${L('Buscar ahora', 'Search now')}</button></span>`}</h2>
-    ${S.updates ? (wuDrv.length ? `<div class="list">${wuDrv.map((u) => `<div class="row"><div class="grow"><div class="name">${esc(u.titulo)}</div>${driverQueEs(u) ? `<div class="note">${esc(driverQueEs(u))}</div>` : ''}<div class="sub">${fmtBytes(u.tamano)}${u.opcional ? ' · ' + L('opcional', 'optional') : ''}</div></div><button class="btn small" data-wu="${esc(u.id)}" ${S.busy ? 'disabled' : ''}>${L('Instalar', 'Install')}</button></div>`).join('')}</div>` : `<div class="card meta">${L('Windows Update no tiene drivers nuevos para ti.', 'Windows Update has no new drivers for you.')}</div>`) : ''}
-    <h2>${L('Drivers importantes instalados', 'Important installed drivers')}<span class="sub">${L('ordenados del más antiguo al más nuevo', 'oldest first')}</span></h2>
-    <div class="list">${imp.map((x) => { const y = yearsSince(x.fecha); return `<div class="row"><div class="grow"><div class="name">${esc(x.dispositivo)}</div><div class="sub">${esc(x.proveedor)} · ${esc(x.version)}</div>${S.settings.modoExperto ? `<div class="tech">${esc(x.inf)} · ${esc(x.clase)}</div>` : ''}</div>
-      ${x.deWindows ? `<span class="badge gris" title="${L('Driver que trae Windows de serie: Windows no guarda su fecha real.', 'Built-in Windows driver: Windows does not store its real date.')}">${L('De Windows', 'Built-in')}</span>` : y != null && y > 3 ? `<span class="badge amarillo">${L('Antiguo', 'Old')}</span>${driverNuevoWU(x) ? `<button class="btn small" data-wu="${esc(driverNuevoWU(x).id)}" ${S.busy ? 'disabled' : ''}>${L('Actualizar', 'Update')}</button>` : `<button class="btn small ghost" data-open="${esc(buscarDriverURL(x))}" title="${L('Windows Update no tiene uno más nuevo: busca el oficial en la web de la marca', 'Windows Update has no newer one: look for the official one on the brand website')}">🔎 ${L('Buscar uno nuevo', 'Find a newer one')}</button>`}` : `<span class="badge verde">OK</span>`}<div class="size">${x.fecha ? esc(x.fecha) : L('Sin fecha', 'No date')}</div></div>`; }).join('') || `<div class="empty">—</div>`}</div>
+  const marca = marcaEquipo();
+  const todos = d.drivers.filter((x) => x.importante && !x.generico).sort((a, b) => String(a.dispositivo).localeCompare(String(b.dispositivo)));
+  const pendientes = prob.length + wuDrv.length;
+  // 1) Resumen en una frase: qué tal están y qué hacer
+  const resumen = pendientes
+    ? `<div class="banner warn"><div class="grow"><b>⚠️ ${L(pendientes === 1 ? '1 cosa para revisar' : pendientes + ' cosas para revisar', pendientes === 1 ? '1 thing to check' : pendientes + ' things to check')}</b> · ${L('Abajo tienes el botón para cada una.', 'Each one has its button below.')}</div></div>`
+    : S.updates && S.updates.error
+      ? `<div class="banner info"><div class="grow"><b>${L('Todos tus dispositivos funcionan', 'All your devices are working')}</b> · ${L('Windows Update no respondió ahora; vuelve a mirar más tarde.', 'Windows Update did not respond right now; check again later.')}</div></div>`
+    : S.updates
+      ? `<div class="banner good"><div class="grow"><b>✅ ${L('Tus drivers están bien', 'Your drivers are fine')}</b> · ${L('Todos tus dispositivos funcionan y Windows Update no tiene drivers nuevos para ti. No hace falta hacer nada.', 'All your devices work and Windows Update has no new drivers for you. Nothing to do.')}</div></div>`
+      : `<div class="banner info"><div class="grow"><b>${L('Todos tus dispositivos funcionan', 'All your devices are working')}</b> · ${L('Buscando drivers nuevos en Windows Update… (puede tardar 1-2 minutos)', 'Looking for new drivers on Windows Update… (may take 1-2 minutes)')}</div></div>`;
+  // 2) Dispositivos que no funcionan
+  const problemas = prob.length ? `<h2>${L('Dispositivos que no funcionan', 'Devices that are not working')}</h2><div class="list">${prob.map((p) => `<div class="row"><div class="grow"><div class="name">${esc(p.dispositivo)}</div><div class="sub">${L(...(PNP_CODES[p.codigo] || ['Tiene un problema.', 'Has a problem.']))}</div>${S.settings.modoExperto ? `<div class="tech">${L('Código', 'Code')} ${p.codigo} · ${esc(p.id)}</div>` : ''}</div><button class="btn small primary" data-pnpfix="${esc(p.id)}" ${S.busy ? 'disabled' : ''}>🔧 ${L('Intentar arreglar', 'Try to fix')}</button></div>`).join('')}</div>` : '';
+  // 3) Drivers nuevos oficiales (Windows Update)
+  const nuevos = wuDrv.length ? `<h2>${L('Drivers nuevos de Windows Update', 'New drivers from Windows Update')}<span class="sub">${L('oficiales y probados por Microsoft', 'official and tested by Microsoft')}</span></h2><div class="list">${wuDrv.map((u) => `<div class="row"><div class="grow"><div class="name">${esc(driverQueEs(u) || u.titulo)}</div><div class="sub">${esc(u.titulo)} · ${fmtBytes(u.tamano)}</div></div><button class="btn small primary" data-wu="${esc(u.id)}" ${S.busy ? 'disabled' : ''}>${L('Instalar', 'Install')}</button></div>`).join('')}</div>` : '';
+  // 4) Fuentes oficiales: gráfica y marca del equipo
+  const tarjetas = [];
+  for (const g of gpus) tarjetas.push(`<div class="card"><h3>${L('Tu tarjeta gráfica', 'Your graphics card')}</h3><div class="big">${esc(g.nombre)}</div><div class="meta">${L('Driver actual', 'Current driver')}: ${esc(g.versionNvidia || g.driver)} (${esc(g.fechaDriver)})</div>
+    <p class="meta">${L('Su driver más nuevo sale de la app oficial de la marca: Windows Update suele ir meses atrás.', 'Its newest driver comes from the brand official app: Windows Update is often months behind.')}</p>
+    <button class="btn small" data-open="${GPU_LINKS[g.fabricante][1]}">${L('Abrir', 'Open')} ${GPU_LINKS[g.fabricante][0]}</button></div>`);
+  if (marca) tarjetas.push(`<div class="card"><h3>${L('Drivers oficiales de tu equipo', 'Official drivers for your computer')}</h3><div class="big">${esc(marca.nombre)}${marca.modelo ? ' · ' + esc(marca.modelo) : ''}</div>
+    <p class="meta">${L('Para el chipset, el sonido, el Wi-Fi o la BIOS, lo más nuevo y seguro está en la web de soporte de ' + marca.nombre + marca.app.es, 'For chipset, audio, Wi-Fi or BIOS, the newest and safest drivers are on the ' + marca.nombre + ' support website' + marca.app.en)}</p>
+    <button class="btn small" data-open="${marca.url}">${L('Abrir el soporte de', 'Open support for')} ${esc(marca.nombre)}</button></div>`);
+  const fuentes = tarjetas.length ? `<h2>${L('Drivers de las marcas', 'Brand drivers')}</h2><div class="grid c2">${tarjetas.join('')}</div>` : '';
+  // 5) Todos los drivers, plegados: solo información, sin alarmas
+  const lista = `<button class="link" data-act="drvTodos" style="margin-top:22px">${S.drvTodos ? '▾' : '▸'} ${L('Ver todos mis drivers', 'See all my drivers')} (${todos.length})</button>
+    ${S.drvTodos ? `<p class="meta">${L('Un driver viejo que funciona no hay que cambiarlo. Si Windows Update o la marca tienen uno nuevo, aparece arriba.', 'An old driver that works does not need changing. If Windows Update or the brand has a new one, it shows up above.')}</p>
+    <div class="list">${todos.map((x) => `<div class="row"><div class="grow"><div class="name">${esc(x.dispositivo)}</div><div class="sub">${esc(x.proveedor)} · ${esc(x.version)}</div>${S.settings.modoExperto ? `<div class="tech">${esc(x.inf)} · ${esc(x.clase)}</div>` : ''}</div><div class="size">${x.deWindows ? L('De Windows', 'Built-in') : x.fecha ? esc(x.fecha) : L('Sin fecha', 'No date')}</div></div>`).join('') || `<div class="empty">—</div>`}</div>` : ''}`;
+  return `<div class="view">${banners()}${head(L('Drivers', 'Drivers'), L('Los drivers son los "traductores" entre Windows y tu hardware. RetroLimpia solo usa fuentes oficiales: Windows Update y las webs y apps de cada marca. Nunca webs de "drivers gratis".', 'Drivers are the "translators" between Windows and your hardware. RetroLimpia only uses official sources: Windows Update and each brand\'s website and app. Never "free driver" websites.'), `<button class="btn" data-act="backupDrivers" ${S.busy ? 'disabled' : ''}>${L('Hacer copia de mis drivers', 'Back up my drivers')}</button>`)}
+    ${progressHTML()}${resumen}${problemas}${nuevos}${fuentes}${lista}
     ${d.respaldos.length ? `<p class="meta" style="margin-top:14px">${L('Copias de drivers guardadas', 'Saved driver backups')}: ${d.respaldos.length} · <button class="link" data-folder="drivers">${L('Abrir carpeta', 'Open folder')}</button></p>` : ''}</div>`;
+}
+// Busca drivers nuevos en Windows Update al abrir la pestaña (una vez, en segundo plano)
+function buscarDriversWU() {
+  if (S.updates || S.buscandoWU) return;
+  S.buscandoWU = true;
+  loadUpdates().catch(() => { S.updates = S.updates || { windows: [], apps: [], solos: [], wingetDisponible: false, error: 'x' }; }).finally(() => { S.buscandoWU = false; if (S.view === 'drivers') render(); });
+}
+// Marca del equipo (o de la placa en PCs armadas) con su web oficial de soporte. Nada de buscadores.
+const MARCAS = [
+  [/^(hp|hewlett)/i, 'HP', 'https://support.hp.com/drivers', [' (o en su app HP Support Assistant).', ' (or in its HP Support Assistant app).']],
+  [/^dell/i, 'Dell', 'https://www.dell.com/support/home', [' (o en su app Dell SupportAssist).', ' (or in its Dell SupportAssist app).']],
+  [/^lenovo/i, 'Lenovo', 'https://pcsupport.lenovo.com/', [' (o en su app Lenovo Vantage).', ' (or in its Lenovo Vantage app).']],
+  [/^asus/i, 'ASUS', 'https://www.asus.com/support/download-center/', [' (o en su app MyASUS).', ' (or in its MyASUS app).']],
+  [/^acer/i, 'Acer', 'https://www.acer.com/us-en/support/drivers-and-manuals', ['.', '.']],
+  [/^(msi|micro-star)/i, 'MSI', 'https://www.msi.com/support/download', [' (o en su app MSI Center).', ' (or in its MSI Center app).']],
+  [/^gigabyte/i, 'Gigabyte', 'https://www.gigabyte.com/Support', ['.', '.']],
+  [/^asrock/i, 'ASRock', 'https://www.asrock.com/support/index.asp', ['.', '.']]
+];
+function marcaEquipo() {
+  const hw = S.hardware; if (!hw) return null;
+  const cand = [[hw.equipo?.fabricante, hw.equipo?.modelo], [hw.placa?.fabricante, hw.placa?.modelo]];
+  for (const [fab, mod] of cand) {
+    const m = MARCAS.find(([re]) => re.test(String(fab || '').trim()));
+    const limpio = (x) => String(x || '').replace(/system product name|to be filled.*|default string/i, '').trim();
+    if (m) return { nombre: m[1], url: m[2], app: { es: m[3][0], en: m[3][1] }, modelo: limpio(mod) || limpio(hw.placa?.modelo) };
+  }
+  return null;
 }
 
 function viewActualizaciones() {
@@ -311,15 +354,4 @@ function viewActualizaciones() {
         <button class="btn primary" data-act="updateSel" ${S.busy ? 'disabled' : ''}>${L('Actualizar seleccionados', 'Update selected')} (${nSel})</button>`
       : `<div class="info">${L('Marca las casillas para elegir qué actualizar. "Todo" no incluye opcionales de Windows ni cambios de versión.', 'Tick boxes to choose what to update. "All" excludes optional Windows updates and version upgrades.')}</div>
         <button class="btn primary" data-act="updateAll" ${S.busy ? 'disabled' : ''}>${L('Actualizar todo', 'Update all')}</button>`}</div>` : ''}</div>`;
-}
-
-// Driver antiguo: si Windows Update trae uno para ese mismo aparato, se ofrece ahí mismo
-function driverNuevoWU(x) {
-  const n = String(x.dispositivo || '').toLowerCase();
-  return (S.updates?.windows || []).find((u) => u.tipo === 'driver' && u.driver && String(u.driver.dispositivo || '').toLowerCase() === n && n) || null;
-}
-// Si no, búsqueda en la web del fabricante (la fuente oficial)
-function buscarDriverURL(x) {
-  const marca = String(x.proveedor || x.fabricante || '').replace(/corporation|corp\.?|inc\.?|ltd\.?|co\.?/gi, '').trim();
-  return 'https://www.google.com/search?q=' + encodeURIComponent((marca + ' ' + x.dispositivo + ' driver descarga oficial').trim());
 }

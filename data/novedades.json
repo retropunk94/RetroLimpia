@@ -2,6 +2,24 @@
   "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
   "versiones": [
     {
+      "version": "4.0.11",
+      "fecha": "2026-11-22",
+      "es": [
+        "Pestaña Drivers rediseñada, mucho más clara: arriba te dice en una frase si tus drivers están bien o cuántas cosas hay que revisar, y cada cosa tiene su botón.",
+        "Los drivers nuevos de Windows Update se buscan solos al abrir la pestaña y cada uno dice para qué es (gráfica, Wi-Fi, sonido…).",
+        "Nuevo: \"Drivers oficiales de tu equipo\". Si tu PC o placa es HP, Dell, Lenovo, ASUS, Acer, MSI, Gigabyte o ASRock, un botón te lleva a la página de soporte oficial de la marca. Gracias por la idea a quien lo pidió para su laptop HP.",
+        "Adiós a las falsas alarmas: ya no hay etiquetas de \"Antiguo\" ni botones que te mandaban a un buscador. Un driver viejo que funciona no hay que cambiarlo; la lista completa queda plegada en \"Ver todos mis drivers\", solo como información.",
+        "Arreglado: algunos drivers que trae Windows de serie (por ejemplo de Intel) aparecían con fecha de 2006."
+      ],
+      "en": [
+        "Redesigned Drivers tab, much clearer: at the top it tells you in one sentence whether your drivers are fine or how many things need a look, and each one has its button.",
+        "New Windows Update drivers are searched automatically when you open the tab, and each one says what it is for (graphics, Wi-Fi, audio…).",
+        "New: \"Official drivers for your computer\". If your PC or motherboard is HP, Dell, Lenovo, ASUS, Acer, MSI, Gigabyte or ASRock, a button takes you to the brand's official support page. Thanks to the person who asked for it for their HP laptop.",
+        "No more false alarms: no \"Old\" labels or buttons sending you to a search engine. An old driver that works does not need changing; the full list is folded under \"See all my drivers\", just for information.",
+        "Fixed: some built-in Windows drivers (for example from Intel) showed a 2006 date."
+      ]
+    },
+    {
       "version": "4.0.10",
       "fecha": "2026-11-22",
       "es": [

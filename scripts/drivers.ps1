@@ -88,7 +88,10 @@ $drivers = @(Get-CimInstance Win32_PnPSignedDriver -ErrorAction SilentlyContinue
     # Los drivers que trae Windows de serie llevan fechas de relleno (1968, 2006...): no son fechas reales
     $f = Format-WmiDate $_.DriverDate
     $gen = ($prov -match '^Microsoft' -or [string]$_.Manufacturer -match '^\(Standard|^Microsoft|^Generic|^\(Estándar')
-    $sinFecha = (-not $f) -or ($f -lt '2000') -or ($gen -and $f -le '2006-06-21')
+    # Fecha de relleno de los drivers que trae Windows (21/06/2006, a veces 20/06 por la zona horaria).
+    # Cuenta como "de Windows" si lo dice Microsoft/genérico o si su versión es la del propio Windows (10.0.xxxxx), aunque sea de otra marca.
+    $deSerie = $gen -or ([string]$_.DriverVersion -match '^10\.0\.\d{5}\.')
+    $sinFecha = (-not $f) -or ($f -lt '2000') -or ($deSerie -and $f -le '2006-06-22')
     @{
         dispositivo = $_.DeviceName
         clase       = [string]$_.DeviceClass
@@ -96,7 +99,7 @@ $drivers = @(Get-CimInstance Win32_PnPSignedDriver -ErrorAction SilentlyContinue
         proveedor   = $prov
         version     = $_.DriverVersion
         fecha       = $(if ($sinFecha) { '' } else { $f })
-        deWindows   = [bool]($gen -and $sinFecha)
+        deWindows   = [bool]($deSerie -and $sinFecha)
         inf         = $_.InfName
         firmado     = [bool]$_.IsSigned
         generico    = $gen

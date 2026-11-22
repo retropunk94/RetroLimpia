@@ -1,7 +1,7 @@
 {
   "name": "retrolimpia",
   "productName": "RetroLimpia",
-  "version": "4.0.10",
+  "version": "4.0.11",
   "description": "Limpia, desinstala sin dejar restos, revisa tu hardware y mantiene tus drivers al día. Guiado paso a paso.",
   "main": "src/main.js",
   "author": "Retropunk94",

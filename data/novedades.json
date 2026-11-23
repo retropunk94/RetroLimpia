@@ -2,6 +2,16 @@
   "_info": "Notas de cada versión. Se muestran en RetroLimpia después de actualizarse y en la página de la versión en GitHub. REGLA: cada versión nueva añade aquí sus notas, en palabras sencillas.",
   "versiones": [
     {
+      "version": "4.0.12",
+      "fecha": "",
+      "es": [
+        "Nueva licencia: RetroLimpia pasa a GPL-3.0. Sigue siendo gratis y de código abierto, pero quien publique una versión modificada tiene que compartir también su código y no puede cerrarlo ni venderlo como suyo. El nombre RetroLimpia y su logo quedan protegidos: las copias modificadas deben usar otro nombre, para que nadie se haga pasar por la versión oficial."
+      ],
+      "en": [
+        "New license: RetroLimpia moves to GPL-3.0. It is still free and open source, but anyone publishing a modified version must share its code too and cannot close it or sell it as their own. The RetroLimpia name and logo are protected: modified copies must use another name, so nobody can pose as the official version."
+      ]
+    },
+    {
       "version": "4.0.11",
       "fecha": "2026-11-22",
       "es": [

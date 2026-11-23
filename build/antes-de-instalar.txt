@@ -28,12 +28,17 @@ puedes haber visto un aviso al descargarlo o abrirlo.
    quita pasa unos días en una cuarentena antes de borrarse.
 
 ------------------------------------------------------------------------------
-LICENCIA (MIT)
+LICENCIA (GPL-3.0 o posterior)
 
-Copyright (c) 2026 Retropunk94
+Copyright (C) 2026 Retropunk94
 
-Se concede permiso, de forma gratuita, a cualquier persona que obtenga una
-copia de este software para usarlo, copiarlo, modificarlo y distribuirlo sin
-restricción, siempre que se incluya este aviso.
+RetroLimpia es software libre: puedes usarlo, estudiarlo, modificarlo y
+compartirlo bajo la Licencia Pública General de GNU, versión 3 o posterior.
+Si distribuyes una versión modificada, tienes que publicar también su código
+bajo la misma licencia y conservar este aviso de autoría.
+Texto completo: https://www.gnu.org/licenses/gpl-3.0.html
+
+El nombre "RetroLimpia", la marca "Retro" y el logo no forman parte de la
+licencia: una versión modificada debe usar otro nombre y otro logo.
 
 EL SOFTWARE SE PROPORCIONA "TAL CUAL", SIN GARANTÍA DE NINGÚN TIPO.

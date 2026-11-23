@@ -5,7 +5,7 @@
   "description": "Limpia, desinstala sin dejar restos, revisa tu hardware y mantiene tus drivers al día. Guiado paso a paso.",
   "main": "src/main.js",
   "author": "Retropunk94",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "homepage": "https://github.com/retropunk94/RetroLimpia",
   "retrolimpia": {
     "repo": "retropunk94/RetroLimpia",
@@ -28,7 +28,7 @@
   "build": {
     "appId": "com.retropunk94.retrolimpia",
     "productName": "RetroLimpia",
-    "copyright": "Código abierto (MIT) - Retropunk94",
+    "copyright": "Código abierto (GPL-3.0) - Retropunk94",
     "directories": {
       "output": "dist",
       "buildResources": "build"

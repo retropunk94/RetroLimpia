@@ -4,7 +4,7 @@
 
 **Limpia tu PC, quita el bloatware sin dejar restos, revisa tu hardware y mantén tus drivers al día. Todo guiado paso a paso, pensado para quien no sabe nada de informática.**
 
-Gratis · Código abierto (MIT) · Sin telemetría · Todo se puede deshacer
+Gratis · Código abierto (GPL-3.0) · Sin telemetría · Todo se puede deshacer
 
 🌐 **Web oficial: [retropunk94.github.io/RetroLimpia](https://retropunk94.github.io/RetroLimpia/)**
 
@@ -110,4 +110,6 @@ RetroLimpia es gratis, sin anuncios y sin telemetría. Detrás no hay una empres
 
 ## Licencia
 
-MIT: úsalo, modifícalo y compártelo libremente.
+**GPL-3.0 o posterior** (desde la 4.0.12): úsalo, estúdialo, modifícalo y compártelo libremente. Si publicas una versión modificada, tiene que llevar también su código bajo GPL y el aviso de autoría. Las versiones hasta la 4.0.11 se publicaron con licencia MIT.
+
+El nombre **RetroLimpia**, la marca **Retro** y el logo no forman parte de la licencia: una versión modificada debe usar otro nombre y otro logo (ver [MARCA.md](MARCA.md)).

@@ -3,13 +3,22 @@
   "versiones": [
     {
       "version": "4.0.12",
-      "fecha": "",
+      "fecha": "2026-11-24",
       "es": [
+        "Al desinstalar varios programas, la lista de la izquierda baja sola hasta el que se está quitando: siempre ves por dónde va.",
+        "Arranque de Windows: los programas activados aparecen primero, y puedes ordenar la lista por recomendación o por nombre.",
+        "Nuevo aviso cuando RetroLimpia te necesita: si un programa abre su propia ventana y tienes que hacer algo (por ejemplo, al desinstalar), suena un pitido corto, el icono parpadea en la barra de tareas y sale un aviso de Windows. El sonido se puede quitar en Ajustes.",
+        "Gracias a quien mandó estas tres ideas desde el botón de reportes 💜",
         "Nueva licencia: RetroLimpia pasa a GPL-3.0. Sigue siendo gratis y de código abierto, pero quien publique una versión modificada tiene que compartir también su código y no puede cerrarlo ni venderlo como suyo. El nombre RetroLimpia y su logo quedan protegidos: las copias modificadas deben usar otro nombre, para que nadie se haga pasar por la versión oficial."
       ],
       "en": [
+        "When uninstalling several programs, the list on the left scrolls by itself to the one being removed: you always see where it is.",
+        "Windows startup: enabled programs come first, and you can sort the list by recommendation or by name.",
+        "New alert when RetroLimpia needs you: if a program opens its own window and you need to act (for example, when uninstalling), a short beep sounds, the taskbar icon flashes and a Windows notification appears. The sound can be turned off in Settings.",
+        "Thanks to whoever sent these three ideas through the report button 💜",
         "New license: RetroLimpia moves to GPL-3.0. It is still free and open source, but anyone publishing a modified version must share its code too and cannot close it or sell it as their own. The RetroLimpia name and logo are protected: modified copies must use another name, so nobody can pose as the official version."
-      ]
+      ],
+      "apoyo": true
     },
     {
       "version": "4.0.11",

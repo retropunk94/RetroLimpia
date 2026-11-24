@@ -62,6 +62,7 @@ async function showNews(desde, todas) {
     <div class="news-badge">✨ v${esc(S.info.version)}</div>
     <h2>${todas ? L('Novedades de RetroLimpia', "What's new in RetroLimpia") : L('¡RetroLimpia se actualizó!', 'RetroLimpia was updated!')}</h2>
     <p class="lead">${todas ? L('Lo que cambió en cada versión.', 'What changed in each version.') : L('Esto es lo que se arregló y mejoró:', 'Here is what was fixed and improved:')}</p>
+    ${!todas && lista.some((v) => v.apoyo) ? apoyoMensajeHTML() : ''}
     <div class="news-list">${lista.map((v) => `<div class="news-ver"><div class="news-head"><b>${L('Versión', 'Version')} ${esc(v.version)}</b>${v.fecha ? `<span>${esc(v.fecha)}</span>` : ''}</div><ul>${(en ? v.en || v.es : v.es).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>`).join('')}</div>
     <div class="foot">${lista.some((v) => v.version === '4.0.0') ? `<button class="btn primary" data-act="miniTour">🧭 ${L('Enséñame lo nuevo (1 min)', 'Show me what is new (1 min)')}</button><button class="btn ghost" data-act="modalClose">${L('Ahora no', 'Not now')}</button>` : `<button class="btn primary" data-act="modalClose">${L('¡Genial!', 'Great!')}</button>`}${S.info.discord ? `<button class="btn ghost" data-open="${S.info.discord}">💬 ${L('Comentar en Discord', 'Discuss on Discord')}</button>` : ''}</div></div>`;
   $('#modal').classList.remove('hidden');

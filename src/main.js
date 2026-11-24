@@ -46,6 +46,7 @@ const defaultSettings = {
   mascota: 'activa',       // activa | tranquila | off
   mascotaPresentada: false,
   misJuegos: [], juegoAuto: false, juegoIntensidad: 'equilibrado', juegoCerrar: [], juegoReabrir: true, juegoPartidas: 0, formateoPasos: {},
+  sonidoAvisos: true,
   wgSolos: {}, wgOk: {}, wgNoAplica: {}   // programas que se actualizan solos (winget no puede) · última versión que winget dijo instalar
 };
 function loadSettings() {
@@ -436,6 +437,11 @@ function sendUpdate(st) {
   if (win && !win.isDestroyed()) win.webContents.send('rl:update', updateState);
 }
 ipcMain.on('rl:busy', (e, busy) => { rendererBusy = !!busy; });
+// RetroLimpia necesita a la persona: parpadea en la barra de tareas y, si no está mirando, aviso de Windows
+ipcMain.on('rl:atencion', (e, texto) => {
+  if (!win || win.isDestroyed()) return;
+  if (!win.isFocused()) { win.flashFrame(true); notify('RetroLimpia', String(texto).slice(0, 200), null, true); }
+});
 
 // Cuando la actualización está lista y nadie está mirando, se instala sola
 function installWhenIdle() {

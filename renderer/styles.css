@@ -392,6 +392,7 @@ select { background: var(--panel-2); border: 1px solid var(--line-2); border-rad
 .mon-log { flex: 1; min-height: 120px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 6px; }
 .mon-line { display: flex; gap: 10px; font-size: 13.5px; animation: tin .2s ease; }
 .mon-line .ico { width: 18px; flex-shrink: 0; text-align: center; }
+.mon-line.t-atencion { background: rgba(255, 200, 69, .1); border-radius: 8px; } .mon-line.t-atencion .ico { color: var(--amarillo); }
 .mon-line.t-ok .ico { color: var(--verde); } .mon-line.t-aviso .ico, .mon-line.t-hallado .ico { color: var(--amarillo); }
 .mon-line.t-error .ico { color: var(--rojo); } .mon-line.t-buscar { color: var(--muted); } .mon-line.t-paso { color: var(--text); font-weight: 600; }
 .mon-path { display: flex; align-items: center; gap: 10px; margin-top: 2px; flex-wrap: wrap; }
@@ -544,3 +545,13 @@ label.inline { display: inline-flex; gap: 8px; align-items: center; font-size: 1
 .ganado-g > div { display: flex; flex-direction: column; gap: 2px; }
 .ganado-g b { font-size: 20px; } .ganado-g .gi { font-size: 18px; }
 .nowrap { white-space: nowrap; }
+
+/* Apoyo al proyecto: tarjeta amable, nunca una ventana que tape nada */
+.apoyo-card { display: flex; gap: 16px; align-items: center; margin: 16px 0; padding: 14px 18px; border-radius: 12px; border: 1px solid rgba(255, 79, 163, .35); background: rgba(255, 79, 163, .07); }
+.apoyo-card p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }
+.apoyo-card .grow { flex: 1; }
+.apoyo-btns { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: flex-end; }
+.apoyo-card.suave { display: block; border-color: var(--line); background: transparent; color: var(--muted); font-size: 13.5px; }
+.apoyo-links { display: block; margin-top: 6px; }
+.apoyo-card.mensaje { margin: 0 0 14px; flex-direction: column; align-items: stretch; }
+.apoyo-card.mensaje .apoyo-btns { justify-content: flex-start; }

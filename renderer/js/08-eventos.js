@@ -22,7 +22,7 @@ document.addEventListener('click', async (e) => {
   if (t.dataset.formIr) { const paso = { drivers: 'drivers', actualizaciones: 'windows', programas: 'bloatware' }[t.dataset.formIr]; formMarcar(paso); S.view = t.dataset.formIr; if (S.view === 'programas') S.progFilter = 'verde'; render(); $('#main').scrollTop = 0; return; }
   if (t.dataset.juegoQuitar !== undefined) { const l = arr(S.settings.misJuegos).filter((_, i) => i !== Number(t.dataset.juegoQuitar)); S.settings = await rl.setSettings({ misJuegos: l, ...(l.length ? {} : { juegoAuto: false }) }); return render(); }
   if (t.dataset.reveal) { const ok = await rl.reveal(t.dataset.reveal); if (!ok) toast(L('Esa ubicación ya no existe (se movió a la cuarentena o se borró).', 'That location no longer exists (moved to quarantine or deleted).'), 'err'); return; }
-  if (t.dataset.copy) { try { await navigator.clipboard.writeText(t.dataset.copy); toast(L('Ruta copiada.', 'Path copied.')); } catch { toast(t.dataset.copy); } return; }
+  if (t.dataset.copy) { try { await navigator.clipboard.writeText(t.dataset.copy); toast(t.dataset.copiado || L('Ruta copiada.', 'Path copied.')); } catch { toast(t.dataset.copy); } return; }
   if (t.dataset.monview) { S.mon.view = Number(t.dataset.monview); return renderMonitor(); }
   if (t.dataset.psort) { S.procSort = t.dataset.psort; return render(); }
   if (t.dataset.pask) { S.procConfirm = t.dataset.pask; return render(); }
@@ -84,6 +84,7 @@ document.addEventListener('click', async (e) => {
   }
   switch (t.dataset.act) {
     case 'cancel': return cancelTask();
+    case 'arranqueOrden': S.settings = await rl.setSettings({ arranqueOrden: t.dataset.orden }); return render();
     case 'drvTodos': S.drvTodos = !S.drvTodos; return render();
     case 'wgSolosReset':
       S.settings = await rl.setSettings({ wgSolos: {}, wgOk: {}, wgNoAplica: {} });
@@ -97,6 +98,7 @@ document.addEventListener('click', async (e) => {
     case 'monClose': $('#monitor').classList.add('hidden'); S.mon = null; return render();
     case 'monQuar': $('#monitor').classList.add('hidden'); S.mon = null; S.quarantine = null; S.view = 'deshacer'; return render();
     case 'donateAsk': return showDonate();
+    case 'apoyoSi': case 'apoyoTarde': case 'apoyoHecho': return apoyoAccion(t.dataset.act);
     case 'donateGo': $('#modal').classList.add('hidden'); return rl.open(S.info.paypal);
     case 'modalClose': $('#modal').classList.add('hidden'); S.rep = null; return;
     case 'retroMenu': return retroMenu();
@@ -181,6 +183,7 @@ document.addEventListener('click', async (e) => {
         ganar('liberado', r.liberado);
         retroReacciona('guino', L('¡Más limpio! 😉', 'Squeaky clean! 😉'));
         await loadJunk();
+        if (r.liberado >= 1024 ** 3) setTimeout(() => apoyoOfrecer(L(`Acabas de liberar ${fmtBytes(r.liberado)}.`, `You just freed ${fmtBytes(r.liberado)}.`)), 0);
       });
     case 'reloadJunk': S.junk = null; return render();
     case 'reloadHw': S.hardware = null; return render();

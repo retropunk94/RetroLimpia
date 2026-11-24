@@ -10,10 +10,11 @@ function monLog(entry) {
   if (!S.mon || S.mon.cur < 0) return;
   const it = S.mon.items[S.mon.cur];
   it.log.push(entry);
+  if (entry.tipo === 'atencion') avisarAtencion(it.nombre);
   const box = document.getElementById('monLog');
   if (box) { box.insertAdjacentHTML('beforeend', monLine(entry)); box.scrollTop = box.scrollHeight; }
 }
-const MON_ICO = { paso: '▶', info: '•', buscar: '🔍', hallado: '📌', ok: '✔', aviso: '⚠', error: '✖' };
+const MON_ICO = { paso: '▶', info: '•', buscar: '🔍', hallado: '📌', ok: '✔', aviso: '⚠', error: '✖', atencion: '🔔' };
 function monLine(l) {
   const ruta = l.ruta ? `<div class="mon-path"><code>${esc(l.ruta)}</code>${l.tipo !== 'paso' && /^[a-z]:\\/i.test(l.ruta) ? `<button class="link" data-reveal="${esc(l.ruta)}">${L('Abrir ubicación', 'Show in folder')}</button>` : /^HKEY_/.test(l.ruta) ? `<button class="link" data-copy="${esc(l.ruta)}">${L('Copiar', 'Copy')}</button>` : ''}</div>` : '';
   return `<div class="mon-line t-${esc(l.tipo)}"><span class="ico">${MON_ICO[l.tipo] || '•'}</span><div><div>${esc(S.settings.idioma === 'en' ? l.en : l.msg)}</div>${ruta}</div></div>`;
@@ -81,6 +82,7 @@ function renderMonitor() {
         <div class="mon-log" id="${sel === m.cur && !m.done ? 'monLog' : 'monLogStatic'}">${it.log.map(monLine).join('') || `<p class="meta">${L('Esperando su turno...', 'Waiting for its turn...')}</p>`}</div>
         ${monSummary(it)}</div>
     </div>
+    ${m.done ? apoyoHTML() : ''}
     <div class="mon-foot">${m.done
       ? `<button class="btn ghost" data-act="monQuar">${L('Ver la cuarentena', 'Open quarantine')}</button><button class="btn primary" data-act="monClose">${L('Cerrar', 'Close')}</button>`
       : `<span class="meta">${L('No cierres RetroLimpia mientras trabaja.', 'Do not close RetroLimpia while it works.')}</span>${S.cancelRequested
@@ -88,6 +90,9 @@ function renderMonitor() {
         : `<button class="btn ghost danger" data-act="cancel">${L('Detener después de este', 'Stop after this one')}</button>`}`}</div></div>`;
   const box = document.getElementById('monLog') || document.getElementById('monLogStatic');
   if (box) box.scrollTop = box.scrollHeight;
+  // La lista de la izquierda baja sola hasta el programa que se está quitando (o el que estás mirando)
+  const on = document.querySelector('#monitor .mon-item.on');
+  if (on) on.scrollIntoView({ block: 'nearest' });
 }
 
 async function uninstallPrograms(list, motivo) {
@@ -137,6 +142,7 @@ async function uninstallPrograms(list, motivo) {
   }
   if (res.reinicio) S.needsReboot = true;
   S.mon.done = true; S.mon.view = null; renderMonitor();
+  if (res.ok > 0 && !S.cancelRequested) setTimeout(() => apoyoOfrecer(L(res.ok === 1 ? 'Quitaste 1 programa y su basura.' : `Quitaste ${res.ok} programas y su basura.`, res.ok === 1 ? 'You removed 1 program and its junk.' : `You removed ${res.ok} programs and their junk.`)), 0);
   return res;
 }
 
@@ -179,6 +185,7 @@ async function updateSelected() {
 
 async function fixAll() {
   const chosen = S.scan.findings.filter((f) => f.elegido && f.accion);
+  const notaAntes = S.scan.score;
   if (!chosen.length) { toast(L('No hay nada seleccionado para arreglar.', 'Nothing selected to fix.'), 'err'); return; }
   if (chosen.some((f) => f.accion === 'wu') && !avisoGrafica()) return;
   S.fix = { steps: chosen.map((f) => ({ id: f.accion, titulo: f.titulo, state: 'wait', extra: '' })), done: false, summary: [] };
@@ -252,7 +259,11 @@ async function fixAll() {
     S.updates = S.updates ? { ...S.updates, windows: [], apps: [] } : S.updates;
     S.scan.findings = buildFindings(); S.scan.score = computeScore();
   });
-  if (S.fix && !S.fix.cancelado) toast(L('¡Listo! Tu PC está más limpio.', 'Done! Your PC is cleaner.'));
+  if (S.fix && !S.fix.cancelado) {
+    toast(L('¡Listo! Tu PC está más limpio.', 'Done! Your PC is cleaner.'));
+    const notaDespues = S.scan.score;
+    if (notaAntes != null && notaDespues > notaAntes) apoyoOfrecer(L(`Tu PC pasó de ${notaAntes} a ${notaDespues} puntos.`, `Your PC went from ${notaAntes} to ${notaDespues} points.`));
+  }
 }
 
 // ---------- Actualización automática con cuenta atrás ----------

@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('rl', {
   data: (name) => ipcRenderer.invoke('rl:data', name),
   getSettings: () => ipcRenderer.invoke('rl:settings:get'),
   setSettings: (s) => ipcRenderer.invoke('rl:settings:set', s),
+  atencion: (texto) => ipcRenderer.send('rl:atencion', String(texto || '')),
   info: () => ipcRenderer.invoke('rl:info'),
   open: (url) => ipcRenderer.invoke('rl:open', url),
   openFolder: (which) => ipcRenderer.invoke('rl:openFolder', which),

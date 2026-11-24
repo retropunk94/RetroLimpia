@@ -350,7 +350,7 @@ try {
 if (-not $result.ok -and $cmd -and $p.permitirVentana -ne $false) {
     Stop-Desinstaladores   # que no choque con un intento silencioso que se quedó colgado
     Send-Progress 50 ('Este programa necesita su propio asistente. Sigue sus pasos en la ventana que se abre.') ('This program needs its own uninstaller. Follow the window that opens.')
-    Send-Log 'aviso' 'No se pudo en silencio: se abre su propio asistente. Sigue sus pasos.' 'Silent mode failed: its own wizard opens. Follow its steps.' $cmd
+    Send-Log 'atencion' 'Te necesita: se abre su propio asistente. Sigue sus pasos en esa ventana.' 'Needs you: its own wizard opens. Follow the steps in that window.' $cmd
     try {
         if ($cmd -match 'msiexec' -and $cmd -match '(\{[0-9A-Fa-f\-]{36}\})') {
             $proc = Start-Process -FilePath "$env:windir\System32\msiexec.exe" -ArgumentList ('/x ' + $Matches[1]) -PassThru

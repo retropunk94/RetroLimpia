@@ -245,3 +245,19 @@ function avisoGrafica(ids) {
   if (!grafica) return true;
   return confirm(L(`Vas a instalar un driver de la tarjeta gráfica:\n${grafica.titulo}\n\nDurante la instalación la pantalla se pondrá negra o parpadeará unos segundos (es normal) y probablemente te pida reiniciar el PC. Guarda lo que estés haciendo antes de seguir.\n\n¿Continuar?`, `You are about to install a graphics card driver:\n${grafica.titulo}\n\nDuring the install the screen will go black or flicker for a few seconds (this is normal) and it will probably ask you to restart. Save your work before continuing.\n\nContinue?`));
 }
+
+// Cuando RetroLimpia te necesita (p. ej. la ventana propia de un desinstalador): sonido corto + aviso de Windows
+function avisarAtencion(nombre) {
+  rl.atencion(L(`${nombre} necesita que sigas los pasos en su ventana`, `${nombre} needs you to follow the steps in its window`));
+  if (S.settings.sonidoAvisos === false) return;
+  try {
+    const ac = new AudioContext();
+    [[880, 0], [1320, 0.18]].forEach(([f, t]) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.frequency.value = f; o.connect(g); g.connect(ac.destination);
+      g.gain.setValueAtTime(0.0001, ac.currentTime + t); g.gain.exponentialRampToValueAtTime(0.25, ac.currentTime + t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + t + 0.16);
+      o.start(ac.currentTime + t); o.stop(ac.currentTime + t + 0.18);
+    });
+    setTimeout(() => ac.close().catch(() => {}), 800);
+  } catch { /* sin audio: no pasa nada */ }
+}

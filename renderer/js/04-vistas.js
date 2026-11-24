@@ -96,6 +96,7 @@ function viewInicio() {
       body = `<div class="hero"><div class="hero-text"><h1>${fx.done ? (fx.cancelado ? L('Detenido', 'Stopped') : L('¡Listo!', 'Done!')) : L('Arreglando tu PC...', 'Fixing your PC...')}</h1><p>${fx.done ? (fx.cancelado ? L('Se detuvo al terminar el paso que estaba en marcha. Lo que se llegó a hacer está en la cuarentena por si quieres deshacerlo.', 'Stopped after the step in progress. Anything already done is in quarantine in case you want to undo it.') : L('Todo lo que se quitó está en la cuarentena unos días por si quieres deshacerlo.', 'Everything removed stays in quarantine for a few days in case you want to undo it.')) : L('No apagues el PC. Esto puede tardar varios minutos si hay actualizaciones.', "Don't turn off your PC. This may take several minutes if there are updates.")}</p>
         ${fx.done ? `<button class="btn" data-act="closeFix">${L('Ver el resumen', 'See summary')}</button> <button class="btn ghost" data-act="report">${L('Guardar informe', 'Save report')}</button>` : ''}</div>${ring}</div>
         ${fx.done ? '' : progressHTML()}
+        ${fx.done ? apoyoHTML() : ''}
         <div class="stepper">${fx.steps.map((s) => `<div class="step ${s.state === 'wait' ? '' : s.state}"><span class="dot"></span>${esc(s.titulo)}<span class="extra">${esc(s.extra)}</span></div>`).join('')}</div>`;
     } else {
       const fs = sc.findings;
@@ -202,7 +203,7 @@ function viewLimpieza() {
   const cats = S.junk.categorias;
   const total = cats.filter((c) => S.junkSel.has(c.id)).reduce((a, c) => a + c.tamano, 0);
   return `<div class="view">${banners()}${head(L('Limpieza', 'Cleanup'), L('Borra archivos que no sirven para nada. Nunca toca tus documentos, fotos, contraseñas ni historial.', 'Deletes useless files. Never touches your documents, photos, passwords or history.'), `<button class="btn ghost" data-act="reloadJunk">${L('Volver a medir', 'Measure again')}</button>`)}
-    ${progressHTML()}
+    ${progressHTML()}${apoyoHTML()}
     <div class="list">${cats.map((c) => { const [es, en, des, den] = JUNK[c.id] || [c.id, c.id, '', '']; return `<label class="row ${c.tamano ? '' : 'disabled'}"><input type="checkbox" class="check" data-junk="${c.id}" ${S.junkSel.has(c.id) ? 'checked' : ''} ${c.tamano ? '' : 'disabled'}>
       <div class="grow"><div class="name">${L(es, en)}</div><div class="note">${L(des, den)}</div></div>
       <span class="badge ${c.color}">${c.color === 'verde' ? L('Seguro', 'Safe') : L('Revisa antes', 'Check first')}</span><div class="size">${fmtBytes(c.tamano)}</div></label>`; }).join('')}</div>
@@ -214,12 +215,18 @@ function viewLimpieza() {
 function viewArranque() {
   if (!S.startup) return loadingView(L('Arranque de Windows', 'Windows startup'), loadStartup);
   const items = S.startup.elementos.map((i) => ({ ...i, c: classifyStartup(i) }));
+  // Orden elegible: activados primero (por defecto), por recomendación o por nombre
   const rank = { desactivar: 0, opcional: 1, desconocido: 2, mantener: 3 };
-  items.sort((a, b) => rank[a.c.rec] - rank[b.c.rec] || a.nombre.localeCompare(b.nombre));
+  const orden = S.settings.arranqueOrden || 'activos';
+  const porNombre = (a, b) => a.nombre.localeCompare(b.nombre);
+  const porRec = (a, b) => rank[a.c.rec] - rank[b.c.rec];
+  items.sort(orden === 'nombre' ? porNombre : orden === 'rec' ? (a, b) => porRec(a, b) || porNombre(a, b) : (a, b) => (b.activo - a.activo) || porRec(a, b) || porNombre(a, b));
+  const ordenes = [['activos', 'Activados primero', 'Enabled first'], ['rec', 'Recomendación', 'Recommendation'], ['nombre', 'Nombre (A-Z)', 'Name (A-Z)']];
   const pend = items.filter((i) => i.activo && i.c.rec === 'desactivar').length;
   const active = items.filter((i) => i.activo).length;
   return `<div class="view">${banners()}${head(L('Arranque de Windows', 'Windows startup'), L(`${active} programa(s) se abren solos al encender el PC. Menos programas = Windows arranca más rápido. Desactivar no borra nada.`, `${active} program(s) open by themselves at boot. Fewer programs = faster startup. Disabling deletes nothing.`))}
     ${progressHTML()}
+    <div class="toolbar"><span class="meta">${L('Ordenar:', 'Sort:')}</span>${ordenes.map(([id, es, en]) => `<button class="chip ${orden === id ? 'on' : ''}" data-act="arranqueOrden" data-orden="${id}">${L(es, en)}</button>`).join('')}</div>
     <div class="list">${items.length ? items.map((i) => `<div class="row"><div class="grow"><div class="name">${esc(i.nombre)}</div><div class="sub">${esc(i.c.nota)}</div>${S.settings.modoExperto ? `<div class="tech">${esc(i.comando)}</div>` : ''}</div>
       <span class="badge ${REC[i.c.rec].c}">${L(REC[i.c.rec].es, REC[i.c.rec].en)}</span>
       <label class="switch" title="${i.activo ? L('Activo', 'Enabled') : L('Desactivado', 'Disabled')}"><input type="checkbox" data-startup="${esc(i.id)}" ${i.activo ? 'checked' : ''} ${S.busy ? 'disabled' : ''}><span></span></label></div>`).join('') : `<div class="empty">${L('No hay programas al inicio.', 'No startup programs.')}</div>`}</div>

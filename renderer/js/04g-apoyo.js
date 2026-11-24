@@ -1,9 +1,10 @@
 // ============================================================ Apoyo al proyecto (donaciones)
 // Reglas: pedir solo en buenos momentos (tras una tarea que salió bien), como mucho una vez cada 3 semanas,
-// nunca la primera semana, ni en Modo Juego. "Quizá más tarde" 3 veces => cada 2 meses. "Ya doné" => nunca más.
-const APOYO = { DIAS: 21, DIAS_LEJOS: 60, PRIMERA_SEMANA: 7 };
+// nunca la primera semana, ni en Modo Juego. "Quizá más tarde" 3 veces => cada 2 meses. "Ya doné" => 6 meses de silencio.
+const APOYO = { DIAS: 21, DIAS_LEJOS: 60, PRIMERA_SEMANA: 7, DIAS_DONO: 182 };
 const DIA = 864e5;
 const apoyoDatos = () => S.settings.apoyo || {};
+const apoyoDono = () => (apoyoDatos().hechoHasta || 0) > Date.now();
 async function apoyoGuardar(cambios) { S.settings = await rl.setSettings({ apoyo: { ...apoyoDatos(), ...cambios } }); }
 
 // Se llama al terminar algo que salió bien, con la frase del logro ("Acabas de liberar 6,7 GB.")
@@ -11,7 +12,7 @@ async function apoyoOfrecer(logro) {
   const a = apoyoDatos(), ahora = Date.now();
   if (S.info.demo === false && !S.info.paypal) return;
   if (!S.settings.primerUso) { S.settings = await rl.setSettings({ primerUso: ahora }); return; }
-  if (a.hecho || ahora < (a.proxima || 0) || ahora - S.settings.primerUso < APOYO.PRIMERA_SEMANA * DIA || jugando()) return;
+  if (apoyoDono() || ahora < (a.proxima || 0) || ahora - S.settings.primerUso < APOYO.PRIMERA_SEMANA * DIA || jugando()) return;
   S.apoyo = { logro };
   await apoyoGuardar({ proxima: ahora + APOYO.DIAS * DIA });   // contado como mostrado: no vuelve a salir en 3 semanas
   render(); if (S.mon) renderMonitor();
@@ -28,7 +29,7 @@ function apoyoHTML() {
 
 // Mensaje personal, una sola vez, en las novedades de la versión que lo lleve ("apoyo": true en novedades.json)
 function apoyoMensajeHTML() {
-  if (apoyoDatos().hecho) return '';
+  if (apoyoDono()) return '';
   return `<div class="apoyo-card mensaje"><div class="grow"><b>${L('Un mensaje de Retropunk94', 'A message from Retropunk94')}</b>
     <p>${L('Hago RetroLimpia solo. Es gratis, sin anuncios y sin vender tus datos, y quiero que siga así. Pero ahora mismo casi nadie lo apoya, y sin apoyo no voy a poder seguir dedicándole el tiempo que necesita. Si quieres que RetroLimpia siga mejorando, este es el momento de echar una mano.', 'I make RetroLimpia on my own. It is free, with no ads and no selling your data, and I want to keep it that way. But right now almost nobody supports it, and without support I will not be able to keep giving it the time it needs. If you want RetroLimpia to keep improving, now is the time to lend a hand.')}</p></div>
     <div class="apoyo-btns"><button class="btn primary small" data-act="apoyoSi">💜 ${L('Apoyar el proyecto', 'Support the project')}</button><button class="link" data-act="apoyoHecho">${L('Ya doné ❤', 'I already donated ❤')}</button></div></div>`;
@@ -37,9 +38,10 @@ function apoyoMensajeHTML() {
 async function apoyoAccion(act) {
   if (act === 'apoyoSi') { S.apoyo = null; render(); if (S.mon) renderMonitor(); return showDonate(); }
   if (act === 'apoyoHecho') {
-    await apoyoGuardar({ hecho: true }); S.apoyo = null;
+    const hasta = Date.now() + APOYO.DIAS_DONO * DIA;
+    await apoyoGuardar({ hechoHasta: hasta, proxima: hasta, tardes: 0 }); S.apoyo = null;
     $('#modal').classList.add('hidden');
-    toast(L('¡Gracias de corazón! No te lo volveré a pedir 💜', 'Thank you from the heart! I will not ask again 💜'));
+    toast(L('¡Gracias de corazón! No te lo volveré a pedir en los próximos meses 💜', 'Thank you from the heart! I will not ask again for the next months 💜'));
   } else if (act === 'apoyoTarde') {
     const tardes = (apoyoDatos().tardes || 0) + 1;
     await apoyoGuardar({ tardes, proxima: Date.now() + (tardes >= 3 ? APOYO.DIAS_LEJOS : APOYO.DIAS) * DIA });
